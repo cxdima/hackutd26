@@ -67,15 +67,28 @@ import { SiteHeader } from './site-header';
       letter-spacing: -0.035em;
       text-wrap: balance;
     }
-    .hero-art-mask {
-      -webkit-mask-image:
-        linear-gradient(to right, transparent 0, #000 32%),
-        linear-gradient(to bottom, transparent 0, #000 5%, #000 78%, transparent 100%);
-      -webkit-mask-composite: source-in;
-      mask-image:
-        linear-gradient(to right, transparent 0, #000 32%),
-        linear-gradient(to bottom, transparent 0, #000 5%, #000 78%, transparent 100%);
-      mask-composite: intersect;
+    .hero-scrim {
+      background:
+        linear-gradient(180deg, rgb(16 20 17 / 0.55) 0%, rgb(16 20 17 / 0) 14%),
+        linear-gradient(
+          90deg,
+          rgb(16 20 17 / 0.72) 0%,
+          rgb(16 20 17 / 0.55) 30%,
+          rgb(16 20 17 / 0.12) 56%,
+          rgb(16 20 17 / 0) 70%
+        ),
+        linear-gradient(180deg, rgb(16 20 17 / 0) 78%, rgb(16 20 17 / 0.55) 100%);
+    }
+    @media (max-width: 767px) {
+      .hero-scrim {
+        background: linear-gradient(
+          180deg,
+          rgb(23 28 24 / 1) 0%,
+          rgb(23 28 24 / 0) 28%,
+          rgb(23 28 24 / 0) 70%,
+          rgb(16 20 17 / 0.75) 100%
+        );
+      }
     }
     .hero-mark {
       background-image: linear-gradient(var(--color-lime), var(--color-lime));
@@ -88,6 +101,16 @@ import { SiteHeader } from './site-header';
 })
 export class LandingPage {
   readonly motion = inject(Motion);
+  readonly heroVideo: VideoSource = {
+    mp4: 'media/ringo-studio-loop.mp4',
+    webm: 'media/ringo-studio-loop.webm',
+    poster: 'media/ringo-studio-poster.jpg',
+  };
+  readonly heroVideoNarrow: VideoSource = {
+    mp4: 'media/ringo-studio-loop-portrait.mp4',
+    webm: 'media/ringo-studio-loop-portrait.webm',
+    poster: 'media/ringo-studio-portrait-900.webp',
+  };
   readonly heroPoints = [
     { icon: 'shield', text: 'Never shares codes, PINs or SSNs' },
     { icon: 'rules', text: 'Nemotron proposes; fixed rules decide' },
@@ -190,35 +213,19 @@ export class LandingPage {
     const root = this.root().nativeElement;
     this.context = gsap.context(() => {
       // Entrance: only decorative layers move; headline and copy are readable from the first paint.
-      gsap.from('[data-hero-art]', { autoAlpha: 0, scale: 0.97, duration: 1.2, ease: 'expo.out' });
-      gsap.from('[data-hero-ring]', {
-        scale: 0.6,
-        autoAlpha: 0,
-        duration: 1.4,
+      gsap.from('[data-hero-art]', { autoAlpha: 0, duration: 1.4, ease: 'expo.out' });
+      gsap.from('[data-hero-caption]', {
+        yPercent: 100,
+        duration: 1,
         ease: 'expo.out',
-        stagger: 0.12,
-        delay: 0.25,
+        delay: 0.5,
       });
-      gsap.from('[data-hero-caption]', { y: 28, duration: 1, ease: 'expo.out', delay: 0.45 });
-      gsap.fromTo(
-        '[data-hero-ring-pulse]',
-        { scale: 1, opacity: 0.6 },
-        {
-          scale: 1.5,
-          opacity: 0,
-          duration: 2.6,
-          ease: 'sine.out',
-          repeat: 1,
-          stagger: 1.3,
-          delay: 0.8,
-        },
-      );
-
-      // Depth: separately prepared layers drift at different rates while the hero scrolls away.
-      const depth = { trigger: '[data-hero]', start: 'top top', end: 'bottom top', scrub: 0.6 };
-      gsap.to('[data-hero-art]', { yPercent: 8, ease: 'none', scrollTrigger: depth });
-      gsap.to('[data-hero-rings]', { yPercent: 16, ease: 'none', scrollTrigger: depth });
-      gsap.to('[data-hero-caption]', { yPercent: -22, ease: 'none', scrollTrigger: depth });
+      // Depth: the studio drifts slower than the page as the hero scrolls away.
+      gsap.to('[data-hero-art]', {
+        yPercent: 12,
+        ease: 'none',
+        scrollTrigger: { trigger: '[data-hero]', start: 'top top', end: 'bottom top', scrub: 0.6 },
+      });
 
       // Ring transition: one protective ring opens into the shared community rings.
       const bridge = gsap.timeline({

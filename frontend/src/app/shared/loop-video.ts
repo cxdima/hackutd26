@@ -116,6 +116,9 @@ export class LoopVideo {
       const shouldPlay = this.wantsPlay() && this.visible();
       if (shouldPlay) {
         if (element.preload === 'none') element.preload = 'auto';
+        // The static muted attribute only sets defaultMuted on script-created elements;
+        // browsers block autoplay unless the muted property itself is true.
+        element.muted = true;
         element.play().then(
           () => this.playing.set(true),
           () => this.playing.set(false),

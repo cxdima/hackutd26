@@ -3,106 +3,41 @@
   <app-site-header />
 
   <main id="main">
-    <!-- HERO -->
-    <section id="top" data-hero class="relative isolate" aria-labelledby="hero-heading">
-      <!-- Wide art: a 16:9 stage anchored right; its empty left half sits behind the copy. -->
+    <!-- HERO: a full-bleed night studio. Ringo's loop plays behind the copy; a scrim keeps text AA. -->
+    <section
+      id="top"
+      data-hero
+      class="on-ink relative isolate -mt-[calc(4.5rem+1px)] overflow-hidden bg-ink text-paper md:h-[100svh] md:min-h-[38rem]"
+      aria-labelledby="hero-heading"
+    >
       <div
-        class="pointer-events-none absolute right-0 top-0 hidden aspect-video h-[min(50vw,calc(100svh-4.5rem),58rem)] lg:block"
-        aria-hidden="true"
+        data-hero-art
+        class="absolute inset-x-0 bottom-0 -z-10 h-[108vw] max-h-[46rem] md:inset-0 md:h-auto md:max-h-none"
       >
-        <div data-hero-art class="hero-art-mask h-full w-full">
-          <picture>
-            <source
-              type="image/avif"
-              srcset="media/ringo-hero-v2-1920.avif 1920w, media/ringo-hero-v2-2688.avif 2688w"
-              sizes="100vw"
-            />
-            <img
-              src="media/ringo-hero-v2-1920.webp"
-              srcset="
-                media/ringo-hero-v2-1280.webp 1280w,
-                media/ringo-hero-v2-1920.webp 1920w,
-                media/ringo-hero-v2-2688.webp 2688w
-              "
-              sizes="100vw"
-              width="2688"
-              height="1520"
-              alt=""
-              fetchpriority="high"
-              class="absolute inset-0 h-full w-full object-cover"
-            />
-          </picture>
-        </div>
-        <!-- Broadcast rings radiate left from Ringo's ring toward the headline. -->
-        <svg
-          data-hero-rings
-          viewBox="0 0 1600 900"
-          class="absolute inset-0 h-full w-full overflow-visible"
-        >
-          <g fill="none" stroke-linecap="round" transform="translate(-112 -9)">
-            <path
-              data-hero-ring
-              d="M1109.1 378.5 A 165 165 0 0 0 1109.1 543.5"
-              stroke="#76b900"
-              stroke-width="5"
-              opacity="0.85"
-            />
-            <path
-              data-hero-ring
-              d="M1052.8 346 A 230 230 0 0 0 1052.8 576"
-              stroke="#76b900"
-              stroke-width="4"
-              opacity="0.55"
-            />
-            <path
-              data-hero-ring
-              d="M1076.8 313.7 A 230 230 0 0 0 1052.8 346"
-              stroke="#e20074"
-              stroke-width="4"
-              opacity="0.8"
-            />
-            <path
-              data-hero-ring
-              d="M996.5 313.5 A 295 295 0 0 0 996.5 608.5"
-              stroke="#76b900"
-              stroke-width="3"
-              opacity="0.32"
-            />
-            <circle
-              data-hero-ring-pulse
-              cx="1252"
-              cy="461"
-              r="111"
-              stroke="#76b900"
-              stroke-width="3"
-              opacity="0"
-              style="transform-box: fill-box; transform-origin: center"
-            />
-            <circle
-              data-hero-ring-pulse
-              cx="1252"
-              cy="461"
-              r="111"
-              stroke="#76b900"
-              stroke-width="3"
-              opacity="0"
-              style="transform-box: fill-box; transform-origin: center"
-            />
-          </g>
-        </svg>
+        <app-loop-video
+          class="absolute inset-0"
+          [wide]="heroVideo"
+          [narrow]="heroVideoNarrow"
+          narrowQuery="(max-width: 767px)"
+          [eager]="true"
+          label="hero animation"
+          videoClass="brightness-[1.22] object-[50%_100%] md:object-[66%_50%] lg:object-[80%_50%]"
+          controlClass="top-4 right-4 md:top-auto md:bottom-24 md:right-6 lg:bottom-28 lg:right-10"
+        />
+        <div class="hero-scrim pointer-events-none absolute inset-0" aria-hidden="true"></div>
       </div>
 
-      <div
-        class="relative mx-auto grid max-w-[86rem] px-4 sm:px-6 lg:min-h-[min(50vw,calc(100svh-4.5rem),58rem)] lg:grid-cols-12 lg:items-center lg:px-10"
-      >
-        <div class="relative z-10 pt-10 pb-8 sm:pt-14 lg:col-span-6 lg:py-20">
+      <div class="mx-auto flex h-full max-w-[86rem] flex-col px-4 pt-[4.5rem] sm:px-6 lg:px-10">
+        <div
+          class="relative z-10 max-w-[44rem] pt-12 pb-[112vw] sm:pt-16 md:my-auto md:pb-28 md:pt-20"
+        >
           <h1 id="hero-heading" class="hero-title font-extrabold">
-            <span class="lg:block lg:whitespace-nowrap">Kind to every caller.</span>
-            <span class="block lg:whitespace-nowrap"
+            <span class="md:block md:whitespace-nowrap">Kind to every caller.</span>
+            <span class="block md:whitespace-nowrap"
               >Firm about <span class="hero-mark">codes.</span></span
             >
           </h1>
-          <p class="mt-6 max-w-[38ch] text-lede text-ink-3">
+          <p class="mt-6 max-w-[36ch] text-lede text-paper/85">
             FirstRing answers your calls first. It takes messages, rings you privately if you’d like
             to talk, and ends any call asking for a code, password or gift card.
           </p>
@@ -110,23 +45,25 @@
             <a class="btn btn-primary !min-h-14 !px-7 text-[1.125rem]" href="#example">
               See a screened call <svg lucideArrowDown [size]="19" aria-hidden="true"></svg>
             </a>
-            <a class="btn btn-secondary !min-h-14 !px-7 text-[1.125rem]" routerLink="/console">
+            <a class="btn btn-quiet !min-h-14 !px-7 text-[1.125rem]" routerLink="/console">
               Open the live dashboard
               <svg lucideArrowRight [size]="19" aria-hidden="true"></svg>
             </a>
           </div>
           <ul
-            class="mt-10 grid max-w-[40rem] gap-x-6 gap-y-3 border-t-2 border-ink pt-5 sm:grid-cols-3"
+            class="mt-10 grid max-w-[40rem] gap-x-6 gap-y-3 border-t border-white/20 pt-5 sm:grid-cols-3"
             aria-label="What FirstRing guarantees"
           >
             @for (point of heroPoints; track point.text) {
-              <li class="flex items-start gap-2.5 text-[1rem] font-semibold leading-snug">
+              <li
+                class="flex items-start gap-2.5 text-[1rem] font-semibold leading-snug text-paper/90"
+              >
                 @switch (point.icon) {
                   @case ('shield') {
                     <svg
                       lucideShieldCheck
                       [size]="19"
-                      class="mt-0.5 shrink-0 text-lime-ink"
+                      class="mt-0.5 shrink-0 text-lime"
                       aria-hidden="true"
                     ></svg>
                   }
@@ -134,7 +71,7 @@
                     <svg
                       lucideCode
                       [size]="19"
-                      class="mt-0.5 shrink-0 text-lime-ink"
+                      class="mt-0.5 shrink-0 text-lime"
                       aria-hidden="true"
                     ></svg>
                   }
@@ -142,7 +79,7 @@
                     <svg
                       lucideCheck
                       [size]="19"
-                      class="mt-0.5 shrink-0 text-lime-ink"
+                      class="mt-0.5 shrink-0 text-lime"
                       aria-hidden="true"
                     ></svg>
                   }
@@ -152,63 +89,34 @@
             }
           </ul>
         </div>
-
-        <!-- Narrow art: a square crop of the same still, copy above it. -->
-        <div
-          class="relative -mx-4 sm:mx-auto sm:w-full sm:max-w-[36rem] lg:hidden"
-          aria-hidden="true"
-        >
-          <div class="hero-mask-narrow relative aspect-square">
-            <img
-              src="media/ringo-hero-v2-square-720.webp"
-              srcset="
-                media/ringo-hero-v2-square-720.webp   720w,
-                media/ringo-hero-v2-square-1080.webp 1080w
-              "
-              sizes="(max-width: 640px) 100vw, 36rem"
-              width="1080"
-              height="1080"
-              alt=""
-              class="absolute inset-0 h-full w-full object-cover"
-            />
-          </div>
-        </div>
-
-        <!-- Lower-third: one screened call, overlapping the art's lower left on desktop. -->
-        <figure
-          data-hero-caption
-          class="relative z-20 -mt-16 mb-10 w-full max-w-[27rem] justify-self-center overflow-hidden rounded-[var(--radius-band)] shadow-[var(--shadow-lift)] sm:-mt-20 lg:absolute lg:bottom-[9%] lg:left-[49%] lg:mt-0 lg:mb-0 lg:w-[min(26rem,28vw)]"
-          aria-label="Example of a screened call"
-        >
-          <div class="flex items-center justify-between bg-lime px-4 py-2">
-            <span class="text-[0.8125rem] font-extrabold uppercase tracking-[0.08em]"
-              >Screened call</span
-            >
-            <span class="text-[0.8125rem] font-extrabold uppercase tracking-[0.08em]">Example</span>
-          </div>
-          <div class="caption-band on-ink !rounded-none px-4 py-4">
-            <p class="text-[1.0625rem] leading-snug">
-              <span class="caption-speaker mr-1.5">&gt;&gt; Caller</span>“Read me the code we
-              texted.”
-            </p>
-            <p class="mt-2 text-[1.0625rem] leading-snug">
-              <span class="caption-speaker mr-1.5 !text-lime">&gt;&gt; FirstRing</span>“I can’t
-              share that. Goodbye.”
-            </p>
-            <p
-              class="mt-3 flex items-start gap-2.5 border-t border-white/12 pt-3 text-[1rem] font-semibold leading-snug"
-            >
-              <svg
-                lucideShieldCheck
-                [size]="19"
-                class="mt-0.5 shrink-0 text-lime"
-                aria-hidden="true"
-              ></svg>
-              Declined, and a note is saved for the family.
-            </p>
-          </div>
-        </figure>
       </div>
+
+      <!-- Lower third: one screened call, set like a broadcast caption bar. -->
+      <figure
+        data-hero-caption
+        class="absolute inset-x-0 bottom-0 z-10 border-t border-white/10 bg-ink/88 backdrop-blur-[2px]"
+        aria-label="Example of a screened call"
+      >
+        <div
+          class="mx-auto flex max-w-[86rem] flex-col gap-x-6 gap-y-1.5 px-4 py-3.5 sm:px-6 md:flex-row md:items-center lg:px-10"
+        >
+          <span
+            class="w-fit shrink-0 rounded-[0.4rem] bg-lime px-2.5 py-1 text-[0.8125rem] font-extrabold uppercase tracking-[0.08em] text-ink"
+            >Screened call</span
+          >
+          <p class="text-[1rem] leading-snug md:text-[1.0625rem]">
+            <span class="caption-speaker mr-1.5">&gt;&gt; Caller</span>“Read me the code we texted.”
+          </p>
+          <p class="text-[1rem] leading-snug md:text-[1.0625rem]">
+            <span class="caption-speaker mr-1.5 !text-lime">&gt;&gt; FirstRing</span>“I can’t share
+            that. Goodbye.”
+          </p>
+          <p class="flex items-center gap-2 text-[0.95rem] font-semibold text-paper/75 md:ml-auto">
+            <svg lucideShieldCheck [size]="17" class="shrink-0 text-lime" aria-hidden="true"></svg>
+            Declined. A note is saved for the family.
+          </p>
+        </div>
+      </figure>
     </section>
 
     <!-- WHY IT MATTERS -->

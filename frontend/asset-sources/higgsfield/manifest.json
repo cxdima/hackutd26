@@ -233,6 +233,43 @@
    "dimensions": "2688x1520",
    "used": true,
    "replaces": "hero/hero-desktop-2k.png and the hero motion loop (the earlier pose showed an extra flipper)"
+  },
+  {
+   "index": 11,
+   "job_id": "5ceb69d1-20c2-412e-b6bf-ceead8033bdd",
+   "purpose": "Hero v3 still: the corrected Ringo re-lit in a night broadcast studio (lime rim light, glowing ring, faint broadcast ripples); first and last frame of the hero loop",
+   "model": "gpt_image_2_6",
+   "settings": {
+    "quality": "high",
+    "resolution": "2k",
+    "aspect_ratio": "16:9",
+    "reference": "ce2e0a3c-5168-436b-9f19-54d7ef5fe4dd"
+   },
+   "source": "hero-v3/studio-a.png",
+   "dimensions": "2688x1520",
+   "used": true
+  },
+  {
+   "index": 12,
+   "job_id": "23d597ba-abf5-4251-a99e-a11fd967ebce",
+   "purpose": "Hero v3 seamless loop (start frame = end frame = studio still): breathing, a blink, the ring pulsing, ripples drifting",
+   "model": "minimax_h3",
+   "settings": {
+    "resolution": "2K",
+    "duration": 6,
+    "aspect_ratio": "16:9"
+   },
+   "source": "hero-v3/studio-loop-minimax.mp4",
+   "dimensions": "2560x1440, 24 fps, 6.58 s",
+   "quoted_credits": 12,
+   "used": true,
+   "verification": "Frames 0, 1.5, 3, 4.5 and 5.9 s inspected: four flippers throughout, ring design stable, first and last frames match.",
+   "shipping": [
+    "public/media/ringo-studio-loop.{mp4,webm}",
+    "public/media/ringo-studio-loop-portrait.{mp4,webm}",
+    "public/media/ringo-studio-poster.jpg",
+    "public/media/ringo-studio-portrait-900.webp"
+   ]
   }
  ],
  "balance_after_credits": 240.5,

@@ -8,15 +8,16 @@ import { Wordmark } from '../shared/wordmark';
   imports: [RouterLink, Wordmark, LucideMenu, LucideX, LucideArrowRight],
   template: `
     <header
-      class="sticky top-0 z-40 border-b border-transparent bg-paper transition-[border-color] duration-300"
-      [class.!border-rule]="scrolled()"
+      class="on-ink sticky top-0 z-40 border-b border-transparent text-paper transition-[background-color,border-color] duration-300"
+      [class.bg-ink]="scrolled() || open()"
+      [class.!border-white/10]="scrolled()"
     >
       <nav
         class="mx-auto flex h-[4.5rem] max-w-[86rem] items-center justify-between gap-6 px-4 sm:px-6 lg:px-10"
         aria-label="Main"
       >
         <a routerLink="/" fragment="top" class="rounded-lg" aria-label="FirstRing home"
-          ><app-wordmark
+          ><app-wordmark [inverse]="true"
         /></a>
         <ul class="hidden items-center gap-1 whitespace-nowrap lg:flex">
           @for (link of links; track link.href) {
@@ -24,13 +25,13 @@ import { Wordmark } from '../shared/wordmark';
               <a
                 [href]="'#' + link.href"
                 (click)="go($event, link.href)"
-                class="rounded-full px-4 py-2.5 text-[1.0625rem] font-semibold text-ink-3 no-underline transition-colors hover:bg-paper-3 hover:text-ink"
+                class="rounded-full px-4 py-2.5 text-[1.0625rem] font-semibold text-paper/80 no-underline transition-colors hover:bg-white/10 hover:text-paper"
                 >{{ link.label }}</a
               >
             </li>
           }
           <li class="ml-3">
-            <a routerLink="/console" class="btn btn-ink !min-h-12 !px-5"
+            <a routerLink="/console" class="btn btn-primary !min-h-12 !px-5"
               >Open dashboard <svg lucideArrowRight [size]="18" aria-hidden="true"></svg
             ></a>
           </li>
@@ -51,14 +52,14 @@ import { Wordmark } from '../shared/wordmark';
         </button>
       </nav>
       @if (open()) {
-        <div id="mobile-menu" class="border-t border-rule bg-paper px-4 pb-6 pt-2 lg:hidden">
+        <div id="mobile-menu" class="border-t border-white/10 bg-ink px-4 pb-6 pt-2 lg:hidden">
           <ul class="flex flex-col">
             @for (link of links; track link.href) {
               <li>
                 <a
                   [href]="'#' + link.href"
                   (click)="go($event, link.href)"
-                  class="flex min-h-14 items-center border-b border-paper-3 text-[1.25rem] font-bold text-ink no-underline"
+                  class="flex min-h-14 items-center border-b border-white/10 text-[1.25rem] font-bold text-paper no-underline"
                   >{{ link.label }}</a
                 >
               </li>
@@ -66,7 +67,7 @@ import { Wordmark } from '../shared/wordmark';
           </ul>
           <a
             routerLink="/console"
-            class="btn btn-ink mt-5 w-full !min-h-14 text-[1.15rem]"
+            class="btn btn-primary mt-5 w-full !min-h-14 text-[1.15rem]"
             (click)="open.set(false)"
             >Open dashboard</a
           >
