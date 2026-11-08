@@ -15,3 +15,6 @@ target/
 .playwright-cli/
 test-results/
 web/playwright-report/
+
+# Angular-generated local build cache (frontend source is owned in its worktree).
+.angular/

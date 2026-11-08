@@ -1,0 +1,42 @@
+{
+  "kind": "bounded_synthetic_native_decoder_diagnostic",
+  "recorded_at": "2026-11-08T13:49:33.383133+00:00",
+  "production_gate": false,
+  "request_timeout_ms": 15000,
+  "max_tokens": 512,
+  "request_sha256": "944c1a15fec944089655ea6fb6267e8416eefdfdca27ff6616038d03c7a2fa77",
+  "instrumentation": "return_token_ids; only count special tokens, no hidden reasoning retained",
+  "source": "production-brev-baseline initial_request",
+  "case_index": 0,
+  "phone_calls": 0,
+  "http_status": 200,
+  "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "finish_reason": "stop",
+  "stop_reason": 15,
+  "usage": {
+    "prompt_tokens": 4207,
+    "total_tokens": 4478,
+    "completion_tokens": 271,
+    "prompt_tokens_details": null
+  },
+  "native_tool_calls": [
+    {
+      "id": "chatcmpl-tool-b88a4d315ff84dc0",
+      "type": "function",
+      "function": {
+        "name": "record_assessment",
+        "arguments": "{\"evidence_refs\": [{\"quote\": \"Hi. I'm Alex, Sarah's son. I'm calling about picking me up.\", \"turn_id\": \"716b3f16-0147-4638-b022-af66e2534a94\"}], \"observation\": {\"direction\": \"caller_supplies\", \"requested_object\": \"routine_information\", \"speech_act\": \"statement\"}, \"understanding\": {\"claimed_identity\": \"Alex, Sarah's son\", \"missing_information\": [\"who needs to be picked up and when\"], \"purpose\": \"arrange pickup for Alex\", \"readiness\": \"needs_information\", \"requested_action\": \"Alex to be picked up\", \"supplied_facts\": [{\"quote\": \"Hi. I'm Alex, Sarah's son. I'm calling about picking me up.\", \"turn_id\": \"716b3f16-0147-4638-b022-af66e2534a94\"}], \"version\": 1}}"
+      }
+    }
+  ],
+  "content_chars": 0,
+  "reasoning_chars": 0,
+  "special_token_counts": {
+    "2": 0,
+    "11": 0,
+    "14": 0,
+    "15": 1
+  },
+  "generated_token_count": 271,
+  "elapsed_ms": 1665
+}

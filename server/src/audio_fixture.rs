@@ -174,6 +174,7 @@ fn scenario_clips(id: &str) -> anyhow::Result<&'static [usize]> {
         "family_pickup_benign_george" => &[9, 10],
         "family_pickup_risky_george" => &[9, 11],
         "exact_appointment_george" => &[12],
+        "armed_handoff_e2e_george" => &[7, 12],
         "maya_appointment_george" => &[13],
         "appointment_correction_george" => &[12, 14],
         "model_failure_recovery_george" => &[12, 15],
@@ -307,6 +308,17 @@ struct ModelFailureInjection {
     reserved_at: String,
 }
 
+#[derive(Clone, Default, Serialize, Deserialize)]
+struct HandoffProbe {
+    finished: bool,
+    bridge_confirmed: bool,
+    test_sentence_requested: bool,
+    remote_audio_asr_captured: bool,
+    // Neither conference state nor machine ASR establishes human listening.
+    human_b_listening_confirmed: bool,
+    bidirectional_audio_verified: bool,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Run {
     pub leg: Leg,
@@ -326,6 +338,8 @@ pub struct Run {
     correction: Option<ScriptedCorrection>,
     #[serde(default)]
     model_failure_injection: Option<ModelFailureInjection>,
+    #[serde(default)]
+    handoff_probe: Option<HandoffProbe>,
     capability: String,
     next_step: u8,
     replies: BTreeMap<u8, String>,
@@ -472,6 +486,7 @@ impl Run {
             started_at: chrono::Utc::now().timestamp(),
             correction: None,
             model_failure_injection: None,
+            handoff_probe: None,
             capability: format!(
                 "{}{}",
                 uuid::Uuid::new_v4().simple(),
@@ -487,6 +502,126 @@ impl Run {
             recording_duration_seconds: None,
             provider_error_code: None,
         }
+    }
+    fn respond_handoff(
+        &mut self,
+        base: &str,
+        sid: &str,
+        step: u8,
+        speech: &str,
+        confidence: &str,
+        bridge_connected: bool,
+    ) -> anyhow::Result<String> {
+        anyhow::ensure!(
+            self.scenario_id == "armed_handoff_e2e_george",
+            "Not an armed handoff scenario"
+        );
+        anyhow::ensure!(
+            !self.loop_detected
+                && twilio::valid_call_sid(sid)
+                && self
+                    .leg
+                    .call_sid
+                    .as_deref()
+                    .is_none_or(|known| known == sid),
+            "Wrong or stopped fixture leg"
+        );
+        let now = chrono::Utc::now().timestamp();
+        let deadline = self.expires_at.min(self.started_at + 90);
+        if now >= deadline {
+            self.outcome = "handoff_wait_deadline_reached".into();
+            return Ok("<Response><Hangup/></Response>".into());
+        }
+        if let Some(reply) = self.replies.get(&step) {
+            return Ok(if self.inbound_ended {
+                "<Response><Hangup/></Response>".into()
+            } else {
+                reply.clone()
+            });
+        }
+        anyhow::ensure!(
+            step == self.next_step && step < 90,
+            "Out-of-order handoff fixture step"
+        );
+        self.leg.apply_status(sid, "in-progress")?;
+        let probe = self.handoff_probe.get_or_insert_with(HandoffProbe::default);
+        if probe.finished {
+            return Ok("<Response><Hangup/></Response>".into());
+        }
+        probe.bridge_confirmed |= bridge_connected;
+        let speech = speech.trim();
+        if step > 0 && !speech.is_empty() {
+            let phase = if probe.test_sentence_requested {
+                "after_scripted_bridge_test"
+            } else {
+                "before_scripted_bridge_test"
+            };
+            self.observations.push(json!({"step":step,"speech_result":speech.chars().take(2000).collect::<String>(),"confidence":confidence.parse::<f64>().ok(),"received_at":chrono::Utc::now().to_rfc3339(),"origin":"twilio_gather_audio_asr","phase":phase,"speaker":"unverified_remote_audio"}));
+        }
+        let mut play = None;
+        let done = if probe.test_sentence_requested {
+            probe.remote_audio_asr_captured = !speech.is_empty();
+            self.outcome = if speech.is_empty() {
+                "handoff_no_remote_audio_after_test"
+            } else {
+                "bridge_audio_observation_ungraded"
+            }
+            .into();
+            true
+        } else if self.inbound_ended || terminal(&self.leg.status) {
+            self.outcome = "defender_ended_before_bridge_test".into();
+            true
+        } else if step == 1 && speech.is_empty() {
+            self.outcome = "no_speech_result".into();
+            true
+        } else {
+            if step == 1 {
+                play = Some(0);
+                self.outcome = "awaiting_private_handoff_reply".into();
+            } else if step >= 2 && bridge_connected {
+                play = Some(1);
+                probe.test_sentence_requested = true;
+                self.outcome = "scripted_bridge_test_requested".into();
+            } else {
+                self.outcome = if step == 0 {
+                    "awaiting_greeting"
+                } else {
+                    "handoff_waiting_for_bridge"
+                }
+                .into();
+            }
+            false
+        };
+        let reply = if done {
+            probe.finished = true;
+            "<Response><Hangup/></Response>".into()
+        } else {
+            let play = play.map_or_else(String::new, |index| {
+                format!(
+                    "<Play>{}</Play>",
+                    twilio::escape(&format!("{base}/media/fixture/{}/{index}", self.capability))
+                )
+            });
+            let action = twilio::escape(&format!(
+                "{base}/voice/fixture/{}/{}",
+                self.leg.action_id,
+                step + 1
+            ));
+            let timeout = (deadline - now).clamp(
+                1,
+                if step < 2 || probe.test_sentence_requested {
+                    12
+                } else {
+                    5
+                },
+            );
+            format!(
+                "<Response><Gather input=\"speech\" language=\"en-US\" timeout=\"{timeout}\" speechTimeout=\"2\" actionOnEmptyResult=\"true\" action=\"{action}\" method=\"POST\">{play}</Gather><Hangup/></Response>"
+            )
+        };
+        self.next_step = step + 1;
+        self.replies.insert(step, reply.clone());
+        Ok(reply)
     }
     fn respond(
         &mut self,
@@ -590,7 +725,7 @@ impl Run {
         Ok(reply)
     }
     fn public(&self) -> Value {
-        json!({"scenario_id":self.scenario_id,"action_id":self.leg.action_id,"execution_mode":"live","data_origin":"synthetic","test_kind":"automated_audio_caller","destination":"owned_firstring_number_only","origin_route":if self.originating_e164.is_some(){"distinct_photon_line"}else{"legacy_same_line"},"voice":"George","clip_count":scenario_clips(&self.scenario_id).map_or(0,|clips|clips.len()),"time_limit_seconds":90,"provider_status":self.leg.status,"provider_error_code":self.provider_error_code,"call_sid_bound":self.leg.call_sid.is_some(),"inbound_bound":self.inbound_sid.is_some(),"inbound_ended":self.inbound_ended,"outcome":self.outcome,"next_step":self.next_step,"observations":self.observations,"partial_observations":self.partial_observations,"recording_available":self.recording_sid.is_some(),"recording_duration_seconds":self.recording_duration_seconds,"human_audition":false,"noise_tested":false,"verdict":"ungraded","scripted_correction":self.correction,"model_failure_injection":self.model_failure_injection})
+        json!({"scenario_id":self.scenario_id,"action_id":self.leg.action_id,"execution_mode":"live","data_origin":"synthetic","test_kind":"automated_audio_caller","destination":"owned_firstring_number_only","origin_route":if self.originating_e164.is_some(){"distinct_photon_line"}else{"legacy_same_line"},"voice":"George","clip_count":scenario_clips(&self.scenario_id).map_or(0,|clips|clips.len()),"time_limit_seconds":90,"provider_status":self.leg.status,"provider_error_code":self.provider_error_code,"call_sid_bound":self.leg.call_sid.is_some(),"inbound_bound":self.inbound_sid.is_some(),"inbound_ended":self.inbound_ended,"outcome":self.outcome,"next_step":self.next_step,"observations":self.observations,"partial_observations":self.partial_observations,"recording_available":self.recording_sid.is_some(),"recording_duration_seconds":self.recording_duration_seconds,"human_audition":false,"noise_tested":false,"verdict":"ungraded","scripted_correction":self.correction,"model_failure_injection":self.model_failure_injection,"handoff_probe":self.handoff_probe})
     }
 }
 
@@ -840,7 +975,8 @@ pub async fn view(app: &App) -> anyhow::Result<Value> {
         "maya_appointment_george",
         "appointment_correction_george",
         "model_failure_recovery_george",
-        "identity_human_decline_george"
+        "identity_human_decline_george",
+        "armed_handoff_e2e_george"
     ]);
     value["noise_supported"] = json!(false);
     value["intentional_interrupt_supported"] = json!(true);
@@ -999,6 +1135,12 @@ pub async fn start_request(
     }
     // Idempotent returns above keep old reservations valid even if the startup
     // origin changes. Only a new reservation requires the distinct designated line.
+    if scenario == "armed_handoff_e2e_george" {
+        anyhow::ensure!(
+            crate::phone_demo::awaiting_signed_inbound(&app.store, &app.config).await?,
+            "Arm the one private handoff for the next signed inbound before starting this fixture"
+        );
+    }
     let originating_e164 = app.twilio.fixture_origin()?.to_owned();
     for index in clips {
         clip(*index).await?;
@@ -1073,9 +1215,32 @@ pub async fn respond(
     speech: &str,
     confidence: &str,
 ) -> anyhow::Result<String> {
+    let current = load_action(&app.store, action).await?;
+    let handoff = current
+        .as_ref()
+        .is_some_and(|run| run.scenario_id == "armed_handoff_e2e_george");
+    let mut connected = false;
+    if handoff
+        && let Some(inbound) = current.as_ref().and_then(|run| run.inbound_sid.as_deref())
+        && let Ok(handle) = app.by_sid(inbound).await
+        && let Ok(snapshot) = handle.send(crate::calls::actor::Input::Snapshot).await
+    {
+        connected = snapshot["state"] == "connected" && snapshot["bridge_committed"] == true;
+    }
     change_action(&app.store, action, |run| {
         anyhow::ensure!(run.leg.action_id == action, "Wrong fixture action");
-        run.respond(&app.config.public_base_url, sid, step, speech, confidence)
+        if handoff {
+            run.respond_handoff(
+                &app.config.public_base_url,
+                sid,
+                step,
+                speech,
+                confidence,
+                connected,
+            )
+        } else {
+            run.respond(&app.config.public_base_url, sid, step, speech, confidence)
+        }
     })
     .await
 }
@@ -1959,6 +2124,85 @@ mod tests {
                 .is_none()
         );
         provider.abort();
+    }
+
+    #[test]
+    fn armed_handoff_waits_for_actual_bridge_then_requests_cached_test_once() {
+        let mut run = Run::new();
+        run.scenario_id = "armed_handoff_e2e_george".into();
+        let sid = "CA00000000000000000000000000000001";
+        let base = "https://fixture.example";
+        let greeting = run.respond_handoff(base, sid, 0, "", "", false).unwrap();
+        assert!(greeting.contains("<Gather"));
+        let opening = run
+            .respond_handoff(base, sid, 1, "Hello, what is the call about?", "0.9", false)
+            .unwrap();
+        assert!(opening.contains(&format!("/media/fixture/{}/0", run.capability)));
+        let pending = run
+            .respond_handoff(base, sid, 2, "I'm checking privately.", "0.9", false)
+            .unwrap();
+        assert!(!pending.contains("<Play>"));
+        assert!(pending.contains("<Gather"));
+        let empty = run.respond_handoff(base, sid, 3, "", "", false).unwrap();
+        assert!(empty.contains("<Gather"));
+        assert!(!empty.contains("<Play>"));
+        let bridge = run
+            .respond_handoff(base, sid, 4, "Hello, this is the recipient.", "0.9", true)
+            .unwrap();
+        assert!(bridge.contains(&format!("/media/fixture/{}/1", run.capability)));
+        assert_eq!(
+            run.respond_handoff(base, sid, 4, "duplicate", "", true)
+                .unwrap(),
+            bridge
+        );
+        let done = run
+            .respond_handoff(base, sid, 5, "I heard your appointment test.", "0.9", true)
+            .unwrap();
+        assert_eq!(done, "<Response><Hangup/></Response>");
+        assert_eq!(
+            run.public()["handoff_probe"]["test_sentence_requested"],
+            true
+        );
+        assert_eq!(
+            run.public()["handoff_probe"]["remote_audio_asr_captured"],
+            true
+        );
+        assert_eq!(
+            run.public()["handoff_probe"]["bidirectional_audio_verified"],
+            false
+        );
+        assert_eq!(
+            run.observations
+                .iter()
+                .filter(|value| value["phase"] == "after_scripted_bridge_test")
+                .count(),
+            1
+        );
+    }
+    #[test]
+    fn armed_handoff_wait_has_a_hard_deadline_and_no_room_for_wrong_leg() {
+        let mut run = Run::new();
+        run.scenario_id = "armed_handoff_e2e_george".into();
+        let sid = "CA00000000000000000000000000000001";
+        run.respond_handoff("https://fixture.example", sid, 0, "", "", false)
+            .unwrap();
+        assert!(
+            run.respond_handoff(
+                "https://fixture.example",
+                "CA00000000000000000000000000000002",
+                1,
+                "wrong",
+                "",
+                true
+            )
+            .is_err()
+        );
+        run.started_at = chrono::Utc::now().timestamp() - 91;
+        let ended = run
+            .respond_handoff("https://fixture.example", sid, 1, "", "", false)
+            .unwrap();
+        assert_eq!(ended, "<Response><Hangup/></Response>");
+        assert_eq!(run.outcome, "handoff_wait_deadline_reached");
     }
 
     #[tokio::test]

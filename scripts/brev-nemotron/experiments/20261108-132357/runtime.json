@@ -1,0 +1,73 @@
+{
+  "recorded_at_utc": "2026-11-08T13:48:29.306282+00:00",
+  "provider": "lambda-labs",
+  "type": "gpu_1x_h100_pcie",
+  "gpu_name": "NVIDIA H100 PCIe",
+  "gpu_memory_mib": 81559,
+  "host_driver": "570.148.08",
+  "pins": {
+    "packages": {
+      "vllm": "0.27.1",
+      "torch": "2.13.0+cu130",
+      "transformers": "5.15.0",
+      "xgrammar": "0.2.3"
+    },
+    "pinned_snapshot_present": true,
+    "safetensors_files": 52,
+    "chat_templates": {
+      "chat_template.jinja": "58933db77d3099b4f78c55a38347a72e1ea05b97d6bd8f38775303dc0194e0a9"
+    },
+    "tool_call_close_token_id": 15,
+    "config.json": {
+      "sha256": "f1d98b530846087dc08b574a219713a94f945bf6583dc7230a19ebf1e8c50933",
+      "eos_token_id": 2,
+      "bos_token_id": 1,
+      "model_type": "nemotron_h",
+      "architectures": [
+        "NemotronHForCausalLM"
+      ]
+    },
+    "generation_config.json": {
+      "sha256": "c67c90fcadf0e7ef78b663eb159664b36a35ffb9dd2523096e226e5c3d1b0e5f",
+      "eos_token_id": [
+        2,
+        11
+      ],
+      "bos_token_id": 1
+    },
+    "tokenizer_config.json": {
+      "sha256": "10f93eabcb9b1602fbb991d6308e787ce1df28ee9cd7a1c6d1e8c3f338b957bc",
+      "eos_token": "<|im_end|>"
+    },
+    "image": "vllm/vllm-openai@sha256:0a51ea5b4ae2dc5d81890e5173f54203d2a3ae0cfffe51b8fd2afd4391bfd967",
+    "recorded_at_utc": "2026-11-08T13:40:09.542323+00:00"
+  },
+  "resource_readiness": {
+    "recorded_at_utc": "2026-11-08T13:47:52.468537+00:00",
+    "resource_warmup_ready": true,
+    "native_protocol_passed": false,
+    "health_http": 200,
+    "authenticated_models_http": 200,
+    "unauthorized_models_http": 401,
+    "model_ids": [
+      "nvidia/nemotron-3.5-lightning-30b-a3b"
+    ],
+    "deadline_utc": "2026-11-08T19:30:00+00:00",
+    "remote_ready_marker": true
+  },
+  "native_protocol": "pending root-run fresh probe; no generation requests by deployment agent",
+  "telemetry": "private three-second GPU memory/utilization/process-count samples for five minutes after readiness",
+  "controls": {
+    "policy_version": 2,
+    "remote_guard": "active systemd timer, exact authenticated identity verified",
+    "remote_clock_synchronized": true,
+    "local_guard": "active watchdog plus caffeinate",
+    "connection_supervision": "maximum two repairs of the owned SSH forward; never restarts model",
+    "hard_cleanup_at_utc": "2026-11-08T19:30:00Z",
+    "max_spend_usd": 27,
+    "cleanup_allowance_usd": 2,
+    "estimate_compute_plus_cleanup_usd": 26.0861
+  },
+  "phone_calls": 0,
+  "inference_requests_by_deployment_agent": 0
+}

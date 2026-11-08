@@ -28,6 +28,8 @@ pub struct RequestObservation {
     pub native_argument_diagnostic: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_error_diagnostic: Option<Value>,
+    pub started_at: String,
+    pub completed_at: String,
     pub elapsed_ms: u128,
     pub outcome: String,
     pub error: Option<String>,
@@ -325,6 +327,7 @@ impl Nemotron {
         phase: ToolPhase,
     ) -> ObservedToolResponse {
         let start = Instant::now();
+        let started_at = chrono::Utc::now().to_rfc3339();
         let mut response_model = None;
         let mut finish_reason = None;
         let mut completion_tokens = None;
@@ -365,6 +368,8 @@ impl Nemotron {
                 reasoning_tokens: diagnostics.reasoning_tokens,
                 native_argument_diagnostic: diagnostics.native_argument,
                 provider_error_diagnostic: diagnostics.provider_error,
+                started_at,
+                completed_at: chrono::Utc::now().to_rfc3339(),
                 elapsed_ms: start.elapsed().as_millis(),
                 outcome: outcome.into(),
                 error,
@@ -401,35 +406,9 @@ impl Nemotron {
         self.next_tool_observed_for(messages, phase).await.result
     }
 
-    async fn request(
-        &self,
-        messages: &[Value],
-        phase: ToolPhase,
-        response_model: &mut Option<String>,
-        finish_reason: &mut Option<String>,
-        completion_tokens: &mut Option<u64>,
-        diagnostics: &mut ProbeDiagnostics,
-    ) -> Result<ModelToolCall> {
-        ensure!(
-            !self.api_key.trim().is_empty(),
-            "Nemotron API access pending: NVIDIA_API_KEY is missing"
-        );
-        let url = reqwest::Url::parse(&self.url)
-            .map_err(|_| anyhow!("invalid Nemotron endpoint configuration"))?;
-        ensure!(
-            url.username().is_empty() && url.password().is_none() && url.fragment().is_none(),
-            "invalid Nemotron endpoint configuration"
-        );
-        let local_http = url.scheme() == "http"
-            && matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"));
-        ensure!(
-            url.scheme() == "https" || local_http,
-            "Nemotron endpoint requires HTTPS"
-        );
-        ensure!(
-            !self.model.trim().is_empty(),
-            "Nemotron model configuration is missing"
-        );
+    /// The exact runtime wire body, also used by synthetic production-context diagnostics.
+    /// Contains no authentication or destination configuration.
+    pub fn request_payload(&self, messages: &[Value], phase: ToolPhase) -> Value {
         // Rust chooses the workflow phase. The model still supplies the actual
         // assessment and next action; unchanged schemas and actor checks apply.
         let schemas = tools::schemas();
@@ -481,6 +460,39 @@ impl Nemotron {
             payload["stop_token_ids"] = json!([15]);
             payload["include_stop_str_in_output"] = json!(true);
         }
+        payload
+    }
+
+    async fn request(
+        &self,
+        messages: &[Value],
+        phase: ToolPhase,
+        response_model: &mut Option<String>,
+        finish_reason: &mut Option<String>,
+        completion_tokens: &mut Option<u64>,
+        diagnostics: &mut ProbeDiagnostics,
+    ) -> Result<ModelToolCall> {
+        ensure!(
+            !self.api_key.trim().is_empty(),
+            "Nemotron API access pending: NVIDIA_API_KEY is missing"
+        );
+        let url = reqwest::Url::parse(&self.url)
+            .map_err(|_| anyhow!("invalid Nemotron endpoint configuration"))?;
+        ensure!(
+            url.username().is_empty() && url.password().is_none() && url.fragment().is_none(),
+            "invalid Nemotron endpoint configuration"
+        );
+        let local_http = url.scheme() == "http"
+            && matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"));
+        ensure!(
+            url.scheme() == "https" || local_http,
+            "Nemotron endpoint requires HTTPS"
+        );
+        ensure!(
+            !self.model.trim().is_empty(),
+            "Nemotron model configuration is missing"
+        );
+        let payload = self.request_payload(messages, phase);
         let mut response = self
             .client
             .post(url)

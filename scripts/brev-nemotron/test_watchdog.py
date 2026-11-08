@@ -277,6 +277,85 @@ class ExpiryTests(unittest.TestCase):
         modified = dict(receipt, campaign_started_at=1647, campaign_work_deadline=8847, deadline=10647)
         self.assertEqual(watchdog.safe_deadline(receipt, modified), 10547)
 
+    def budget_v2_receipt(self):
+        return dict(self.receipt(), budget_policy_version=2, total_budget_usd=60,
+                    prior_spend_usd=9.1, balance_usd=50.9, reserve_usd=0,
+                    max_spend_usd=17, cleanup_allowance_usd=2, deadline=19000,
+                    instance_id="owned-id")
+
+    def test_explicit_budget_v2_fits_five_hours_and_preserves_both_deadlines(self):
+        r = self.budget_v2_receipt()
+        self.assertEqual(watchdog.expiry(r), 2800)
+        self.assertTrue(remote_guard.cleanup_due(r, 2800, False))
+        r["ready"] = True
+        self.assertEqual(watchdog.expiry(r), 19000)
+        self.assertFalse(remote_guard.cleanup_due(r, 18999, True))
+        self.assertTrue(remote_guard.cleanup_due(r, 19000, True))
+
+    def test_v2_explicit_reserve_does_not_silently_relax_legacy_policy(self):
+        r = dict(self.budget_v2_receipt(), balance_usd=40, prior_spend_usd=20,
+                 max_spend_usd=5, deadline=4600, ready=True)
+        self.assertEqual(watchdog.expiry(r), 4600)
+        with self.assertRaises(ValueError):
+            watchdog.expiry(dict(self.receipt(), balance_usd=40, deadline=4600))
+
+    def test_v2_spend_includes_cleanup_actual_balance_reserve_and_prior_cost(self):
+        for changes in [dict(max_spend_usd=16.99), dict(balance_usd=16.99),
+                        dict(prior_spend_usd=43.01), dict(reserve_usd=34),
+                        dict(total_budget_usd=61), dict(cleanup_allowance_usd=1),
+                        dict(cleanup_allowance_usd=3), dict(hourly_usd=0),
+                        dict(max_spend_usd=0), dict(prior_spend_usd=60)]:
+            for validator in [watchdog.expiry, lambda r: remote_guard.cleanup_due(r, 1000, False)]:
+                with self.subTest(changes=changes, validator=validator), self.assertRaises(ValueError):
+                    validator(dict(self.budget_v2_receipt(), **changes))
+
+    def test_v2_eight_hour_boundary_and_thirty_minute_warmup_are_enforced(self):
+        r = dict(self.budget_v2_receipt(), deadline=29800, max_spend_usd=26, ready=True)
+        self.assertEqual(watchdog.expiry(r), 29800)
+        self.assertTrue(remote_guard.cleanup_due(r, 29800, True))
+        for changes in [dict(deadline=29801), dict(deadline=1000),
+                        dict(warmup_deadline=2801), dict(warmup_deadline=1000),
+                        dict(deadline=1500, warmup_deadline=2800)]:
+            for validator in [watchdog.expiry, lambda x: remote_guard.cleanup_due(x, 30000, True)]:
+                with self.subTest(changes=changes), self.assertRaises(ValueError):
+                    validator(dict(r, **changes))
+
+    def test_v2_rejects_invalid_numeric_fields_and_unknown_or_mixed_policy(self):
+        fields = ["created_at", "deadline", "warmup_deadline", "hourly_usd",
+                  "balance_usd", "max_spend_usd", "total_budget_usd",
+                  "prior_spend_usd", "reserve_usd", "cleanup_allowance_usd"]
+        for field in fields:
+            for invalid in [True, False, -1, float("nan"), float("inf"), "2", None]:
+                r = dict(self.budget_v2_receipt(), **{field: invalid})
+                for validator in [watchdog.expiry, lambda x: remote_guard.cleanup_due(x, 1000, False)]:
+                    with self.subTest(field=field, invalid=invalid), self.assertRaises(ValueError):
+                        validator(r)
+        for version in [None, True, False, 0, 1, 3, "2", 2.0]:
+            for validator in [watchdog.expiry, lambda x: remote_guard.cleanup_due(x, 1000, False)]:
+                with self.subTest(version=version), self.assertRaises(ValueError):
+                    # A legacy-compatible short duration must not hide a missing
+                    # policy-version check behind the older ninety-minute limit.
+                    validator(dict(self.budget_v2_receipt(), budget_policy_version=version,
+                                   deadline=4600, balance_usd=60, prior_spend_usd=0,
+                                   max_spend_usd=5))
+        for field in ["campaign_authorized", "campaign_started_at", "campaign_work_deadline"]:
+            for validator in [watchdog.expiry, lambda x: remote_guard.cleanup_due(x, 1000, False)]:
+                with self.subTest(mixed_field=field), self.assertRaises(ValueError):
+                    validator(dict(self.budget_v2_receipt(), **{field: True}))
+
+    def test_v2_missing_budget_fields_and_mutable_edits_keep_original_cutoff(self):
+        original = self.budget_v2_receipt()
+        for field in ["total_budget_usd", "prior_spend_usd", "reserve_usd", "cleanup_allowance_usd"]:
+            changed = dict(original); del changed[field]
+            for validator in [watchdog.expiry, lambda x: remote_guard.cleanup_due(x, 1000, False)]:
+                with self.subTest(missing=field), self.assertRaises(ValueError):
+                    validator(changed)
+        for field in ["budget_policy_version", "total_budget_usd", "prior_spend_usd",
+                      "reserve_usd", "cleanup_allowance_usd", "max_spend_usd", "balance_usd", "deadline"]:
+            changed = dict(original, ready=True); changed[field] += 1
+            self.assertEqual(watchdog.safe_deadline(original, changed), 2800)
+        self.assertEqual(watchdog.safe_deadline(original, dict(original, ready=True)), 19000)
+
 
 if __name__ == "__main__":
     unittest.main()

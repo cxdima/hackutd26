@@ -1,3 +1,13 @@
+## Post-campaign demo-readiness pass — Nov 8, 08:05 Central
+
+Checkpoint work preserves campaign `44ecc40`, the live database and all 19/26 automated reservations. Seven remain; Sarah's probe remains unused, recipient unenrolled, family disabled. Claude's Angular source worktree is untouched; its existing build has rendered successfully against an isolated Rust preview with authenticated state and no browser errors. `/console` and nested refreshes work; missing API/voice/media routes stay errors.
+
+Implemented durable, authenticated one-use phone-demo arming, a bridge-aware cached caller fixture, scoped SQLite number reputation with correction/expiry/audit, actual model-context lookup receipts, and separate current-deployment availability. Local checks: **357 Rust tests passed, 2 explicitly ignored**, fmt/Clippy/build passed; **33 cleanup/connection guard tests passed**. These are not new phone proofs.
+
+New Brev run `firstring-nemotron-20261108-132357`: Lambda H100 PCIe80GB, $3.948/hour with fixed1TiB included. Prior posted spend$8.88, posted balance$51.12; this run not yet settled. Maximum$27 including$2 cleanup allowance, independently guarded deletion **19:30UTC /13:30Central**. Actual Nemotron NVFP4 weights loaded, authenticated inventory and wrong-key rejection verified. Native protocol is **not yet promoted**: exact attempt19 reconstruction reproduced512-token truncation. Decoded native XML shows an unfinished nested understanding object followed by thousands of spaces; no closing delimiter, no accepted action. Increasing1024 hit the unchanged3.5s request timeout. A bounded whitespace-decoding experiment is underway; no phone attempts spent. Fresh NVIDIA-hosted fallback returned403 authorization failure, not a quota diagnosis.
+
+See [additive integration contracts](backend-integration.md) and `fixtures/results/2026-11-08-production-*.json`. The running8080 phone service remains the signed transport probe until a fresh complete native cycle and semantic checks pass.
+
 # Progress
 
 **Campaign finished.** Work ended Nov8 03:09:50Central /09:09:50UTC. Artifacts/database exported and all calls terminal. Exact H100 deletion was requested09:10:46UTC; authenticated404 plus zero-instance inventory verified09:13:19UTC, before the09:39:50deadline. Reported spend$8.88 ($2.60prior+$6.28current), remainingcredit$51.12, auto-rechargeoff; final billing settlement remains unverified. [Cleanup receipt](evidence/brev-cleanup-readback-2026-11-08-091319.json).
