@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="diagram.css">
+<script src="diagram.js"></script>
+<style>
+  .lane-head { position: absolute; z-index: 3; text-align: center; border-radius: 12px; padding: 10px 8px;
+               background: #1b211c; border: 1px solid #3a433c; }
+  .lane-head b { display: block; font-size: 14.5px; font-weight: 800; letter-spacing: -0.01em; }
+  .lane-head span { display: block; font-family: var(--mono); font-size: 11px; color: #8a938b; margin-top: 2px; }
+  .lane-head.ext { border-color: rgba(143, 211, 189, 0.5); }
+  .lane-head.ext b { color: #d3efe5; }
+  .lane-head.actor { border: 1.5px solid var(--lime); background: #1a2116; }
+  .lane-head.nv { border-color: rgba(118, 185, 0, 0.75); background: #18200f; }
+  .lane-head.nv b { color: #d6f2a8; }
+  .lifeline { position: absolute; width: 0; border-left: 1.5px dashed rgba(247, 247, 242, 0.14); z-index: 1; }
+  .lifeline.actor { border-left: 2px solid rgba(118, 185, 0, 0.45); }
+  .msg { position: absolute; z-index: 4; font-family: var(--mono); font-size: 12px; color: #dfe3dc; white-space: nowrap;
+         background: #121714; padding: 1px 6px; border-radius: 6px; transform: translateX(-50%); }
+  .msg.dim { color: #aeb6ac; }
+  .self { position: absolute; z-index: 4; font-family: var(--mono); font-size: 12px; white-space: nowrap; transform: translateX(-50%);
+          padding: 5px 10px; border-radius: 8px; background: #1b211c; border: 1px solid #3a433c; color: #dfe3dc; }
+  .self.policy { border-color: rgba(255, 116, 181, 0.7); color: #ffd0e6; background: #24161d; }
+  .self.lime { border-color: rgba(118, 185, 0, 0.6); color: #e4f7c2; background: #19200f; }
+  .phase { position: absolute; z-index: 2; left: 32px; right: 32px; height: 0; border-top: 1px solid #2a312b; }
+  .phase span { position: absolute; left: 0; top: -9px; background: #121714; padding-right: 10px;
+                font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--lime); }
+  .note { position: absolute; z-index: 4; font-family: var(--mono); font-size: 12px; color: #ffd0e6; text-align: center;
+          padding: 6px 10px; border-radius: 8px; border: 1px dashed rgba(255, 116, 181, 0.7); background: #1f151a; }
+</style>
+</head>
+<body>
+<div id="frame"></div>
+<script>
+const { mount, el, header, wire } = window.D;
+const W = 1080;
+const f = document.getElementById('frame');
+const ctx = mount(f, { width: W, height: 1400 });
+header(f, {
+  n: '01', label: 'Call lifecycle',
+  title: 'One call, end to end.',
+  sub: 'Every arrow is a real request, WebSocket frame or provider call in the code. Solid arrows start work; dashed arrows return results. Rust is the only participant that decides anything.',
+});
+
+const lanes = {
+  caller: { x: 92, name: 'Caller', sub: 'any phone', cls: 'ext' },
+  twilio: { x: 262, name: 'Photon → Twilio', sub: 'SIP · TwiML', cls: 'ext' },
+  relay: { x: 438, name: 'ConversationRelay', sub: 'STT · TTS', cls: 'ext' },
+  actor: { x: 640, name: 'Rust session actor', sub: 'one per call', cls: 'actor' },
+  model: { x: 846, name: 'Nemotron', sub: 'vLLM on Brev H100', cls: 'nv' },
+  store: { x: 1000, name: 'SQLite + SSE', sub: 'events · console', cls: '' },
+};
+const HY = 168, HH = 54;
+for (const [k, l] of Object.entries(lanes)) {
+  const w = k === 'store' ? 132 : 150;
+  el(f, `<b>${l.name}</b><span>${l.sub}</span>`, `left:${l.x - w / 2}px;top:${HY}px;width:${w}px`, `lane-head ${l.cls}`);
+}
+
+let y = HY + HH + 40;
+const ROW = 40;
+const rows = [];
+const phase = (label) => { rows.push({ phase: label, y }); y += 34; };
+const msg = (n, from, to, label, opt = {}) => { rows.push({ n, from, to, label, y, ...opt }); y += ROW; };
+const self = (n, at, label, cls = '') => { rows.push({ n, self: at, label, y, cls }); y += ROW + 4; };
+const note = (from, to, label) => { rows.push({ note: true, from, to, label, y }); y += ROW + 6; };
+
+phase('Connect');
+msg(1, 'caller', 'twilio', "dials the household's Photon number", { color: 'water' });
+msg(2, 'twilio', 'actor', 'POST /voice/incoming + X-Twilio-Signature', { color: 'water' });
+self(3, 'actor', 'validate HMAC over the configured URL · create Session · spawn actor');
+msg(4, 'actor', 'twilio', 'TwiML: Connect → ConversationRelay (session_token)', { color: 'paper', dashed: true });
+msg(5, 'twilio', 'relay', 'open media + wss://…/voice/relay', { color: 'water' });
+msg(6, 'relay', 'actor', 'setup (callSid, session_token) → bound to session', { color: 'water' });
+phase('Listen');
+msg(7, 'relay', 'caller', 'welcomeGreeting in the profile voice', { color: 'water', dashed: true });
+msg(8, 'caller', 'relay', 'speaks → Deepgram STT', { color: 'water' });
+msg(9, 'relay', 'actor', 'prompt (voicePrompt, last=true)', { color: 'water' });
+self(10, 'actor', 'commit_turn · turn_version++ · generation++ · revoke pending offer');
+phase('Decide');
+msg(11, 'actor', 'model', 'record_assessment (forced) + reputation context', { color: 'lime' });
+msg(12, 'model', 'actor', 'observation + literal evidence quote + understanding', { color: 'lime', dashed: true });
+self(13, 'actor', 'quote ⊂ caller turn? epoch current? risky? → next phase', 'policy');
+msg(14, 'actor', 'model', 'next step: ask_caller | take_message | end_call | …', { color: 'lime' });
+msg(15, 'model', 'actor', 'one native tool call', { color: 'lime', dashed: true });
+msg(16, 'actor', 'store', 'append events · persist session', { color: 'paper' });
+phase('Speak');
+msg(17, 'actor', 'relay', 'text frame (interruptible, preemptible)', { color: 'paper', dashed: true });
+msg(18, 'relay', 'caller', 'ElevenLabs speech', { color: 'water', dashed: true });
+note('caller', 'actor', 'caller talks over the reply → interrupt event → stale reply dropped, gate re-closes');
+phase('Close');
+msg(19, 'actor', 'relay', 'end → TwiML closing (Gather + cached Play) → Hangup', { color: 'paper' });
+self(20, 'store', 'SSE /api/events → console', 'lime');
+
+const bottom = y + 10;
+for (const [k, l] of Object.entries(lanes)) {
+  el(f, '', `left:${l.x}px;top:${HY + HH + 10}px;height:${bottom - HY - HH - 10}px`, `lifeline ${k === 'actor' ? 'actor' : ''}`);
+}
+
+for (const r of rows) {
+  if (r.phase) { el(f, `<span>${r.phase}</span>`, `top:${r.y + 10}px`, 'phase'); continue; }
+  if (r.note) {
+    const a = lanes[r.from].x - 60, b = lanes[r.to].x + 60;
+    el(f, r.label, `left:${a}px;top:${r.y + 4}px;width:${b - a}px`, 'note');
+    continue;
+  }
+  if (r.self) {
+    const x = lanes[r.self].x;
+    const chip = el(f, r.label, `left:${x}px;top:${r.y + 6}px`, `self ${r.cls}`);
+    if (r.self === 'store') { chip.style.transform = 'none'; chip.style.left = ''; chip.style.right = '32px'; }
+    const num = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const cx = r.self === 'store' ? x : x - chip.offsetWidth / 2 - 16;
+    num.innerHTML = `<circle cx="${cx}" cy="${r.y + 19}" r="10" fill="#121714" stroke="var(--c-paper)" stroke-width="1.5"/>
+      <text x="${cx}" y="${r.y + 23}" text-anchor="middle" font-family="Manrope" font-weight="800" font-size="11" fill="var(--c-paper)">${r.n}</text>`;
+    if (r.self === 'store') {
+      const cx2 = chip.getBoundingClientRect().left - f.getBoundingClientRect().left - 16;
+      num.querySelector('circle').setAttribute('cx', cx2); num.querySelector('text').setAttribute('x', cx2);
+    }
+    ctx.svg.appendChild(num);
+    continue;
+  }
+  const x1 = lanes[r.from].x, x2 = lanes[r.to].x, ay = r.y + 26;
+  const dir = Math.sign(x2 - x1);
+  wire(ctx, [[x1 + dir * 12, ay], [x2 - dir * 4, ay]], { color: r.color, dashed: r.dashed });
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.innerHTML = `<circle cx="${x1}" cy="${ay}" r="10" fill="#121714" stroke="var(--c-${r.color})" stroke-width="1.5"/>
+    <text x="${x1}" y="${ay + 4}" text-anchor="middle" font-family="Manrope" font-weight="800" font-size="11" fill="var(--c-${r.color})">${r.n}</text>`;
+  ctx.svg.appendChild(g);
+  el(f, r.label, `left:${(x1 + x2) / 2}px;top:${r.y}px`, `msg ${r.dashed ? 'dim' : ''}`);
+}
+
+const legendY = bottom + 14;
+el(f, `<div class="legend">
+  <span><span class="sw" style="border-color:var(--c-water)"></span>telephony / voice provider</span>
+  <span><span class="sw" style="border-color:var(--lime)"></span>Nemotron request</span>
+  <span><span class="sw" style="border-color:var(--c-paper);border-top-style:dashed"></span>result / reply</span>
+  <span><span class="sq" style="border-color:var(--c-magenta)"></span>policy check</span>
+  <span style="margin-left:auto" class="mono">server/src/calls · providers</span></div>`, `left:32px;right:32px;top:${legendY}px`);
+const h = legendY + 50;
+f.style.height = h + 'px';
+ctx.svg.setAttribute('height', h);
+</script>
+</body>
+</html>

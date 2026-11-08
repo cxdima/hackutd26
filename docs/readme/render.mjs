@@ -23,6 +23,7 @@ const targets = {
   voice: ['voice-pipeline.html', 'voice-pipeline.png', 1080],
   brev: ['brev-stack.html', 'brev-stack.png', 1080],
   console: ['console.html', 'console.webp', 1080],
+  lifecycle: ['lifecycle.html', 'lifecycle.png', 1080],
 };
 
 const wanted = process.argv.slice(2);

@@ -144,38 +144,7 @@ hackutd26/
 
 ### The call lifecycle
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant C as Caller
-    participant T as Photon SIP → Twilio
-    participant R as ConversationRelay<br/>(Deepgram · ElevenLabs)
-    participant A as Rust session actor
-    participant N as Nemotron (vLLM on Brev)
-    participant D as SQLite + SSE
-
-    C->>T: dials the household's Photon number
-    T->>A: POST /voice/incoming (X-Twilio-Signature)
-    A->>A: validate HMAC over configured URL, create Session, spawn actor
-    A-->>T: TwiML Connect → ConversationRelay (session_token)
-    T->>R: open media + wss://…/voice/relay
-    R->>A: setup event (callSid, session_token)
-    R-->>C: welcomeGreeting (profile voice)
-    C->>R: speaks
-    R->>A: prompt event (voicePrompt, last=true)
-    A->>A: commit_turn → turn_version++, generation++, revoke pending offer
-    A->>N: record_assessment (forced) + reputation context
-    N-->>A: tool call: observation + literal evidence quote + understanding
-    A->>A: quote ⊂ caller turn? epoch current? risky? → next phase
-    A->>N: next step (ask_caller | take_message | end_call | …)
-    N-->>A: tool call
-    A->>D: append events, persist session
-    A-->>R: text frame (interruptible, preemptible)
-    R-->>C: ElevenLabs speech
-    Note over C,R: caller talks over the reply → interrupt event → gate re-closes
-    A-->>R: end → TwiML closing (Gather + cached Play) → Hangup
-    D-->>D: SSE /api/events → console
-```
+<img src="docs/readme/lifecycle.png" width="100%" alt="Call lifecycle in five phases across six participants (caller, Photon to Twilio, ConversationRelay, Rust session actor, Nemotron on Brev, SQLite and SSE). Connect: dial, signed webhook, HMAC validation and actor spawn, TwiML Connect, Relay WebSocket setup. Listen: greeting, caller speech, prompt event, commit_turn. Decide: record_assessment to Nemotron, evidence-quoted result, Rust policy check, next-step tool call, events persisted. Speak: text frame, ElevenLabs speech, interruptions drop stale replies. Close: end, TwiML closing, SSE to the console.">
 
 <br>
 
