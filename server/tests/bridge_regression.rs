@@ -103,6 +103,7 @@ fn config() -> Config {
         family_enabled: false,
         max_call_seconds: 180,
         nvidia_key: String::new(),
+        model_backend: firstring::config::ModelBackend::NvidiaHosted,
         model_url: "https://integrate.api.nvidia.com/v1/chat/completions".into(),
         model: "nvidia/nemotron-3.5-lightning-30b-a3b".into(),
     }
@@ -139,7 +140,7 @@ async fn pending_actor() -> (App, Handle, String) {
     let assessment = tool(
         &h,
         "record_assessment",
-        json!({"observation":benign(),"evidence_refs":evidence}),
+        json!({"observation":benign(),"evidence_refs":evidence,"understanding":{"version":1,"claimed_identity":null,"purpose":"Share the clinic visit day","requested_action":"Pass along the Wednesday visit","supplied_facts":[{"text":"Wednesday","evidence_refs":evidence}],"missing_information":[],"readiness":"ready"}}),
     )
     .await;
     assert_eq!(assessment["ok"], true);

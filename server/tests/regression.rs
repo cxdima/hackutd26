@@ -42,6 +42,7 @@ fn config(database_url: String) -> Config {
         family_enabled: false,
         max_call_seconds: 180,
         nvidia_key: String::new(),
+        model_backend: firstring::config::ModelBackend::NvidiaHosted,
         model_url: "https://integrate.api.nvidia.com/v1/chat/completions".into(),
         model: "nvidia/nemotron-3.5-lightning-30b-a3b".into(),
     }

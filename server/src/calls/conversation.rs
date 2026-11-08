@@ -5,7 +5,7 @@ use crate::{
     providers::{
         nemotron::{
             ModelCapabilities, Nemotron, ToolPhase, append_tool_result, conversation_messages,
-            system_prompt,
+            next_step_phase, system_prompt,
         },
         twilio,
     },
@@ -20,6 +20,30 @@ const MODEL_FAILURE_CLOSING: &str =
 
 impl Actor {
     pub(crate) async fn conversation(&mut self, input: Input) -> anyhow::Result<Value> {
+        let input = match input {
+            Input::ClosingResponseForRelay { token } => {
+                anyhow::ensure!(
+                    token == self.session.relay_token,
+                    "Obsolete Relay closing callback"
+                );
+                Input::ClosingResponse
+            }
+            Input::RelaySpeech { token, text, last } => {
+                anyhow::ensure!(
+                    self.active_relay_token.as_deref() == Some(token.as_str())
+                        && token == self.session.relay_token,
+                    "Obsolete Relay input"
+                );
+                if last {
+                    Input::FinalPrompt {
+                        text: text.unwrap_or_default(),
+                    }
+                } else {
+                    Input::Speech { partial: text }
+                }
+            }
+            other => other,
+        };
         match input {
             Input::RelayTelemetry {
                 event,
@@ -33,13 +57,25 @@ impl Actor {
                 let text = match self.session.closing_reason.as_deref() {
                     Some("message_saved") => self.saved_message_closing(),
                     Some("model_failure") => MODEL_FAILURE_CLOSING,
+                    Some("no_message") => "Thanks for calling. Goodbye.",
                     _ => anyhow::bail!("No committed closing response"),
                 };
                 if self.session.inbound_ended || self.session.end_requested {
                     return Ok(json!({"twiml":"<Response><Hangup/></Response>"}));
                 }
-                return Ok(json!({"twiml":twilio::say_end(text)}));
+                let nonce = self.closing_nonce();
+                let url = self
+                    .app
+                    .config
+                    .external_url(&format!("/voice/closing?nonce={nonce}"));
+                let twiml = format!(
+                    "<Response><Gather input=\"speech\" speechTimeout=\"1\" timeout=\"2\" actionOnEmptyResult=\"true\" action=\"{}\" method=\"POST\"><Say voice=\"Polly.Joanna-Neural\" language=\"en-US\">{}</Say></Gather><Hangup/></Response>",
+                    twilio::escape(&url),
+                    twilio::escape(text)
+                );
+                return Ok(json!({"twiml":twiml}));
             }
+            Input::ClosingInput { nonce, text } => return self.closing_input(nonce, text).await,
             Input::PostCallTool { tool } => {
                 anyhow::ensure!(
                     self.session.inbound_ended && self.session.blocked,
@@ -68,13 +104,19 @@ impl Actor {
                 anyhow::ensure!(
                     !self.relay_attached
                         && !self.session.inbound_ended
+                        && !self.session.end_requested
+                        && self.session.closing_reason.is_none()
                         && sid == self.session.inbound_sid
                         && token == self.session.relay_token,
                     "Relay session binding rejected"
                 );
                 self.relay_attached = true;
+                self.active_relay_token = Some(token);
                 self.emit("caller", "voice.connected", json!({"transport":"relay"}))
                     .await?;
+                if let Some(text) = self.pending_relay_prompt.take() {
+                    return self.final_prompt(text).await;
+                }
             }
             Input::SpeechRecovery { generation, epoch } => {
                 return self.recover_pending_speech(generation, epoch).await;
@@ -107,43 +149,7 @@ impl Actor {
                 }
                 self.arm_speech_recovery().await?;
             }
-            Input::FinalPrompt { text } => {
-                anyhow::ensure!(
-                    !self.session.inbound_ended
-                        && !self.session.bridge_committed
-                        && self.session.closing_reason.is_none(),
-                    "Screening has ended"
-                );
-                anyhow::ensure!(
-                    !text.trim().is_empty() && text.len() <= 4000 && self.session.turns.len() < 100,
-                    "Invalid or excessive caller turn"
-                );
-                self.clear_speech_recovery();
-                self.cancel_model();
-                let previous = self
-                    .session
-                    .offer
-                    .as_ref()
-                    .filter(|o| o.status == "pending")
-                    .cloned();
-                let id = self.session.commit_turn(&text);
-                self.emit(
-                    "caller",
-                    "transcript.final",
-                    json!({"turn_id":id,"text":text}),
-                )
-                .await?;
-                if let Some(offer) = previous {
-                    self.revoke_cleanup(&offer.id, &offer.leg_id).await?;
-                }
-                self.app.store.save(&self.session).await?;
-                if self.session.execution_mode == ExecutionMode::Live {
-                    self.start_model();
-                }
-                return Ok(
-                    json!({"turn_id":id,"generation":self.session.generation_id,"epoch":self.session.policy_epoch,"version":self.session.turn_version}),
-                );
-            }
+            Input::FinalPrompt { text } => return self.final_prompt(text).await,
             Input::ModelTool {
                 generation,
                 epoch,
@@ -162,13 +168,23 @@ impl Actor {
                     "Obsolete model tool result"
                 );
                 let parsed = ToolCall::parse(&tool.name, tool.arguments)?;
+                anyhow::ensure!(
+                    !matches!(
+                        &parsed,
+                        ToolCall::RecordAssessment {
+                            understanding: None,
+                            ..
+                        }
+                    ),
+                    "Native assessment requires current call understanding"
+                );
                 self.emit("system", "agent.tool.proposed", json!({"name":tool.name,"generation_id":generation,"turn_version":version,"arguments":crate::tools::public_arguments(&parsed)})).await?;
                 let result = self.execute_tool(parsed).await;
                 match result {
                     Ok(value) => {
                         self.emit("system", "agent.tool.result", json!({"name":tool.name,"generation_id":generation,"turn_version":version,"ok":true,"result":crate::tools::public_result(&value)})).await?;
                         return Ok(
-                            json!({"ok":true,"result":value,"epoch":self.session.policy_epoch}),
+                            json!({"ok":true,"result":value,"epoch":self.session.policy_epoch,"next_phase":next_step_phase(&self.session)}),
                         );
                     }
                     Err(e) => {
@@ -451,9 +467,15 @@ impl Actor {
                     .await?;
                 }
             }
-            Input::RelayDisconnected => {
+            Input::RelayDisconnected { token } => {
+                if self.active_relay_token.as_deref() != Some(token.as_str())
+                    || token != self.session.relay_token
+                {
+                    return Ok(json!({"ignored":"obsolete_relay_disconnect"}));
+                }
                 self.clear_speech_recovery();
                 self.relay_attached = false;
+                self.active_relay_token = None;
                 self.cancel_model();
                 if !self.session.bridge_committed && self.session.closing_reason.is_none() {
                     self.session.speech_started();
@@ -479,6 +501,132 @@ impl Actor {
             _ => anyhow::bail!("Unsupported conversation command"),
         }
         Ok(json!({"ok":true}))
+    }
+    fn closing_nonce(&self) -> String {
+        format!(
+            "{}.{}",
+            self.session.relay_token, self.session.generation_id
+        )
+    }
+
+    async fn closing_input(&mut self, nonce: String, text: String) -> anyhow::Result<Value> {
+        if self.session.inbound_ended || self.session.end_requested {
+            return Ok(json!({"twiml":"<Response><Hangup/></Response>"}));
+        }
+        let gather = self.app.config.transport == "gather";
+        if gather && let Some(token) = self.session.gather_claims.get(&nonce) {
+            anyhow::ensure!(
+                token == &self.session.relay_token && self.session.closing_reason.is_none(),
+                "Obsolete closing callback"
+            );
+            // The existing GatherClaim/GatherComplete path owns this turn's
+            // response cache, including retries while its model work is pending.
+            return Ok(json!({"gather_turn_token":token,"duplicate":true}));
+        }
+        if let Some(cached) = self.session.gather_replies.get(&nonce) {
+            anyhow::ensure!(
+                self.session.gather_claims.get(&nonce) == Some(&self.session.relay_token)
+                    && self.session.closing_reason.is_none(),
+                "Obsolete closing callback"
+            );
+            return Ok(json!({"twiml":cached,"duplicate":true}));
+        }
+        anyhow::ensure!(
+            nonce == self.closing_nonce()
+                && matches!(
+                    self.session.closing_reason.as_deref(),
+                    Some("message_saved" | "model_failure" | "no_message")
+                )
+                && !self.session.bridge_committed,
+            "Invalid or obsolete closing token"
+        );
+        anyhow::ensure!(
+            text.len() <= 4000 && self.session.turns.len() < 100,
+            "Invalid or excessive closing speech"
+        );
+        self.clear_speech_recovery();
+        self.cancel_model();
+        if text.trim().is_empty() {
+            self.session.end_requested = true;
+            self.session.speech_pending = true;
+            self.session.current_action =
+                "Acknowledgement finished; awaiting call completion".into();
+            self.emit(
+                "system",
+                "closing.completed",
+                json!({"speech_received":false,"provider_completion_pending":true}),
+            )
+            .await?;
+            return Ok(json!({"twiml":"<Response><Hangup/></Response>"}));
+        }
+        let mut candidate = self.session.clone();
+        candidate.closing_reason = None;
+        candidate.state = "screening".into();
+        candidate.current_action = "Caller added information; reconnecting the assistant".into();
+        candidate.speech_started();
+        candidate.relay_token = uuid::Uuid::new_v4().to_string();
+        let response = if gather {
+            candidate.gather_token = candidate.relay_token.clone();
+            json!({"gather_turn_token":candidate.gather_token})
+        } else {
+            let twiml = crate::providers::relay::reconnect_twiml(
+                &self.app.config.public_base_url,
+                &candidate.relay_token,
+            );
+            candidate
+                .gather_replies
+                .insert(nonce.clone(), twiml.clone());
+            json!({"twiml":twiml})
+        };
+        candidate
+            .gather_claims
+            .insert(nonce.clone(), candidate.relay_token.clone());
+        self.app.store.save(&candidate).await?;
+        self.session = candidate;
+        self.relay_attached = false;
+        self.active_relay_token = None;
+        self.pending_relay_prompt = if gather { None } else { Some(text) };
+        self.emit("caller", "closing.interrupted", json!({"speech_received":true,"message_preserved":self.session.message.is_some(),"reconnect_pending":!gather,"transport":self.app.config.transport})).await?;
+        Ok(response)
+    }
+
+    async fn final_prompt(&mut self, text: String) -> anyhow::Result<Value> {
+        anyhow::ensure!(
+            !self.session.inbound_ended
+                && !self.session.end_requested
+                && !self.session.bridge_committed
+                && self.session.closing_reason.is_none(),
+            "Screening has ended"
+        );
+        anyhow::ensure!(
+            !text.trim().is_empty() && text.len() <= 4000 && self.session.turns.len() < 100,
+            "Invalid or excessive caller turn"
+        );
+        self.clear_speech_recovery();
+        self.cancel_model();
+        let previous = self
+            .session
+            .offer
+            .as_ref()
+            .filter(|o| o.status == "pending")
+            .cloned();
+        let id = self.session.commit_turn(&text);
+        self.emit(
+            "caller",
+            "transcript.final",
+            json!({"turn_id":id,"text":text}),
+        )
+        .await?;
+        if let Some(offer) = previous {
+            self.revoke_cleanup(&offer.id, &offer.leg_id).await?;
+        }
+        self.app.store.save(&self.session).await?;
+        if self.session.execution_mode == ExecutionMode::Live {
+            self.start_model();
+        }
+        Ok(
+            json!({"turn_id":id,"generation":self.session.generation_id,"epoch":self.session.policy_epoch,"version":self.session.turn_version}),
+        )
     }
     fn find_offer(&self, id: &str) -> anyhow::Result<&crate::calls::state::Offer> {
         self.session
@@ -635,7 +783,8 @@ impl Actor {
         let c = self.app.config.clone();
         let turns = self.session.turns.clone();
         tokio::spawn(async move {
-            let model = Nemotron::new(c.nvidia_key.clone(), c.model_url.clone(), c.model.clone());
+            let model = Nemotron::new(c.nvidia_key.clone(), c.model_url.clone(), c.model.clone())
+                .with_backend(c.model_backend);
             let messages = vec![
                 json!({"role":"system","content":system_prompt()}),
                 json!({"role":"user","content":json!({"post_call_job":true,"instruction":"The blocked incident has ended. Propose only publish_tactic using categorical fields. No private content or transcript in tool arguments.","turns":turns}).to_string()}),
@@ -654,7 +803,8 @@ impl Actor {
             let deadline = Instant::now() + Duration::from_secs(6);
             let future = async {
                 let model =
-                    Nemotron::new(c.nvidia_key.clone(), c.model_url.clone(), c.model.clone());
+                    Nemotron::new(c.nvidia_key.clone(), c.model_url.clone(), c.model.clone())
+                        .with_backend(c.model_backend);
                 let mut messages = conversation_messages(&s, &ModelCapabilities::from_config(&c));
                 let mut epoch = s.policy_epoch;
                 let mut phase = ToolPhase::Assessment;
@@ -676,8 +826,8 @@ impl Actor {
                         })
                         .await?;
                     epoch = outcome["epoch"].as_u64().unwrap_or(epoch);
-                    if phase == ToolPhase::Assessment && outcome["ok"] == true {
-                        phase = ToolPhase::NextStep;
+                    if outcome["ok"] == true && outcome["result"]["stop"] != true {
+                        phase = serde_json::from_value(outcome["next_phase"].clone())?;
                     }
                     append_tool_result(&mut messages, &tool, &outcome);
                     if outcome["result"]["stop"] == true {
@@ -706,16 +856,22 @@ impl Actor {
             ToolCall::RecordAssessment {
                 observation,
                 evidence_refs,
+                understanding,
             } => {
-                self.session.assess(
-                    self.session.generation_id,
-                    self.session.turn_version,
+                let mut candidate = self.session.clone();
+                candidate.assess(
+                    candidate.generation_id,
+                    candidate.turn_version,
                     &observation,
                     &evidence_refs,
                 )?;
+                if let Some(value) = understanding {
+                    candidate.accept_understanding(value)?;
+                }
+                self.session = candidate;
                 self.emit("system",if self.session.blocked{"policy.denied"}else{"policy.allowed"},json!({"operation":"assessment","observation":observation,"quote":self.session.evidence_quote,"handoff_allowed":!self.session.blocked && !self.session.ambiguous})).await?;
                 Ok(
-                    json!({"blocked":self.session.blocked,"ambiguous":self.session.ambiguous,"assessed_version":self.session.assessed_version}),
+                    json!({"blocked":self.session.blocked,"ambiguous":self.session.ambiguous,"assessed_version":self.session.assessed_version,"understanding":self.session.understanding}),
                 )
             }
             ToolCall::AskCaller {
@@ -729,7 +885,7 @@ impl Actor {
                 );
                 self.session.evidence_valid(&evidence_refs, true)?;
                 let question = if purpose == QuestionPurpose::ClarifyCodeType {
-                    "Is that an appointment reference, or a code used to sign in? Please don't read the code itself.".to_string()
+                    "What's the code used for? Please don't read the code itself.".to_string()
                 } else {
                     question
                 };
@@ -950,7 +1106,8 @@ impl Actor {
                 .await?;
                 // End Relay before scheduling the goodbye. Its documented protocol
                 // has no audio-drained acknowledgement. The signed Connect action
-                // returns Say then Hangup, so the final speech is not interrupted by end.
+                // returns a speech Gather around the acknowledgement, then Hangup
+                // after the bounded grace. Caller corrections can reopen screening.
                 self.emit("system", "audio.requested", json!({"text":self.saved_message_closing(),"voice":"preset","transport":"twiml_closing","heard":false})).await?;
                 let _ = self.handle.audio.send(AudioFrame {
                     generation: self.session.generation_id,
@@ -962,6 +1119,34 @@ impl Actor {
             }
             ToolCall::PublishTactic { .. } => {
                 anyhow::bail!("Publication runs only in a post-call job")
+            }
+            ToolCall::EndCall {
+                reason,
+                evidence_refs,
+            } => {
+                self.session.require_end_call(&evidence_refs)?;
+                let mut candidate = self.session.clone();
+                candidate.closing_reason = Some("no_message".into());
+                candidate.state = "closing".into();
+                candidate.current_action = "Closing politely; no message saved".into();
+                candidate.speech_pending = true;
+                candidate.generation_id += 1;
+                self.app.store.save(&candidate).await?;
+                self.session = candidate;
+                self.clear_speech_recovery();
+                self.emit(
+                    "system",
+                    "call.closing",
+                    json!({"reason":reason,"message_recorded":false}),
+                )
+                .await?;
+                let _ = self.handle.audio.send(AudioFrame {
+                    generation: self.session.generation_id,
+                    epoch: self.session.policy_epoch,
+                    payload: crate::providers::relay::end("no_message"),
+                    purpose: AudioPurpose::NoMessageClosing,
+                });
+                Ok(json!({"closing":true,"message_recorded":false,"stop":true}))
             }
         }
     }
@@ -1005,7 +1190,10 @@ mod message_tests {
         (app, handle, evidence)
     }
 
-    async fn send_tool(handle: &Handle, name: &str, arguments: Value) -> anyhow::Result<Value> {
+    async fn send_tool(handle: &Handle, name: &str, mut arguments: Value) -> anyhow::Result<Value> {
+        if name == "record_assessment" && arguments.get("understanding").is_none() {
+            arguments["understanding"] = json!({"version":1,"claimed_identity":null,"purpose":"Leave a routine update","requested_action":"Save the caller update","supplied_facts":[],"missing_information":[],"readiness":"ready"});
+        }
         let snapshot = handle.send(Input::Snapshot).await?;
         handle
             .send(Input::ModelTool {

@@ -1,0 +1,84 @@
+{
+  "backend": "nvidia_hosted",
+  "backend_evidence": "Configured adapter selection; this label alone does not prove GPU execution",
+  "data_origin": "synthetic",
+  "error": "Nemotron completion was truncated or incomplete",
+  "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+  "max_output_tokens": 1024,
+  "native_result_roundtrips": 1,
+  "native_tool_choice": "named_assessment_then_readiness_gated_next_step",
+  "observed_assessments": [
+    {
+      "arguments": {
+        "evidence_refs": [
+          {
+            "quote": "The clinic appointment time has changed, and I need to give her the new time.",
+            "turn_id": "turn-1"
+          }
+        ],
+        "observation": {
+          "direction": "caller_requests_from_sarah",
+          "requested_object": "routine_information",
+          "speech_act": "statement"
+        },
+        "understanding": {
+          "claimed_identity": null,
+          "missing_information": [
+            "new appointment time"
+          ],
+          "purpose": "give sarah new clinic appointment time",
+          "readiness": "needs_information",
+          "requested_action": "update sarah on new appointment time",
+          "supplied_facts": [],
+          "version": 1
+        }
+      },
+      "context_index": 0,
+      "name": "record_assessment",
+      "tool_call_id": "call-b3d3c7cf-05e4-4c96-aa71-00a1e7183cf8"
+    }
+  ],
+  "observed_followups": [
+    "What is the new appointment time?"
+  ],
+  "phone_tested": false,
+  "recorded_at": "2026-11-08T05:33:02.078020+00:00",
+  "relevance_check": "prewritten lexical anchors; human review still required",
+  "request_observations": [
+    {
+      "backend": "nvidia_hosted",
+      "completion_tokens": 168,
+      "elapsed_ms": 1779,
+      "error": null,
+      "finish_reason": "tool_calls",
+      "outcome": "success",
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "nvidia_hosted",
+      "completion_tokens": 66,
+      "elapsed_ms": 1332,
+      "error": null,
+      "finish_reason": "tool_calls",
+      "outcome": "success",
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "nvidia_hosted",
+      "completion_tokens": 1024,
+      "elapsed_ms": 8174,
+      "error": "Nemotron completion was truncated or incomplete",
+      "finish_reason": "length",
+      "outcome": "schema",
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    }
+  ],
+  "request_timeout_ms": 10000,
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "requests_submitted": 3,
+  "retained_arguments_scope": "Synthetic native assessment arguments only; no assistant content or hidden reasoning",
+  "status": "model_probe_failed"
+}

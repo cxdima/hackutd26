@@ -1,0 +1,26 @@
+{
+  "data_origin": "synthetic",
+  "error": "Nemotron completion was truncated or incomplete",
+  "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+  "native_result_roundtrips": 0,
+  "native_tool_choice": "named_assessment_then_readiness_gated_next_step",
+  "observed_followups": [],
+  "phone_tested": false,
+  "recorded_at": "2026-11-08T05:27:43.626597+00:00",
+  "relevance_check": "prewritten lexical anchors; human review still required",
+  "request_observations": [
+    {
+      "completion_tokens": 512,
+      "elapsed_ms": 4527,
+      "error": "Nemotron completion was truncated or incomplete",
+      "finish_reason": "length",
+      "outcome": "schema",
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    }
+  ],
+  "request_timeout_ms": 10000,
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "requests_submitted": 1,
+  "status": "model_probe_failed"
+}

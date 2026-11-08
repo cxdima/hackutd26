@@ -34,10 +34,16 @@ pub async fn run(app: &App, scenario: &str) -> anyhow::Result<Value> {
     let turn = h.send(Input::FinalPrompt { text: text.clone() }).await?;
     let evidence = json!([{"turn_id":turn["turn_id"],"quote":text}]);
     let benign = json!({"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"});
+    let fact = if scenario == "benign_new_number" {
+        "appointment reference is A-42"
+    } else {
+        "Tuesday at two"
+    };
+    let understanding = json!({"version":1,"claimed_identity":null,"purpose":"Share appointment information","requested_action":"Pass along the appointment update","supplied_facts":[{"text":fact,"evidence_refs":evidence}],"missing_information":[],"readiness":"ready"});
     apply(
         &h,
         "record_assessment",
-        json!({"observation":benign,"evidence_refs":evidence}),
+        json!({"observation":benign,"evidence_refs":evidence,"understanding":understanding}),
     )
     .await?;
     if scenario == "benign_new_number" {
@@ -87,7 +93,7 @@ pub async fn run(app: &App, scenario: &str) -> anyhow::Result<Value> {
             .await?;
         let refs =
             json!([{"turn_id":turn["turn_id"],"quote":"read me the digits from the sign-in text"}]);
-        apply(&h,"record_assessment",json!({"observation":{"speech_act":"request","requested_object":"authentication_secret","direction":"caller_requests_from_sarah"},"evidence_refs":refs})).await?;
+        apply(&h,"record_assessment",json!({"observation":{"speech_act":"request","requested_object":"authentication_secret","direction":"caller_requests_from_sarah"},"evidence_refs":refs,"understanding":{"version":1,"claimed_identity":null,"purpose":"Request account access","requested_action":"Obtain authentication material","supplied_facts":[],"missing_information":[],"readiness":"ready"}})).await?;
         apply(&h,"lookup_tactics",json!({"requested_action":"relay_sign_in_text_digits","pretext_category":"clinic_appointment"})).await?;
         h.send(Input::Choice {
             offer_id: offer,

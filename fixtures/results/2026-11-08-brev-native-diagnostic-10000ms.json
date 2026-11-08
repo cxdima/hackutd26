@@ -1,0 +1,89 @@
+{
+  "assessment_only": false,
+  "backend": "brev_hosted",
+  "backend_evidence": "Configured adapter selection; this label alone does not prove GPU execution",
+  "data_origin": "synthetic",
+  "error": "Nemotron completion was truncated or incomplete",
+  "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+  "max_output_tokens": 512,
+  "native_result_roundtrips": 0,
+  "native_tool_choice": "named_assessment_then_readiness_gated_next_step",
+  "observed_assessments": [
+    {
+      "arguments": {
+        "evidence_refs": [
+          {
+            "quote": "The clinic appointment time has changed, and I need to give her the new time.",
+            "turn_id": "turn-1"
+          }
+        ],
+        "observation": {
+          "direction": "caller_requests_from_sarah",
+          "requested_object": "routine_information",
+          "speech_act": "request"
+        },
+        "understanding": {
+          "claimed_identity": null,
+          "missing_information": [
+            "new appointment time"
+          ],
+          "purpose": "give sarah new clinic appointment time",
+          "readiness": "needs_information",
+          "requested_action": "provide new appointment time to sarah",
+          "supplied_facts": [],
+          "version": 1
+        }
+      },
+      "context_index": 0,
+      "name": "record_assessment",
+      "tool_call_id": "chatcmpl-tool-9743992fe9d49b77"
+    }
+  ],
+  "observed_followups": [],
+  "phone_tested": false,
+  "recorded_at": "2026-11-08T05:54:35.218956+00:00",
+  "relevance_check": "prewritten lexical anchors; human review still required",
+  "request_observations": [
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 176,
+      "content_chars": 0,
+      "elapsed_ms": 1075,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 512,
+      "content_chars": 0,
+      "elapsed_ms": 8899,
+      "error": "Nemotron completion was truncated or incomplete",
+      "finish_reason": "length",
+      "native_argument_diagnostic": {
+        "argument_chars": 211,
+        "argument_prefix": "{\"evidence_refs\": [{\"quote\": \"The clinic appointment time has changed, and I need to give her the new time.\", \"turn_id\": \"turn-1\"}], \"purpose\": \"clarify_request\", \"question\": \"What is the new appointment time?\"}",
+        "argument_suffix": "{\"evidence_refs\": [{\"quote\": \"The clinic appointment time has changed, and I need to give her the new time.\", \"turn_id\": \"turn-1\"}], \"purpose\": \"clarify_request\", \"question\": \"What is the new appointment time?\"}",
+        "arguments_json_valid": true,
+        "function_name": "ask_caller",
+        "native_tool_count": 1,
+        "scope": "fixed_synthetic_probe_only"
+      },
+      "outcome": "schema",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    }
+  ],
+  "request_timeout_ms": 10000,
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "requests_submitted": 2,
+  "retained_arguments_scope": "Synthetic native assessment arguments only; no assistant content or hidden reasoning",
+  "selected_context_index": null,
+  "status": "model_probe_failed"
+}

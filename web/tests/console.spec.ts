@@ -105,6 +105,14 @@ test("model HTTP receipt remains distinct from a current assessment and audible 
   const snapshot: ConsoleState = {
     ...empty,
     transport: "relay",
+    model_backend: {
+      backend: "brev_hosted",
+      label: "Brev-hosted Nemotron",
+      requested_model: "nvidia/Nemotron-3-Nano-30B-A3B-FP8",
+      configured: true,
+      protocol_verified: false,
+      detail: "This backend's native tool cycle has not been verified.",
+    },
     sessions: [
       {
         ...revoked.sessions[0],
@@ -136,6 +144,7 @@ test("model HTTP receipt remains distinct from a current assessment and audible 
       boundary: "model_http",
       heard: false,
       observation: {
+        backend: "nvidia_hosted",
         requested_model: "nvidia/nemotron-3.5-lightning-30b-a3b",
         response_model: "nvidia/nemotron-3.5-lightning-30b-a3b",
         elapsed_ms: 998,
@@ -169,6 +178,17 @@ test("model HTTP receipt remains distinct from a current assessment and audible 
   await page.getByLabel("Operator token").fill("fixture-operator-token");
   await page.getByRole("button", { name: "Connect console" }).click();
   const card = page.getByRole("group", { name: "Model HTTP observation" });
+  const selectedBackend = page.getByRole("group", {
+    name: "Current model backend",
+  });
+  await expect(selectedBackend).toContainText("Brev-hosted Nemotron");
+  await expect(selectedBackend).toContainText(
+    "Native protocol: Pending for this backend",
+  );
+  await expect(card).toContainText("Backend: NVIDIA hosted");
+  await expect(card).toContainText(
+    "Recorded backend differs from the selected backend",
+  );
   await expect(card).toContainText("998 ms");
   await expect(card).toContainText("Earlier turn or generation");
   await expect(card).toContainText("Model job later cancelled");
@@ -214,7 +234,7 @@ test("reads automated caller receipts without initiating or retrying a call", as
     methods.push(route.request().method());
     return route.fulfill({
       json: {
-        scenario_id: "negated_warning_george",
+        scenario_id: "family_pickup_risky_george",
         execution_mode: "live",
         data_origin: "synthetic",
         test_kind: "automated_audio_caller",
@@ -256,7 +276,7 @@ test("reads automated caller receipts without initiating or retrying a call", as
   const status = page.getByRole("region", { name: "Automated caller status" });
   await expect(status).toContainText("completed");
   await expect(status).toContainText("Ungraded");
-  await expect(status).toContainText("Negated warning");
+  await expect(status).toContainText("Claimed family pickup → sign-in request");
   await expect(status).toContainText("1 final ASR observation");
   await expect(status).toContainText("Attempts remaining: 0");
   await expect(status).toContainText(
@@ -332,6 +352,30 @@ test("recorded inbound and model proof do not enable Relay or an unenrolled Phon
         assessed_version: 2,
         generation_id: 2,
         evidence_quote: "clinic",
+        understanding: {
+          generation_id: 2,
+          turn_version: 2,
+          policy_epoch: 2,
+          understanding: {
+            version: 1,
+            claimed_identity: null,
+            purpose: "Reschedule a clinic visit",
+            requested_action: "Share the new appointment time",
+            supplied_facts: [
+              {
+                text: "reschedule the clinic visit",
+                evidence_refs: [
+                  {
+                    turn_id: "t1",
+                    quote: "Please reschedule the clinic visit.",
+                  },
+                ],
+              },
+            ],
+            missing_information: ["New appointment time"],
+            readiness: "needs_information",
+          },
+        },
         turns: [
           {
             id: "earlier",
@@ -400,6 +444,14 @@ test("recorded inbound and model proof do not enable Relay or an unenrolled Phon
   ).toBeVisible();
   await expect(page.locator(".evidence-quote blockquote")).toHaveText(
     "“reschedule the clinic visit”",
+  );
+  const understanding = page.getByRole("group", {
+    name: "Accepted call understanding",
+  });
+  await expect(understanding).toContainText("Current accepted understanding");
+  await expect(understanding).toContainText("Reschedule a clinic visit");
+  await expect(understanding).toContainText(
+    "Still needed: New appointment time",
   );
   await page.screenshot({
     path: info.outputPath("fixture-evidence-desktop.png"),

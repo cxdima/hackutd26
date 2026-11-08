@@ -12,6 +12,8 @@ const fixtureStatus = z.object({
     "supplied_reference_george",
     "quoted_report_george",
     "handoff_changed_george",
+    "family_pickup_benign_george",
+    "family_pickup_risky_george",
   ]),
   destination: z.literal("owned_firstring_number_only"),
   test_kind: z.literal("automated_audio_caller"),
@@ -47,6 +49,8 @@ const scenarioNames: Record<FixtureStatus["scenario_id"], string> = {
   supplied_reference_george: "Caller-supplied reference",
   quoted_report_george: "Quoted report",
   handoff_changed_george: "Changed handoff request",
+  family_pickup_benign_george: "Claimed family pickup → routine details",
+  family_pickup_risky_george: "Claimed family pickup → sign-in request",
 };
 
 /** Read-only: refreshing this panel cannot start or retry a caller leg. */

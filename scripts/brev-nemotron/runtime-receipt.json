@@ -1,0 +1,92 @@
+{
+  "observed_at_utc": "2026-11-08T06:36:21.505459+00:00",
+  "instance_state": "DELETED",
+  "provider_health": "HEALTHY",
+  "gpu": "NVIDIA H100 PCIe",
+  "gpu_total_mib": 81559,
+  "driver_version": "570.195.03",
+  "container": "vllm/vllm-openai:v0.27.1",
+  "model_repository": "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4",
+  "model_revision": "bee7596271d1495f6992ae224aefde4410e816b8",
+  "loaded_shards": 52,
+  "reported_model_memory_gib": 19.17,
+  "reported_model_load_seconds": 27.431565,
+  "reported_torch_compile_seconds": 10.51,
+  "tool_parser": "qwen3_coder",
+  "reasoning_parser": "nemotron_v3",
+  "max_context_tokens": 8192,
+  "max_concurrent_sequences": 4,
+  "speculative_model": null,
+  "inference_ready": false,
+  "native_tool_probe_passed": false,
+  "phone_backend_changed": false,
+  "local_cleanup_guard_active": false,
+  "remote_cleanup_timer_active": false,
+  "remote_credential_mode": "0600 root",
+  "warmup_cleanup_utc": "2026-11-08T06:05:28Z",
+  "hard_cleanup_utc": "2026-11-08T07:05:28Z",
+  "cleanup_verified": true,
+  "api_readiness": {
+    "checked_at_utc": "2026-11-08T05:48:43.379783+00:00",
+    "health_status": 200,
+    "authenticated": {
+      "status": 200,
+      "models": [
+        "nvidia/nemotron-3.5-lightning-30b-a3b"
+      ]
+    },
+    "invalid_key": {
+      "status": 401
+    }
+  },
+  "ready_gpu_metrics_csv": "NVIDIA H100 PCIe, 81559 MiB, 73935 MiB, 0 %, 0 %, 81.27 W, 36, 570.195.03",
+  "initialization_summary": [
+    "(EngineCore pid=326) INFO 11-08 05:45:41 [default_loader.py:430] Loading weights took 4.82 seconds",
+    "(EngineCore pid=326) INFO 11-08 05:45:44 [gpu_model_runner.py:5405] Model loading took 19.17 GiB memory and 27.431565 seconds",
+    "(EngineCore pid=326) INFO 11-08 05:45:56 [monitor.py:53] torch.compile took 10.51 s in total",
+    "(EngineCore pid=326) INFO 11-08 05:48:19 [gpu_worker.py:563] Available KV cache memory: 50.99 GiB",
+    "(EngineCore pid=326) INFO 11-08 05:48:19 [kv_cache_utils.py:2235] GPU KV cache size: 5,717,333 tokens",
+    "(EngineCore pid=326) INFO 11-08 05:48:19 [kv_cache_utils.py:2236] Maximum concurrency for 8,192 tokens per request: 697.92x",
+    "(EngineCore pid=326) INFO 11-08 05:48:23 [gpu_model_runner.py:6913] Graph capturing finished in 2 secs, took 0.07 GiB",
+    "(EngineCore pid=326) INFO 11-08 05:48:25 [core.py:348] init engine (profile, create kv cache, warmup model) took 160.77 s (compilation: 10.51 s)",
+    "(APIServer pid=1) INFO 11-08 05:48:29 [api_server.py:682] Starting vLLM server on http://127.0.0.1:8000",
+    "(APIServer pid=1) INFO:     Application startup complete."
+  ],
+  "probe_observations": {
+    "cold_client_result": "timeout_3504ms",
+    "cold_server_e2e_seconds": 3.449604034423828,
+    "cold_server_ttft_seconds": 2.5635228157043457,
+    "cold_jit_kernels": [
+      "causal_conv1d_fwd",
+      "batch_memcpy",
+      "moe_fused_mul_sum",
+      "apply_token_bitmask_inplace"
+    ],
+    "warmed_assessment_client_ms": 972,
+    "warmed_assessment_tokens": 175,
+    "warmed_assessment_server_e2e_seconds": 0.764909029006958,
+    "next_phase_client_result": "timeout_3503ms",
+    "new_jit_warning_observed_on_next_phase": false,
+    "running_requests_zero_by_utc": "2026-11-08T05:51:09Z",
+    "interpretation": "Cold compilation corroborated. Cause of next-phase timeout unproven; do not activate.",
+    "diagnostic_10s": {
+      "assessment_ms": 1075,
+      "assessment_tokens": 176,
+      "next_phase_ms": 8899,
+      "next_phase_tokens": 512,
+      "next_phase_finish_reason": "length",
+      "native_tool_count": 1,
+      "native_arguments_chars": 211,
+      "strict_parser_accepted": false,
+      "new_jit_warning_observed": false
+    },
+    "named_phase_experiment": {
+      "assessment_ms": 1115,
+      "assessment_tokens": 218,
+      "assessment_finish_reason": "stop",
+      "strict_evidence_validation_passed": false,
+      "clarification_request_reached": false
+    }
+  },
+  "cleanup_receipt": "scripts/brev-nemotron/cleanup-receipt.json"
+}

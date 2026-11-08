@@ -32,6 +32,7 @@ async fn setup() -> (App, Handle, broadcast::Receiver<AudioFrame>) {
         family_enabled: false,
         max_call_seconds: 180,
         nvidia_key: String::new(),
+        model_backend: firstring::config::ModelBackend::NvidiaHosted,
         model_url: "http://127.0.0.1:1/never-contacted".into(),
         model: "fixture".into(),
     };
@@ -71,7 +72,17 @@ async fn final_assessed(h: &Handle, text: &str) -> (Value, Value) {
         .unwrap();
     let s = h.send(Input::Snapshot).await.unwrap();
     let evidence = json!([{"turn_id":turn["turn_id"],"quote":text}]);
-    assert_eq!(tool(h,&s,"record_assessment",json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":evidence})).await.unwrap()["ok"],true);
+    let missing = if text == "The visit has changed." {
+        vec!["The new visit day or time"]
+    } else {
+        vec![]
+    };
+    let readiness = if missing.is_empty() {
+        "ready"
+    } else {
+        "needs_information"
+    };
+    assert_eq!(tool(h,&s,"record_assessment",json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":evidence,"understanding":{"version":1,"claimed_identity":null,"purpose":"Update the clinic visit","requested_action":"Pass along the updated schedule","supplied_facts":[{"text":text,"evidence_refs":evidence}],"missing_information":missing,"readiness":readiness}})).await.unwrap()["ok"],true);
     (h.send(Input::Snapshot).await.unwrap(), evidence)
 }
 async fn recovery(audio: &mut broadcast::Receiver<AudioFrame>) -> AudioFrame {

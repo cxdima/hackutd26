@@ -1,0 +1,31 @@
+{
+  "data_origin": "synthetic",
+  "error": "Nemotron request timed out",
+  "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+  "native_result_roundtrips": 0,
+  "native_tool_choice": "named_assessment_then_required_next_step",
+  "observed_followups": [],
+  "phone_tested": false,
+  "recorded_at": "2026-11-08T06:42:36.122394+00:00",
+  "relevance_check": "prewritten lexical anchors; human review still required",
+  "request_observations": [
+    {
+      "elapsed_ms": 1568,
+      "error": null,
+      "outcome": "success",
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "elapsed_ms": 3503,
+      "error": "Nemotron request timed out",
+      "outcome": "timeout",
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": null
+    }
+  ],
+  "request_timeout_ms": 3500,
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "requests_submitted": 2,
+  "status": "model_probe_failed"
+}

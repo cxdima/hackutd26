@@ -1,0 +1,69 @@
+{
+  "assessment_only": false,
+  "backend": "brev_hosted",
+  "backend_evidence": "Configured adapter selection; this label alone does not prove GPU execution",
+  "data_origin": "synthetic",
+  "error": "Nemotron transport failed",
+  "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+  "max_output_tokens": 512,
+  "native_result_roundtrips": 0,
+  "native_tool_choice": "named_assessment_then_readiness_gated_next_step",
+  "observed_assessments": [
+    {
+      "arguments": {
+        "evidence_refs": [
+          {
+            "quote": "The clinic appointment time has changed, and I need to give her the new time.",
+            "turn_id": "turn-1"
+          }
+        ],
+        "observation": {
+          "direction": "caller_requests_from_sarah",
+          "requested_object": "routine_information",
+          "speech_act": "request"
+        },
+        "understanding": {
+          "claimed_identity": null,
+          "missing_information": [
+            "new appointment time"
+          ],
+          "purpose": "give sarah new clinic time",
+          "readiness": "needs_information",
+          "requested_action": "provide sarah with new appointment time",
+          "supplied_facts": [],
+          "version": 1
+        }
+      },
+      "context_index": 0,
+      "name": "record_assessment",
+      "tool_call_id": "chatcmpl-tool-a049b233d03e7a99"
+    }
+  ],
+  "observed_followups": [],
+  "phone_tested": false,
+  "recorded_at": "2026-11-08T06:35:51.978258+00:00",
+  "relevance_check": "prewritten lexical anchors; human review still required",
+  "request_observations": [
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": null,
+      "content_chars": null,
+      "elapsed_ms": 2,
+      "error": "Nemotron transport failed",
+      "finish_reason": null,
+      "outcome": "transport",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": null
+    }
+  ],
+  "request_timeout_ms": 3500,
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "requests_submitted": 1,
+  "retained_arguments_scope": "Synthetic native assessment arguments only; no assistant content or hidden reasoning",
+  "reused_prefix": true,
+  "reused_prefix_source": "fixtures/results/2026-11-08-brev-native-warm.json",
+  "selected_context_index": null,
+  "status": "model_probe_failed"
+}

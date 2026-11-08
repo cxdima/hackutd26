@@ -36,46 +36,74 @@ fn scenario_clips(id: &str) -> anyhow::Result<&'static [usize]> {
         "supplied_reference_george" => &[5],
         "quoted_report_george" => &[6],
         "handoff_changed_george" => &[7, 8],
+        "family_pickup_benign_george" => &[9, 10],
+        "family_pickup_risky_george" => &[9, 11],
         _ => anyhow::bail!("Unknown audio fixture scenario"),
     })
 }
 const CACHE: &str = ".tools/audio-fixtures/20261108T035107Z-f7c2c209-a79e-4ae9-bc1a-e8e3b27812c4";
-const CLIPS: [(&str, &str); 9] = [
+const FAMILY_CACHE: &str =
+    ".tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e";
+const CLIPS: [(&str, &str, &str); 12] = [
     (
         "clinic_opening_caller_brisk",
         "003ee739433076ec124e2b68353c6c93b37163e32c6424073f95b4b52978a58f",
+        CACHE,
     ),
     (
         "login_request_caller_brisk",
         "fa61bc58fc8af658ced2218965997916da0f5bde009322683a53236c4f9114d7",
+        CACHE,
     ),
     (
         "clinic_details_caller_brisk",
         "45d4912041d8cabb6a71329e8e76e18fc2c84bafa36f2f52110045338babfd09",
+        CACHE,
     ),
     (
         "ambiguous_code_caller_brisk",
         "9f7ac0e120ac081c966d43e2cbfeccd6a577f5070164a76eef18a5b9243265ae",
+        CACHE,
     ),
     (
         "negated_warning_caller_brisk",
         "cd2179fb88031762528526b7d83f10dc373d58738806ca01afba1a1b741d49e2",
+        CACHE,
     ),
     (
         "supplied_reference_caller_brisk",
         "9116cfe56ceb304bd96b127adb5ef6360c18270c207bec4520be0afa4a41f2be",
+        CACHE,
     ),
     (
         "quoted_report_caller_brisk",
         "aee8680b669acb8d4205a2f8eebaf1f7589d58b7d4c64229979d841f887266b6",
+        CACHE,
     ),
     (
         "handoff_opening_caller_brisk",
         "4725f4c8167d1e8039c502334ed54da376a5ae610ad76bcee2ea8238de1d3780",
+        CACHE,
     ),
     (
         "handoff_changed_request_caller_brisk",
         "1fa09fb7413a0d1df7b11688223997f5610b9074bfebdea18f042e2bb4d0d29d",
+        CACHE,
+    ),
+    (
+        "family_opening_caller_george",
+        "18ee6db29e55948535d1fab7eb8cb757d0cf5cfa326d5a84ed065d205765d387",
+        FAMILY_CACHE,
+    ),
+    (
+        "family_benign_details_caller_george",
+        "1470a7008be863bd48d327c08f26cca3b5d4d3d52d8bee1c4b92f93b02e69994",
+        FAMILY_CACHE,
+    ),
+    (
+        "family_risky_details_caller_george",
+        "171b514138fdb6c332fae46ec58e37f449cc65df5621f769ffc931521aead451",
+        FAMILY_CACHE,
     ),
 ];
 
@@ -428,12 +456,12 @@ pub(crate) async fn check_budget(
     Ok(())
 }
 async fn clip(index: usize) -> anyhow::Result<Vec<u8>> {
-    let (name, expected) = CLIPS
+    let (name, expected, cache) = CLIPS
         .get(index)
         .ok_or_else(|| anyhow::anyhow!("Unknown fixture clip"))?;
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
-        .join(CACHE)
+        .join(cache)
         .join(format!("{name}.mp3"));
     let metadata = tokio::fs::metadata(&path)
         .await
@@ -474,7 +502,9 @@ pub async fn view(app: &App) -> anyhow::Result<Value> {
         "negated_warning_george",
         "supplied_reference_george",
         "quoted_report_george",
-        "handoff_changed_george"
+        "handoff_changed_george",
+        "family_pickup_benign_george",
+        "family_pickup_risky_george"
     ]);
     value["noise_supported"] = json!(false);
     value["intentional_interrupt_supported"] = json!(false);
@@ -783,6 +813,86 @@ pub async fn recording(app: &App, action: Option<&str>) -> anyhow::Result<Vec<u8
 mod tests {
     use super::*;
     const SID: &str = "CA11111111111111111111111111111111";
+    #[tokio::test]
+    async fn family_scenarios_share_opening_select_their_continuation_and_stay_replay_inert() {
+        let app = app().await;
+        let public = view(&app).await.unwrap();
+        for (scenario, continuation, expected_hash) in [
+            (
+                "family_pickup_benign_george",
+                "family_benign_details_caller_george",
+                "1470a7008be863bd48d327c08f26cca3b5d4d3d52d8bee1c4b92f93b02e69994",
+            ),
+            (
+                "family_pickup_risky_george",
+                "family_risky_details_caller_george",
+                "171b514138fdb6c332fae46ec58e37f449cc65df5621f769ffc931521aead451",
+            ),
+        ] {
+            let selected = scenario_clips(scenario).expect("Family scenario must be allowlisted");
+            assert_eq!(selected.len(), 2);
+            assert_eq!(CLIPS[selected[0]].0, "family_opening_caller_george");
+            assert_eq!(
+                CLIPS[selected[0]].1,
+                "18ee6db29e55948535d1fab7eb8cb757d0cf5cfa326d5a84ed065d205765d387"
+            );
+            assert_eq!(CLIPS[selected[1]].0, continuation);
+            assert_eq!(CLIPS[selected[1]].1, expected_hash);
+            // The ignored cache is optional in a clean checkout. When present,
+            // exercise the actual loader so a wrong directory or byte hash fails.
+            let cached_manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../.tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e/manifest.json");
+            if cached_manifest.is_file() {
+                assert_eq!(
+                    format!("{:x}", Sha256::digest(clip(selected[0]).await.unwrap())),
+                    "18ee6db29e55948535d1fab7eb8cb757d0cf5cfa326d5a84ed065d205765d387"
+                );
+                assert_eq!(
+                    format!("{:x}", Sha256::digest(clip(selected[1]).await.unwrap())),
+                    expected_hash
+                );
+            }
+            assert!(
+                public["supported_scenarios"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|value| value == scenario)
+            );
+            let mut run = Run::new();
+            run.scenario_id = scenario.into();
+            assert_eq!(run.public()["clip_count"], 2);
+            assert!(
+                !run.respond("https://fixture.example", SID, 0, "", "")
+                    .unwrap()
+                    .contains("<Play>")
+            );
+            for step in 1..=2 {
+                let reply = run
+                    .respond("https://fixture.example", SID, step, "actual reply", "0.9")
+                    .unwrap();
+                assert!(reply.contains(&format!("/{}</Play>", step - 1)));
+            }
+            assert_eq!(
+                run.respond("https://fixture.example", SID, 3, "goodbye", "0.9")
+                    .unwrap(),
+                "<Response><Hangup/></Response>"
+            );
+            assert!(
+                run.respond("https://fixture.example", SID, 4, "extra", "1")
+                    .is_err()
+            );
+            let error = start_request(&app, scenario, Some(&uuid::Uuid::new_v4().to_string()))
+                .await
+                .unwrap_err();
+            assert!(error.to_string().contains("Replay cannot call"));
+        }
+        let actions: i64 = sqlx::query_scalar("SELECT count(*) FROM actions")
+            .fetch_one(&app.store.pool)
+            .await
+            .unwrap();
+        assert_eq!(actions, 0);
+    }
     #[tokio::test]
     async fn batch_cannot_start_while_an_old_reservation_is_unknown() {
         let app = app().await;
@@ -1169,6 +1279,7 @@ mod tests {
             family_enabled: false,
             max_call_seconds: 180,
             nvidia_key: String::new(),
+            model_backend: crate::config::ModelBackend::NvidiaHosted,
             model_url: "http://127.0.0.1:1/not-contacted".into(),
             model: "fixture".into(),
         })

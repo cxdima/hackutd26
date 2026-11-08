@@ -1,0 +1,42 @@
+{
+  "assessment_only": false,
+  "backend": "nvidia_hosted",
+  "backend_evidence": "Configured adapter selection; this label alone does not prove GPU execution",
+  "data_origin": "synthetic",
+  "error": "Nemotron request timed out",
+  "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+  "max_output_tokens": 512,
+  "native_result_roundtrips": 0,
+  "native_tool_choice": "named_assessment_then_readiness_gated_next_step",
+  "observed_assessments": [],
+  "observed_followups": [],
+  "phone_tested": false,
+  "recorded_at": "2026-11-08T06:41:37.284623+00:00",
+  "relevance_check": "prewritten lexical anchors; human review still required",
+  "request_observations": [
+    {
+      "backend": "nvidia_hosted",
+      "completion_tokens": null,
+      "content_chars": null,
+      "elapsed_ms": 3505,
+      "error": "Nemotron request timed out",
+      "finish_reason": null,
+      "outcome": "timeout",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": null
+    }
+  ],
+  "request_timeout_ms": 3500,
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "requests_submitted": 1,
+  "retained_arguments_scope": "Synthetic native assessment arguments only; no assistant content or hidden reasoning",
+  "reused_prefix": false,
+  "reused_prefix_source": null,
+  "selected_context_index": null,
+  "status": "model_probe_failed",
+  "checkpoint": "NOT_verified_fa2b05b",
+  "measurement_validity": "invalid_checkpoint_attribution_shared_target_reused_current_binary",
+  "note": "Request timed out3505ms; source archive was correct but binary contained current diagnostics. Not fallback checkpoint evidence."
+}

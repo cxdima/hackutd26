@@ -1,0 +1,16 @@
+{
+  "recorded_at": "2026-11-08T05:39:54.132899+00:00",
+  "operation": "GET /v1/models",
+  "backend": "nvidia_hosted",
+  "endpoint_host": "integrate.api.nvidia.com",
+  "status": 200,
+  "elapsed_ms": 437,
+  "inference_requests": 0,
+  "phone_calls": 0,
+  "key_source": "local_dotenv",
+  "key_name": "NVIDIA_API_KEY",
+  "configuration_matches_documented_model_and_url": true,
+  "model_count": 84,
+  "requested_model_listed": true,
+  "scope": "Catalog response only; does not establish inference authorization or native tool execution."
+}

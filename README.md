@@ -1,5 +1,7 @@
 # FirstRing
 
+**Latest sprint:** real Brev H100 Nemotron inference was demonstrated, but the full native tool continuation failed; it is not the live phone backend. The instance is deleted: **$2.60 spent, $57.40 credits remain**. General-purpose understanding, message/closing fixes and backend-aware console passed242Rust tests and41frontend unit tests; new live behavioral proof is still pending. [Current status](docs/progress.md), [Brev evidence](docs/brev-nemotron-deployment.md).
+
 A Rust call-screening prototype for HackUTD 2026. A disclosed assistant screens unfamiliar callers, offers a private keypad choice, and withdraws that offer when the request changes. Rust owns permission and provider effects. The console shows actual actor events and separates real execution from authored replay.
 
 **Verified live exchange, Nov 7 at 22:10 Central:** a real inbound Photon → Twilio Relay call completed a Nemotron tool/result conversation, protective refusal, minimized incident note and automatic hangup after the full goodbye. The caller confirmed hearing the responses. Eight in-call requests returned the exact specified NVIDIA model; HTTP latency was **1120–2892ms, median 1796ms**. The caller estimated **3–5 seconds** per reply; that is not instrumented audio latency. See the [live call receipt](docs/evidence/nvidia-relay-call-2026-11-07.json).

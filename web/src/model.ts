@@ -1,4 +1,4 @@
-import { matchSchema } from "./types";
+import { matchSchema, modelBackendSchema } from "./types";
 import type { CallEvent, Leg, Session, TacticMatch } from "./types";
 import { z } from "zod";
 
@@ -8,6 +8,7 @@ const httpObservation = z.object({
   boundary: z.literal("model_http"),
   heard: z.literal(false),
   observation: z.object({
+    backend: modelBackendSchema.optional(),
     response_model: z.string().max(200).nullable(),
     elapsed_ms: z.number().int().nonnegative(),
     outcome: z.enum([

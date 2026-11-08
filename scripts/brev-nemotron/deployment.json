@@ -1,0 +1,36 @@
+{
+  "purpose": "FirstRing native Nemotron tool inference; no ASR training",
+  "status": "deleted_after_failed_native_gate",
+  "model_repository": "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4",
+  "model_revision": "bee7596271d1495f6992ae224aefde4410e816b8",
+  "checkpoint_bytes": 21561882284,
+  "checkpoint_safetensors_files": 52,
+  "served_model_name": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "container_tag": "vllm/vllm-openai:v0.27.1",
+  "container_digest": "sha256:0a51ea5b4ae2dc5d81890e5173f54203d2a3ae0cfffe51b8fd2afd4391bfd967",
+  "preferred_hardware": "one H100 80GB, x86_64",
+  "tool_call_parser": "qwen3_coder",
+  "reasoning_parser": "nemotron_v3",
+  "chat_template": "checkpoint-provided, pinned model revision",
+  "request_chat_template_kwargs": {
+    "enable_thinking": false
+  },
+  "maximum_experiment_minutes": 90,
+  "absolute_authorized_ceiling_usd": 60,
+  "effective_ceiling": "min(60, verified remaining organization credits); include storage and deletion reserve",
+  "public_catalog_example": {
+    "instance_type": "hyperstack_H100",
+    "hourly_usd": 3.0,
+    "disk_gb": 850,
+    "stoppable": false,
+    "account_eligibility_verified": true,
+    "ninety_minute_compute_only_usd": 4.5
+  },
+  "verified_balance_usd": 60,
+  "auto_recharge_enabled": false,
+  "experiment_limit_usd": 10,
+  "preserve_credits_usd": 50,
+  "allocation_performed": true,
+  "remaining_credit_usd_observed": 57.4,
+  "experiment_debit_usd_observed": 2.6
+}

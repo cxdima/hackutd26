@@ -1,0 +1,40 @@
+{
+  "recorded_at": "2026-11-08T05:25:50.439308+00:00",
+  "status": "frozen_before_compact_understanding_followup",
+  "change": "Compact output guidance and sanitized finish/usage diagnostics; schema, gold labels and deadlines unchanged. Numeric message privacy contract updated by root.",
+  "files": [
+    {
+      "path": "fixtures/language-general-purpose-development.json",
+      "sha256": "35c7c620bfd77eeb1dfa4550f8fee0537e2dc5dadb1e7f282b9a7a47305ce0c0"
+    },
+    {
+      "path": "fixtures/general-purpose-understanding-v1-rubric.json",
+      "sha256": "d3b60326fd61e002a02a8fcdce3ec95c3182ddc9349dd3ecd263436c1ae59d7a"
+    },
+    {
+      "path": "server/src/providers/nemotron.rs",
+      "sha256": "bbc12de563376463277634ca61d7effe7354756adfcdd8c9bced8b8e3e0d5932"
+    },
+    {
+      "path": "server/src/bin/preflight.rs",
+      "sha256": "e37321907e40afcedf95681bdd07c8609bb474fa4c5f44b2f1973c3351ec1485"
+    },
+    {
+      "path": "server/src/tools.rs",
+      "sha256": "fcb5ac40a5b1c2a37008a008c8c3ca4b6f863d0cc30ae4070e77a7a0dea19269"
+    },
+    {
+      "path": "server/src/calls/state.rs",
+      "sha256": "9b7d8a3e7bd43cafa5da4defc1257b4a5d3548e599aeb3dd0ac8a53ba12db3d2"
+    }
+  ],
+  "limits": {
+    "max_requests": 32,
+    "run_deadline_seconds": 120,
+    "request_timeout_ms": 3500,
+    "turn_deadline_ms": 6000,
+    "max_steps_per_turn": 4,
+    "max_completion_tokens": 512
+  },
+  "phone_calls": 0
+}

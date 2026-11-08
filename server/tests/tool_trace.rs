@@ -20,7 +20,7 @@ async fn accepted_tool_trace_has_turn_binding_sanitized_arguments_and_actual_res
     .await
     .unwrap();
     let s = h.send(Input::Snapshot).await.unwrap();
-    let arguments = json!({"observation":{"speech_act":"request","requested_object":"routine_information","direction":"caller_requests_from_sarah"},"evidence_refs":[{"turn_id":s["turns"][0]["id"],"quote":"appointment reminder"}]});
+    let arguments = json!({"observation":{"speech_act":"request","requested_object":"routine_information","direction":"caller_requests_from_sarah"},"evidence_refs":[{"turn_id":s["turns"][0]["id"],"quote":"appointment reminder"}],"understanding":{"version":1,"claimed_identity":null,"purpose":"Leave an appointment reminder","requested_action":"Pass along reminder details","supplied_facts":[],"missing_information":["What should the reminder say?"],"readiness":"needs_information"}});
     let result = h
         .send(Input::ModelTool {
             generation: s["generation_id"].as_u64().unwrap(),

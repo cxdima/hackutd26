@@ -1,0 +1,24 @@
+{
+  "recorded_at": "2026-11-08T05:19:58.199742+00:00",
+  "status": "frozen_before_first_understanding_v1_evaluation",
+  "data_origin": "synthetic",
+  "files": [
+    {
+      "path": "fixtures/language-general-purpose-development.json",
+      "sha256": "35c7c620bfd77eeb1dfa4550f8fee0537e2dc5dadb1e7f282b9a7a47305ce0c0"
+    },
+    {
+      "path": "fixtures/general-purpose-understanding-v1-rubric.json",
+      "sha256": "d3b60326fd61e002a02a8fcdce3ec95c3182ddc9349dd3ecd263436c1ae59d7a"
+    }
+  ],
+  "limits": {
+    "max_requests": 32,
+    "run_deadline_seconds": 120,
+    "request_timeout_ms": 3500,
+    "turn_deadline_ms": 6000,
+    "max_steps_per_turn": 4
+  },
+  "held_out_modified": false,
+  "phone_calls_authorized_by_this_evaluation": 0
+}

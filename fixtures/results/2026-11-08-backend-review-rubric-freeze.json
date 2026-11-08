@@ -1,0 +1,14 @@
+{
+  "recorded_at": "2026-11-08T05:45:14.192107+00:00",
+  "fixture_sha256": "6c282b82c811a7ce6ff413acf7b6075abbcac5bdad49d1c6e9e4b649128547f6",
+  "review_rubric": "fixtures/backend-comparison-review-v1.json",
+  "review_rubric_sha256": "15753bf1f298e623e58f6bc10dd46223cad15de39849d65b575dcfd2f68d5b95",
+  "prior_six_case_fixture_unchanged": true,
+  "comparison_runs_to_date": 0,
+  "limits": {
+    "request_ms": 3500,
+    "turn_ms": 6000,
+    "max_output_tokens": 512,
+    "max_requests": 24
+  }
+}

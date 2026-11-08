@@ -120,7 +120,7 @@ The [official event schedule](https://zeroday.hackutd.co/#schedule) currently co
 
 Current runtime is `VOICE_TRANSPORT=relay`, `DEMO_EXECUTION_MODE=live`, with `TEST_CALLS_AUTHORIZED=false`, `HANDOFF_CALLS_ENABLED=false`, and `FAMILY_CALLS_ENABLED=false`. Keep all three false for caller-only testing. Phone B is unavailable; its single historical smoke-attempt budget is unspent. The console must leave that action unavailable. No family endpoint or later outbound scope is established.
 
-Next live gate: the requested deliberate interruption in the current noisy room, with actual interrupt/cancellation, current-generation model result, audible response and clean ending correlated. Preserve public health and signature checks. B is not a prerequisite. Full two-phone M1, private consent and independent contact remain unverified; Brev stays deferred. Keep credentials and ledgers intact. See the [caller-only runbook](demo-runbook.md).
+Next live gate: the requested deliberate interruption in the current noisy room, with actual interrupt/cancellation, current-generation model result, audible response and clean ending correlated. Preserve public health and signature checks. B is not a prerequisite. Full two-phone M1, private consent and independent contact remain unverified; Brev Nemotron deployment is authorized; the current account and deployment gates are tracked separately. Keep credentials and ledgers intact. See the [caller-only runbook](demo-runbook.md).
 
 ## Account setup history — 2026-11-07 20:28 Central
 

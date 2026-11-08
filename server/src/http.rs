@@ -61,6 +61,7 @@ pub fn router(app: App) -> Router {
         .route("/voice/relay", get(relay_ws))
         .route("/voice/relay/", get(relay_ws))
         .route("/voice/after-relay", post(after_relay))
+        .route("/voice/closing", post(closing_input))
         .route("/voice/turn", post(turn))
         .route("/voice/whisper/{id}", post(whisper))
         .route("/voice/choice/{id}", post(choice))
@@ -471,17 +472,18 @@ async fn state(State(app): State<App>) -> ApiResult {
     let c = &app.config;
     let (community, tactics) = crate::patterns::view(&app.store, c.mode).await?;
     let evidence = crate::evidence::view(&app.store).await?;
+    let model_backend = crate::evidence::model_backend(c, &app.store).await?;
     let phone_b = crate::evidence::phone_b(c, &app.store).await?;
     let capabilities = json!([
     {"id":"inbound","status":if c.inbound_configured(){"configured"}else{"pending"},"detail":"Local signing and HTTPS inputs; recorded phone proof is shown separately"},
     {"id":"outbound","status":if c.outbound_configured(){"configured"}else{"pending"},"detail":"Separate Photon SIP credentials and caller number; endpoint enrollment, authorization and real outbound test remain separate gates"},
-    {"id":"nemotron","status":if c.model_configured(){"configured"}else{"pending"},"detail":"Local hosted model inputs; protocol evidence and behavior evaluation are separate"},
+    {"id":"nemotron","status":if c.model_configured(){"configured"}else{"pending"},"detail":"Selected Nemotron backend inputs; protocol evidence and behavior evaluation are separate"},
     {"id":"relay","status":if c.relay_configured(){"configured"}else{"pending"},"detail":"Local signed-WebSocket inputs only; onboarding and real phone protocol test pending"},
     {"id":"smoke_test","status":if c.smoke_authorized{"configured"}else{"pending"},"detail":"Exactly one authorized outbound attempt to Sarah/Phone B"},
     {"id":"family","status":if c.family_enabled{"configured"}else{"disabled"},"detail":"Family calls require separate enrollment and authorization"},
     {"id":"voice_clone","status":"disabled","detail":"Preset assistant voice; no clone endpoint verified"}
     ]);
-    Ok(Json(json!({"execution_mode":c.mode,"data_origin":"synthetic","transport":c.transport,"phone_display":if c.photon_number.is_empty(){"Not configured"}else{&c.photon_number},"selected_household":app.store.metadata("selected_household").await?.unwrap_or_else(||"sarah".into()),"capabilities":capabilities,"evidence":evidence,"phone_b":phone_b,"speech":relay::speech_configuration(&c.transport),"sessions":snapshots,"community":community,"tactics":tactics})).into_response())
+    Ok(Json(json!({"execution_mode":c.mode,"data_origin":"synthetic","transport":c.transport,"phone_display":if c.photon_number.is_empty(){"Not configured"}else{&c.photon_number},"selected_household":app.store.metadata("selected_household").await?.unwrap_or_else(||"sarah".into()),"capabilities":capabilities,"evidence":evidence,"model_backend":model_backend,"phone_b":phone_b,"speech":relay::speech_configuration(&c.transport),"sessions":snapshots,"community":community,"tactics":tactics})).into_response())
 }
 async fn ready(State(app): State<App>) -> Response {
     let c = &app.config;
@@ -489,7 +491,10 @@ async fn ready(State(app): State<App>) -> Response {
     let evidence = crate::evidence::view(&app.store).await.unwrap_or_default();
     let inbound = evidence["inbound_phone"]["status"] == "passed";
     let relay = evidence["relay_phone"]["status"] == "passed";
-    let model = evidence["model_protocol"]["status"] == "passed";
+    let model_backend = crate::evidence::model_backend(c, &app.store)
+        .await
+        .unwrap_or_default();
+    let model = model_backend["protocol_verified"] == true;
     let selected = ready
         && c.mode == crate::config::ExecutionMode::Live
         && match c.transport.as_str() {
@@ -503,7 +508,7 @@ async fn ready(State(app): State<App>) -> Response {
         } else {
             StatusCode::SERVICE_UNAVAILABLE
         },
-        Json(json!({"configured":ready,"live_verified":selected,"execution_mode":c.mode,"transport":c.transport,"evidence":evidence,
+        Json(json!({"configured":ready,"live_verified":selected,"execution_mode":c.mode,"transport":c.transport,"evidence":evidence,"model_backend":model_backend,
             "capabilities":{
                 "inbound":{"configured":c.inbound_configured(),"live_verified":inbound},
                 "outbound":{"configured":c.outbound_configured(),"live_verified":false},
@@ -599,9 +604,20 @@ async fn conference_status(
         .await?;
     Ok(StatusCode::NO_CONTENT.into_response())
 }
-async fn after_relay(State(app): State<App>, Extension(f): Extension<FormData>) -> ApiResult {
+async fn after_relay(
+    State(app): State<App>,
+    Query(q): Query<HashMap<String, String>>,
+    Extension(f): Extension<FormData>,
+) -> ApiResult {
     let h = app.by_sid(f.field("CallSid")).await?;
     let s = h.send(Input::Snapshot).await?;
+    let token = q
+        .get("relay_token")
+        .ok_or_else(|| anyhow::anyhow!("Missing Relay callback token"))?
+        .clone();
+    if s["relay_token"].as_str() != Some(token.as_str()) {
+        return Err(anyhow::anyhow!("Obsolete Relay callback").into());
+    }
     let session: Session = serde_json::from_value(s.clone())?;
     let code = f.field("ErrorCode").parse::<u32>().ok();
     let status = match f.field("SessionStatus") {
@@ -613,9 +629,9 @@ async fn after_relay(State(app): State<App>, Extension(f): Extension<FormData>) 
     app.store.append(Some(&session), "system", "relay.ended", json!({"error_code":code,"status":status,"duration_seconds":f.field("SessionDuration").parse::<u64>().ok()}),session.execution_mode).await?;
     if matches!(
         s["closing_reason"].as_str(),
-        Some("message_saved" | "model_failure")
+        Some("message_saved" | "model_failure" | "no_message")
     ) {
-        let closing = h.send(Input::ClosingResponse).await?;
+        let closing = h.send(Input::ClosingResponseForRelay { token }).await?;
         return Ok(xml(closing["twiml"]
             .as_str()
             .unwrap_or("<Response><Hangup/></Response>")
@@ -626,10 +642,41 @@ async fn after_relay(State(app): State<App>, Extension(f): Extension<FormData>) 
             "<Response><Pause length=\"10\"/><Hangup/></Response>".into()
         ));
     }
-    h.send(Input::RelayDisconnected).await?;
+    h.send(Input::RelayDisconnected { token }).await?;
     Ok(xml(twilio::say_end(
         "The assistant connection ended. No private choice will connect this call. Goodbye.",
     )))
+}
+async fn closing_input(
+    State(app): State<App>,
+    Query(q): Query<HashMap<String, String>>,
+    Extension(f): Extension<FormData>,
+) -> ApiResult {
+    let nonce = q
+        .get("nonce")
+        .ok_or_else(|| anyhow::anyhow!("Missing closing token"))?
+        .clone();
+    let h = app.by_sid(f.field("CallSid")).await?;
+    let response = h
+        .send(Input::ClosingInput {
+            nonce,
+            text: f.field("SpeechResult").into(),
+        })
+        .await?;
+    if let Some(token) = response["gather_turn_token"].as_str() {
+        // Continue the already signed form through the existing bounded Gather
+        // turn handler; closing corrections never upgrade the selected transport.
+        return turn(
+            State(app),
+            Query(HashMap::from([("turn_id".into(), token.into())])),
+            Extension(f),
+        )
+        .await;
+    }
+    Ok(xml(response["twiml"]
+        .as_str()
+        .unwrap_or("<Response><Hangup/></Response>")
+        .into()))
 }
 async fn turn(
     State(app): State<App>,
@@ -685,7 +732,7 @@ async fn turn(
     let s = h.send(Input::Snapshot).await?;
     let twiml = if matches!(
         s["closing_reason"].as_str(),
-        Some("message_saved" | "model_failure")
+        Some("message_saved" | "model_failure" | "no_message")
     ) {
         h.send(Input::ClosingResponse).await?["twiml"]
             .as_str()
@@ -814,9 +861,12 @@ async fn relay_socket(app: App, mut socket: WebSocket) {
         tracing::warn!("Relay setup call binding rejected");
         return;
     };
+    // Subscribe before attaching: a queued closing interruption can start its
+    // model immediately after setup, and broadcast does not retain old frames.
+    let mut audio = h.audio.subscribe();
     if h.send(Input::ConnectRelay {
         sid: call_sid.clone(),
-        token: session_token,
+        token: session_token.clone(),
     })
     .await
     .is_err()
@@ -824,7 +874,6 @@ async fn relay_socket(app: App, mut socket: WebSocket) {
         tracing::warn!("Relay setup session-token or active-leg binding rejected");
         return;
     }
-    let mut audio = h.audio.subscribe();
     relay_observation(&h, started, "setup", None).await;
     loop {
         tokio::select! {biased;
@@ -834,11 +883,11 @@ async fn relay_socket(app: App, mut socket: WebSocket) {
             let (command,event,characters)=match relay::parse(&raw){
              Ok(RelayInput::Prompt{voice_prompt,last,..})=>{
                let characters=Some(voice_prompt.chars().count());
-               (Some(if last {Input::FinalPrompt{text:voice_prompt}}else{Input::Speech{partial:Some(voice_prompt)}}),if last{"prompt.final"}else{"prompt.partial"},characters)
+               (Some(Input::RelaySpeech{token:session_token.clone(),text:Some(voice_prompt),last}),if last{"prompt.final"}else{"prompt.partial"},characters)
              },
-             Ok(RelayInput::Interrupt{..})=>(Some(Input::Speech{partial:None}),"interrupt",None),
+             Ok(RelayInput::Interrupt{..})=>(Some(Input::RelaySpeech{token:session_token.clone(),text:None,last:false}),"interrupt",None),
              Ok(RelayInput::Dtmf{digit})=>(Some(Input::Keypad{sid:call_sid.clone(),digits:digit}),"dtmf",None),
-             Ok(RelayInput::Error{..})|Err(_)=>{let _=h.send(Input::RelayDisconnected).await;relay_observation(&h,started,"error",None).await;break;},
+             Ok(RelayInput::Error{..})|Err(_)=>{let _=h.send(Input::RelayDisconnected{token:session_token.clone()}).await;relay_observation(&h,started,"error",None).await;break;},
              _=>(None,"other",None),
             };
             // Caller policy input must enter the actor before observability can
@@ -855,10 +904,11 @@ async fn relay_socket(app: App, mut socket: WebSocket) {
           let Ok(frame)=outgoing else{break;};
           let Ok(s)=h.send(Input::Snapshot).await else{break;};
           let Ok(session)=serde_json::from_value::<Session>(s) else {break;};
+          if session.relay_token != session_token { break; }
           if frame.permitted_for(&session) {
             if socket.send(Message::Text(frame.payload.to_string().into())).await.is_err(){break;}
             let event=match frame.purpose {
-              crate::calls::actor::AudioPurpose::MessageClosing | crate::calls::actor::AudioPurpose::ModelFailureClosing=>"output.end",
+              crate::calls::actor::AudioPurpose::MessageClosing | crate::calls::actor::AudioPurpose::ModelFailureClosing | crate::calls::actor::AudioPurpose::NoMessageClosing=>"output.end",
               crate::calls::actor::AudioPurpose::PendingSpeechRecovery=>"output.recovery",
               crate::calls::actor::AudioPurpose::Response=>"output.text",
             };
@@ -869,7 +919,11 @@ async fn relay_socket(app: App, mut socket: WebSocket) {
          }
         }
     }
-    let _ = h.send(Input::RelayDisconnected).await;
+    let _ = h
+        .send(Input::RelayDisconnected {
+            token: session_token,
+        })
+        .await;
     relay_observation(&h, started, "closed", None).await;
 }
 

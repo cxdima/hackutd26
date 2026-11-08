@@ -64,7 +64,7 @@ async fn respond(State(state): State<MockState>, Json(request): Json<Value>) -> 
         (
             "assessment-call-1",
             "record_assessment",
-            json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":evidence}),
+            json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":evidence,"understanding":{"version":1,"claimed_identity":null,"purpose":"Share an update","requested_action":"Confirm whether to save","supplied_facts":[],"missing_information":["Whether a message is wanted"],"readiness":"needs_information"}}),
         )
     } else {
         (
@@ -124,6 +124,7 @@ async fn app(url: &str, mode: ExecutionMode) -> (App, Handle) {
         family_enabled: false,
         max_call_seconds: 180,
         nvidia_key: "local-fixture-key".into(),
+        model_backend: firstring::config::ModelBackend::NvidiaHosted,
         model_url: url.into(),
         model: "fixture-model".into(),
     };
@@ -162,8 +163,12 @@ async fn native_assessment_result_is_returned_with_matching_id_before_validated_
     );
     assert_eq!(first["parallel_tool_calls"], false);
     let second = request(&mut provider).await;
-    assert_eq!(second["tool_choice"], "required");
-    assert_eq!(second["tools"].as_array().unwrap().len(), 6);
+    assert_eq!(
+        second["tool_choice"],
+        json!({"type":"function","function":{"name":"ask_caller"}})
+    );
+    assert_eq!(second["tools"].as_array().unwrap().len(), 1);
+    assert_eq!(second["tools"][0]["function"]["name"], "ask_caller");
     assert!(
         second["tools"]
             .as_array()
@@ -304,7 +309,7 @@ async fn native_risky_assessment_then_real_http_timeout_closes_without_saving_a_
             }
             let context:Value=serde_json::from_str(request["messages"][1]["content"].as_str().unwrap()).unwrap();
             let turn=&context["turns"][0];
-            Json(json!({"model":"fixture-model","choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"accepted-risk","type":"function","function":{"name":"record_assessment","arguments":json!({"observation":{"speech_act":"request","requested_object":"authentication_secret","direction":"caller_requests_from_sarah"},"evidence_refs":[{"turn_id":turn["id"],"quote":turn["text"]}]}).to_string()}}]}}]}))
+            Json(json!({"model":"fixture-model","choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"accepted-risk","type":"function","function":{"name":"record_assessment","arguments":json!({"observation":{"speech_act":"request","requested_object":"authentication_secret","direction":"caller_requests_from_sarah"},"evidence_refs":[{"turn_id":turn["id"],"quote":turn["text"]}],"understanding":{"version":1,"claimed_identity":null,"purpose":"Request account access","requested_action":"Obtain authentication material","supplied_facts":[],"missing_information":[],"readiness":"ready"}}).to_string()}}]}}]}))
         }
     }));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

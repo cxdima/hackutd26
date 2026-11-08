@@ -35,3 +35,20 @@ The earlier Nov 7 dry run planned **36 clips / 3,549 characters**, estimated **2
 After generation, listen to each clip and record pronunciation, clipping, pace and whether the intended quotation/negation is audible. During an authorized A-only phone test, play only an appropriate development segment through the caller's microphone, wait for the actual response, then play the next segment in the same group. Compare the real ASR transcript, accepted assessment, proposed tool and actual outcome with the prewritten rubric. A-only runs cannot satisfy fictional handoff/family completion expectations. Synthesized caller audio, model-only tests and successful MP3 downloads do not prove carrier routing, ASR, first audible latency, private handoff or a completed callback.
 
 The adapter uses the official [create-speech endpoint](https://elevenlabs.io/docs/api-reference/text-to-speech/convert), `xi-api-key`, `eleven_multilingual_v2` and `mp3_44100_128`. It checks [available models](https://elevenlabs.io/docs/api-reference/models/list) and each [voice's metadata](https://elevenlabs.io/docs/api-reference/voices/get) before synthesis. Voice selection can use the documented [voice list](https://elevenlabs.io/docs/api-reference/voices/search). The [stream endpoint](https://elevenlabs.io/docs/api-reference/text-to-speech/stream) is available, but complete file conversion is sufficient here; this utility does not add a streaming transport to FirstRing.
+
+## Matched family development clips
+
+On **Nov 7 at 23:25 Central**, the separately authored `fixtures/audio-family-development.json` produced exactly **three George clips**: a shared claimed-son/pickup opening, a benign train-time/entrance continuation, and an authentication-extraction continuation. Their labels were reviewed before synthesis. All three remain in the single `family_pickup` development group; the alternatives are not independent held-out examples, and a claimed family identity is unverified.
+
+The [synthesis receipt](evidence/audio-family-development-2026-11-07.json) records the manifest, exact text/render/audio hashes, settings and per-clip receipts. The separate cache is `.tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e/`. Three requests submitted **233 text characters** (59 + 85 + 89) after two metadata reads; all three succeeded without retries or unknown outcomes. Audio totals **219,557 bytes**, with measured MP3 durations **3.669s / 4.783s / 5.062s**, mono 44.1kHz. Request-through-transfer times were 526 / 565 / 610ms; these are not phone or first-audible latency. Actual provider billing/quota was not measured.
+
+All 110 original cache files and the six preserved source/evaluation fixture files were hash-checked unchanged. These new files have **not been listened to, transcribed or phone-tested**; synthesis performed zero telephony actions. Exact command used (rerunning incurs new synthesis):
+
+```bash
+bash scripts/cargo.sh run --bin audio_fixtures -- \
+  --dataset fixtures/audio-family-development.json \
+  --voice-slot caller_george --voice-ids JBFqnCBsd6RMkjVDRZzb \
+  --limit 3 --generate
+```
+
+The generator also accepts repeated `--scenario ID` selections from an authored development dataset. It validates the complete source and ancestry before selecting clips, preserves the 36-request maximum, and creates a fresh cache rather than overwriting existing audio.

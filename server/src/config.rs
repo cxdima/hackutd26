@@ -7,6 +7,81 @@ pub enum ExecutionMode {
     Live,
     Replay,
 }
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ModelBackend {
+    NvidiaHosted,
+    BrevHosted,
+}
+
+/// Selecting a backend never overwrites the other backend's endpoint or key.
+pub struct ModelSettings {
+    pub backend: ModelBackend,
+    pub key: String,
+    pub url: String,
+    pub model: String,
+}
+impl ModelSettings {
+    pub fn from_env() -> anyhow::Result<Self> {
+        Self::from_lookup(|key| std::env::var(key).ok())
+    }
+    fn from_lookup(get: impl Fn(&str) -> Option<String>) -> anyhow::Result<Self> {
+        let backend = match get("NEMOTRON_BACKEND")
+            .as_deref()
+            .unwrap_or("nvidia_hosted")
+        {
+            "nvidia_hosted" => ModelBackend::NvidiaHosted,
+            "brev_hosted" => ModelBackend::BrevHosted,
+            _ => anyhow::bail!("NEMOTRON_BACKEND must be nvidia_hosted or brev_hosted"),
+        };
+        let (key, url, model) = match backend {
+            ModelBackend::NvidiaHosted => (
+                get("NVIDIA_API_KEY").unwrap_or_default(),
+                get("NEMOTRON_CHAT_URL").unwrap_or_else(|| {
+                    "https://integrate.api.nvidia.com/v1/chat/completions".into()
+                }),
+                get("NEMOTRON_MODEL")
+                    .unwrap_or_else(|| "nvidia/nemotron-3.5-lightning-30b-a3b".into()),
+            ),
+            ModelBackend::BrevHosted => (
+                get("BREV_NEMOTRON_API_KEY").unwrap_or_default(),
+                get("BREV_NEMOTRON_CHAT_URL").unwrap_or_default(),
+                get("BREV_NEMOTRON_MODEL").unwrap_or_default(),
+            ),
+        };
+        if backend == ModelBackend::BrevHosted {
+            anyhow::ensure!(
+                !key.trim().is_empty() && !model.trim().is_empty(),
+                "Brev backend requires BREV_NEMOTRON_API_KEY and BREV_NEMOTRON_MODEL"
+            );
+            let endpoint = url::Url::parse(&url)
+                .map_err(|_| anyhow::anyhow!("Configure BREV_NEMOTRON_CHAT_URL"))?;
+            let loopback = matches!(
+                endpoint.host_str(),
+                Some("localhost" | "127.0.0.1" | "[::1]")
+            );
+            anyhow::ensure!(
+                (endpoint.scheme() == "https" || (loopback && endpoint.scheme() == "http"))
+                    && endpoint.username().is_empty()
+                    && endpoint.password().is_none()
+                    && endpoint.query().is_none()
+                    && endpoint.fragment().is_none(),
+                "Brev inference requires HTTPS or a loopback SSH forward, without credentials in its URL"
+            );
+            anyhow::ensure!(
+                endpoint.host_str() != Some("integrate.api.nvidia.com"),
+                "Brev backend must use the actual instance endpoint, not hosted NVIDIA inference"
+            );
+        }
+        Ok(Self {
+            backend,
+            key,
+            url,
+            model,
+        })
+    }
+}
 #[derive(Clone)]
 pub struct Config {
     pub public_base_url: String,
@@ -28,11 +103,13 @@ pub struct Config {
     pub family_enabled: bool,
     pub max_call_seconds: u32,
     pub nvidia_key: String,
+    pub model_backend: ModelBackend,
     pub model_url: String,
     pub model: String,
 }
 impl Config {
     pub fn from_env() -> anyhow::Result<Self> {
+        let model_settings = ModelSettings::from_env()?;
         let get = |k: &str, default: &str| std::env::var(k).unwrap_or_else(|_| default.into());
         let mode = match get("DEMO_EXECUTION_MODE", "replay").as_str() {
             "live" => ExecutionMode::Live,
@@ -126,12 +203,10 @@ impl Config {
             handoff_enabled: get("HANDOFF_CALLS_ENABLED", "false") == "true",
             family_enabled: get("FAMILY_CALLS_ENABLED", "false") == "true",
             max_call_seconds,
-            nvidia_key: get("NVIDIA_API_KEY", ""),
-            model_url: get(
-                "NEMOTRON_CHAT_URL",
-                "https://integrate.api.nvidia.com/v1/chat/completions",
-            ),
-            model: get("NEMOTRON_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b"),
+            nvidia_key: model_settings.key,
+            model_backend: model_settings.backend,
+            model_url: model_settings.url,
+            model: model_settings.model,
         })
     }
     pub fn inbound_configured(&self) -> bool {
@@ -175,4 +250,74 @@ pub fn is_e164(s: &str) -> bool {
         && (9..=16).contains(&s.len())
         && s.as_bytes()[1] != b'0'
         && s[1..].bytes().all(|b| b.is_ascii_digit())
+}
+pub fn endpoint_fingerprint(url: &str) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(url.as_bytes()))
+}
+
+#[cfg(test)]
+mod model_settings_tests {
+    use super::*;
+    fn settings(values: &[(&str, &str)]) -> anyhow::Result<ModelSettings> {
+        ModelSettings::from_lookup(|key| {
+            values
+                .iter()
+                .find(|(k, _)| *k == key)
+                .map(|(_, v)| v.to_string())
+        })
+    }
+    #[test]
+    fn backend_selection_keeps_hosted_fallback_and_separate_authentication() {
+        let hosted = settings(&[
+            ("NVIDIA_API_KEY", "hosted-test"),
+            ("BREV_NEMOTRON_API_KEY", "instance-test"),
+        ])
+        .unwrap();
+        assert_eq!(hosted.backend, ModelBackend::NvidiaHosted);
+        assert_eq!(hosted.key, "hosted-test");
+        let brev = settings(&[
+            ("NEMOTRON_BACKEND", "brev_hosted"),
+            ("NVIDIA_API_KEY", "hosted-test"),
+            ("BREV_NEMOTRON_API_KEY", "instance-test"),
+            (
+                "BREV_NEMOTRON_CHAT_URL",
+                "http://127.0.0.1:18080/v1/chat/completions",
+            ),
+            ("BREV_NEMOTRON_MODEL", "actual-checkpoint"),
+        ])
+        .unwrap();
+        assert_eq!(brev.backend, ModelBackend::BrevHosted);
+        assert_eq!(brev.key, "instance-test");
+        assert_eq!(brev.model, "actual-checkpoint");
+    }
+    #[test]
+    fn brev_requires_its_own_key_and_protected_endpoint() {
+        let base = [
+            ("NEMOTRON_BACKEND", "brev_hosted"),
+            ("BREV_NEMOTRON_MODEL", "checkpoint"),
+            ("NVIDIA_API_KEY", "hosted-test"),
+        ];
+        for endpoint in [
+            "http://198.51.100.1/v1/chat/completions",
+            "https://key:secret@example.test/v1/chat/completions",
+            "https://integrate.api.nvidia.com/v1/chat/completions",
+        ] {
+            let mut v = base.to_vec();
+            v.extend([
+                ("BREV_NEMOTRON_API_KEY", "instance-test"),
+                ("BREV_NEMOTRON_CHAT_URL", endpoint),
+            ]);
+            assert!(settings(&v).is_err());
+        }
+        let mut missing = base.to_vec();
+        missing.push((
+            "BREV_NEMOTRON_CHAT_URL",
+            "http://127.0.0.1:18080/v1/chat/completions",
+        ));
+        assert!(
+            settings(&missing).is_err(),
+            "Hosted key must never silently authenticate to the instance"
+        );
+    }
 }

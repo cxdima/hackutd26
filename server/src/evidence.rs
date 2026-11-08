@@ -83,6 +83,48 @@ pub async fn view(store: &Store) -> anyhow::Result<Value> {
     }))
 }
 
+/// Historical hosted receipts never verify a different deployment. Brev proof
+/// additionally requires the operator's GPU-loading/native-cycle receipt.
+pub async fn model_backend(config: &Config, store: &Store) -> anyhow::Result<Value> {
+    use crate::config::ModelBackend;
+    let (label, protocol_verified) = match config.model_backend {
+        ModelBackend::NvidiaHosted => (
+            "NVIDIA-hosted Nemotron",
+            config.model_url == "https://integrate.api.nvidia.com/v1/chat/completions"
+                && config.model == "nvidia/nemotron-3.5-lightning-30b-a3b"
+                && view(store).await?["model_protocol"]["status"] == "passed",
+        ),
+        ModelBackend::BrevHosted => {
+            let stored: Value = store
+                .metadata("verification.brev_model_protocol")
+                .await?
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or(Value::Null);
+            let passed = stored["status"] == "passed"
+                && stored["source"] == "brev_gpu_model_probe"
+                && stored["model"] == config.model
+                && stored["endpoint_sha256"]
+                    == crate::config::endpoint_fingerprint(&config.model_url)
+                && stored["recorded_at"]
+                    .as_str()
+                    .is_some_and(|s| chrono::DateTime::parse_from_rfc3339(s).is_ok())
+                && [
+                    "loaded_on_gpu",
+                    "authenticated",
+                    "native_assessment",
+                    "native_tool_results",
+                    "action_selection",
+                ]
+                .iter()
+                .all(|c| stored["checks"][c] == true);
+            ("Brev-hosted Nemotron", passed)
+        }
+    };
+    Ok(
+        json!({"backend":config.model_backend,"label":label,"requested_model":config.model,"configured":config.model_configured(),"protocol_verified":protocol_verified,"detail":if protocol_verified {"Recorded native tool-cycle evidence; behavioral quality and live phone proof remain separate."} else {"Configuration selected; this backend's native tool cycle has not been verified."}}),
+    )
+}
+
 pub async fn phone_b(config: &Config, store: &Store) -> anyhow::Result<Value> {
     let used: i64 =
         sqlx::query_scalar("SELECT count(*) FROM actions WHERE kind='probe' AND mode='live'")

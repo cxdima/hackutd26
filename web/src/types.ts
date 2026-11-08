@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const mode = z.enum(["live", "replay"]);
+export const modelBackendSchema = z.enum(["nvidia_hosted", "brev_hosted"]);
 export type ExecutionMode = z.infer<typeof mode>;
 export const legSchema = z.object({
   action_id: z.string(),
@@ -54,6 +55,34 @@ export const assessmentSchema = z.object({
   observation: observationSchema,
   evidence_refs: z.array(z.object({ turn_id: z.string(), quote: z.string() })),
 });
+const acceptedUnderstandingSchema = z.object({
+  generation_id: z.number().int().nonnegative(),
+  turn_version: z.number().int().nonnegative(),
+  policy_epoch: z.number().int().nonnegative(),
+  understanding: z.object({
+    version: z.literal(1),
+    claimed_identity: z.string().max(120).nullable(),
+    purpose: z.string().max(180),
+    requested_action: z.string().max(180),
+    supplied_facts: z
+      .array(
+        z.object({
+          text: z.string().max(180),
+          evidence_refs: z.array(
+            z.object({ turn_id: z.string(), quote: z.string() }),
+          ),
+        }),
+      )
+      .max(4),
+    missing_information: z.array(z.string().max(160)).max(3),
+    readiness: z.enum([
+      "needs_information",
+      "ready",
+      "caller_declined",
+      "no_message",
+    ]),
+  }),
+});
 export const sessionSchema = z.object({
   id: z.string(),
   household_id: z.string(),
@@ -68,6 +97,7 @@ export const sessionSchema = z.object({
   turn_version: z.number().int().nonnegative().optional(),
   assessed_version: z.number().int().nonnegative().optional(),
   assessments: z.array(assessmentSchema).optional(),
+  understanding: acceptedUnderstandingSchema.nullable().optional(),
   message: z
     .object({
       summary: z.string(),
@@ -106,6 +136,16 @@ export const stateSchema = z.object({
   transport: z.string(),
   phone_display: z.string(),
   selected_household: z.string(),
+  model_backend: z
+    .object({
+      backend: modelBackendSchema,
+      label: z.string(),
+      requested_model: z.string(),
+      configured: z.boolean(),
+      protocol_verified: z.boolean(),
+      detail: z.string(),
+    })
+    .optional(),
   speech: z
     .object({
       source: z.literal("configured"),

@@ -1,0 +1,37 @@
+{
+  "assessment_only": false,
+  "backend": "brev_hosted",
+  "backend_evidence": "Configured adapter selection; this label alone does not prove GPU execution",
+  "data_origin": "synthetic",
+  "error": "Facts must retain literal caller wording; sanitized tool shape: {\"arguments\":{\"fields\":{\"evidence_refs\":{\"items\":[{\"fields\":{\"quote\":{\"length\":77,\"type\":\"string\"},\"turn_id\":{\"length\":6,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0}],\"length\":1,\"type\":\"array\"},\"observation\":{\"fields\":{\"direction\":{\"enum_valid\":true,\"type\":\"string\",\"value\":\"caller_supplies\"},\"requested_object\":{\"enum_valid\":true,\"type\":\"string\",\"value\":\"routine_information\"},\"speech_act\":{\"enum_valid\":true,\"type\":\"string\",\"value\":\"statement\"}},\"type\":\"object\",\"unexpected_field_count\":0},\"understanding\":{\"fields\":{\"claimed_identity\":{\"type\":\"null\"},\"missing_information\":{\"items\":[{\"length\":20,\"type\":\"string\"}],\"length\":1,\"type\":\"array\"},\"purpose\":{\"length\":40,\"type\":\"string\"},\"readiness\":{\"enum_valid\":true,\"type\":\"string\",\"value\":\"needs_information\"},\"requested_action\":{\"length\":31,\"type\":\"string\"},\"supplied_facts\":{\"items\":[{\"fields\":{\"evidence_refs\":{\"items\":[{\"fields\":{\"quote\":{\"length\":77,\"type\":\"string\"},\"turn_id\":{\"length\":6,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0}],\"length\":1,\"type\":\"array\"},\"text\":{\"length\":24,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0}],\"length\":1,\"type\":\"array\"},\"version\":{\"enum_valid\":true,\"type\":\"number\",\"value\":1}},\"type\":\"object\",\"unexpected_field_count\":0}},\"type\":\"object\",\"unexpected_field_count\":0},\"tool\":\"record_assessment\"}",
+  "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+  "max_output_tokens": 512,
+  "native_result_roundtrips": 0,
+  "native_tool_choice": "named_assessment_then_readiness_gated_next_step",
+  "observed_assessments": [],
+  "observed_followups": [],
+  "phone_tested": false,
+  "recorded_at": "2026-11-08T05:56:16.388228+00:00",
+  "relevance_check": "prewritten lexical anchors; human review still required",
+  "request_observations": [
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 218,
+      "content_chars": 0,
+      "elapsed_ms": 1115,
+      "error": "Facts must retain literal caller wording; sanitized tool shape: {\"arguments\":{\"fields\":{\"evidence_refs\":{\"items\":[{\"fields\":{\"quote\":{\"length\":77,\"type\":\"string\"},\"turn_id\":{\"length\":6,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0}],\"length\":1,\"type\":\"array\"},\"observation\":{\"fields\":{\"direction\":{\"enum_valid\":true,\"type\":\"string\",\"value\":\"caller_supplies\"},\"requested_object\":{\"enum_valid\":true,\"type\":\"string\",\"value\":\"routine_information\"},\"speech_act\":{\"enum_valid\":true,\"type\":\"string\",\"value\":\"statement\"}},\"type\":\"object\",\"unexpected_field_count\":0},\"understanding\":{\"fields\":{\"claimed_identity\":{\"type\":\"null\"},\"missing_information\":{\"items\":[{\"length\":20,\"type\":\"string\"}],\"length\":1,\"type\":\"array\"},\"purpose\":{\"length\":40,\"type\":\"string\"},\"readiness\":{\"enum_valid\":true,\"type\":\"string\",\"value\":\"needs_information\"},\"requested_action\":{\"length\":31,\"type\":\"string\"},\"supplied_facts\":{\"items\":[{\"fields\":{\"evidence_refs\":{\"items\":[{\"fields\":{\"quote\":{\"length\":77,\"type\":\"string\"},\"turn_id\":{\"length\":6,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0}],\"length\":1,\"type\":\"array\"},\"text\":{\"length\":24,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0}],\"length\":1,\"type\":\"array\"},\"version\":{\"enum_valid\":true,\"type\":\"number\",\"value\":1}},\"type\":\"object\",\"unexpected_field_count\":0}},\"type\":\"object\",\"unexpected_field_count\":0},\"tool\":\"record_assessment\"}",
+      "finish_reason": "stop",
+      "outcome": "schema",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    }
+  ],
+  "request_timeout_ms": 3500,
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "requests_submitted": 1,
+  "retained_arguments_scope": "Synthetic native assessment arguments only; no assistant content or hidden reasoning",
+  "selected_context_index": null,
+  "status": "model_probe_failed"
+}

@@ -63,6 +63,13 @@ pub struct RecordedMessage {
     pub evidence_turn_ids: Vec<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AcceptedUnderstanding {
+    pub understanding: crate::tools::CallUnderstanding,
+    pub generation_id: u64,
+    pub turn_version: u64,
+    pub policy_epoch: u64,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Session {
     pub id: String,
     pub household_id: String,
@@ -77,6 +84,8 @@ pub struct Session {
     pub offer: Option<Offer>,
     #[serde(default)]
     pub message: Option<RecordedMessage>,
+    #[serde(default)]
+    pub understanding: Option<AcceptedUnderstanding>,
     #[serde(default)]
     pub closing_reason: Option<String>,
     pub legs: Vec<Leg>,
@@ -142,6 +151,7 @@ impl Session {
             evidence_quote: None,
             offer: None,
             message: None,
+            understanding: None,
             closing_reason: None,
             legs: vec![],
             execution_mode: mode,
@@ -189,6 +199,77 @@ impl Session {
     }
 }
 impl Session {
+    pub fn current_understanding(&self) -> Option<&crate::tools::CallUnderstanding> {
+        self.understanding
+            .as_ref()
+            .filter(|value| {
+                value.generation_id == self.generation_id
+                    && value.turn_version == self.turn_version
+                    && value.policy_epoch == self.policy_epoch
+                    && self.assessed_version == self.turn_version
+                    && !self.speech_pending
+            })
+            .map(|value| &value.understanding)
+    }
+    pub fn accept_understanding(
+        &mut self,
+        value: crate::tools::CallUnderstanding,
+    ) -> anyhow::Result<()> {
+        value.validate()?;
+        for fact in &value.supplied_facts {
+            self.evidence_valid(&fact.evidence_refs, false)?;
+        }
+        if let Some(identity) = &value.claimed_identity {
+            anyhow::ensure!(
+                self.turns
+                    .iter()
+                    .any(|turn| turn.speaker == "caller" && turn.text.contains(identity)),
+                "Identity claim must quote caller words"
+            );
+        }
+        self.understanding = Some(AcceptedUnderstanding {
+            understanding: value,
+            generation_id: self.generation_id,
+            turn_version: self.turn_version,
+            policy_epoch: self.policy_epoch,
+        });
+        Ok(())
+    }
+    pub fn require_message_readiness(&self) -> anyhow::Result<()> {
+        // Authored legacy replay checkpoints remain usable; a native model result
+        // is separately required to carry understanding, even in inert evaluation.
+        if self.blocked
+            || (self.execution_mode == ExecutionMode::Replay && self.understanding.is_none())
+        {
+            return Ok(());
+        }
+        anyhow::ensure!(
+            self.current_understanding().is_some_and(|u| matches!(
+                u.readiness,
+                crate::tools::Readiness::Ready | crate::tools::Readiness::CallerDeclined
+            )),
+            "Message is not ready: ask for the identified missing information before closing"
+        );
+        Ok(())
+    }
+    pub fn require_end_call(&self, evidence: &[crate::tools::EvidenceRef]) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            !self.inbound_ended
+                && !self.bridge_committed
+                && !self.end_requested
+                && self.closing_reason.is_none()
+                && !self.blocked
+                && !self.speech_pending,
+            "Ordinary closing is not authorized in the current state"
+        );
+        self.evidence_valid(evidence, true)?;
+        anyhow::ensure!(
+            self.current_understanding()
+                .is_some_and(|u| u.readiness == crate::tools::Readiness::NoMessage),
+            "Ordinary closing needs a current no-message understanding"
+        );
+        Ok(())
+    }
     pub fn speech_started(&mut self) {
         if self.bridge_committed || self.inbound_ended || self.closing_reason.is_some() {
             return;
@@ -260,9 +341,40 @@ impl Session {
             "Assess the current turn before completing a message"
         );
         self.evidence_valid(evidence, true)?;
+        self.require_message_readiness()?;
+        // Minimize from already accepted conversation semantics, without performing
+        // another risk classification. Never copy credential-bearing wording
+        // from an authentication discussion into its saved message.
+        let observation = self
+            .assessments
+            .iter()
+            .rev()
+            .find(|assessment| {
+                assessment["observation"]["requested_object"] == "authentication_secret"
+            })
+            .map(|assessment| &assessment["observation"]);
+        // A later ordinary turn cannot relabel a previously disclosed credential
+        // as a harmless number. Conservatively keep these conversations categorical;
+        // this may omit a later benign detail, but does not alter their risk policy.
+        let summary = if self.blocked {
+            "Suspicious request blocked; independent verification recommended."
+        } else if observation
+            .is_some_and(|value| value["requested_object"] == "authentication_secret")
+        {
+            match observation.and_then(|value| value["speech_act"].as_str()) {
+                Some("negation") => "Caller shared a warning about protecting account information.",
+                Some("quotation") => {
+                    "Caller reported a discussion involving sensitive account information."
+                }
+                _ => "Caller discussed sensitive account information; sensitive details omitted.",
+            }
+        } else {
+            summary
+        };
         let lower = summary.to_lowercase();
-        // This deliberately rejects sensitive wording instead of attempting to
-        // identify every possible credential value. It is not a semantic scrubber.
+        // Credential material unexpectedly placed in an ordinary message is
+        // rejected. This safeguard is not a semantic classifier or a guarantee
+        // that arbitrary unlabelled strings can be recognized as secrets.
         let credential_word = lower.split(|c: char| !c.is_alphabetic()).any(|word| {
             matches!(
                 word.strip_suffix('s').unwrap_or(word),
@@ -285,22 +397,73 @@ impl Session {
                 .any(|term| lower.contains(term)),
             "Remove authentication details from the message summary"
         );
-        // Contact/number literals are unnecessary in the private incident receipt;
-        // outbound contact resolution always uses the enrolled directory.
-        let summary: String = summary
-            .split_whitespace()
-            .map(|word| {
-                if word.contains('@') || word.chars().any(char::is_numeric) {
-                    "[redacted]"
-                } else {
-                    word
+        // Retain numeric facts such as times, dates, quantities and prices.
+        // Contact-shaped literals remain unnecessary: actions resolve only
+        // enrolled contacts. A bare long number can be ambiguous, so phone-like
+        // sequences are conservatively redacted; this is a bounded shape check.
+        fn date(word: &str) -> bool {
+            let value = word.trim_matches(|c| matches!(c, ',' | '.' | ';' | '(' | ')'));
+            let parts: Vec<_> = value.split(['/', '-']).collect();
+            let number = |s: &str| s.parse::<u32>().ok();
+            match parts.as_slice() {
+                [month, day] if value.contains('/') => {
+                    number(month).is_some_and(|v| (1..=12).contains(&v))
+                        && number(day).is_some_and(|v| (1..=31).contains(&v))
                 }
-            })
-            .collect::<Vec<_>>()
-            .join(" ")
-            .chars()
-            .take(360)
-            .collect();
+                [first, second, third] => {
+                    let (month, day, year) = if first.len() == 4 {
+                        (*second, *third, *first)
+                    } else {
+                        (*first, *second, *third)
+                    };
+                    matches!(year.len(), 2 | 4)
+                        && number(year).is_some()
+                        && number(month).is_some_and(|v| (1..=12).contains(&v))
+                        && number(day).is_some_and(|v| (1..=31).contains(&v))
+                }
+                _ => false,
+            }
+        }
+        fn phone_piece(word: &str) -> bool {
+            !date(word)
+                && word.chars().any(|c| c.is_ascii_digit())
+                && word.chars().all(|c| {
+                    c.is_ascii_digit() || matches!(c, '+' | '-' | '(' | ')' | '.' | ',' | ';')
+                })
+        }
+        let words: Vec<_> = summary.split_whitespace().collect();
+        let mut minimized = Vec::with_capacity(words.len());
+        let mut i = 0;
+        while i < words.len() {
+            if words[i].contains('@') {
+                minimized.push("[redacted]");
+                i += 1;
+                continue;
+            }
+            let mut end = i;
+            let mut digits = 0;
+            let mut marked = false;
+            while end < words.len() && end - i < 6 && phone_piece(words[end]) {
+                let next = words[end].chars().filter(char::is_ascii_digit).count();
+                if digits + next > 15 {
+                    break;
+                }
+                digits += next;
+                marked |= words[end].contains(['+', '-', '(', ')']);
+                end += 1;
+                if words[end - 1].ends_with([',', ';', '.']) {
+                    break;
+                }
+            }
+            if digits >= 7 && (marked || digits >= 10) {
+                minimized.push("[redacted]");
+                i = end;
+            } else {
+                minimized.push(words[i]);
+                i += 1;
+            }
+        }
+        let summary: String = minimized.join(" ").chars().take(360).collect();
         anyhow::ensure!(!summary.is_empty(), "Message summary is empty");
         self.message = Some(RecordedMessage {
             summary,
@@ -373,6 +536,13 @@ impl Session {
         leg_id: &str,
         now: chrono::DateTime<chrono::Utc>,
     ) -> anyhow::Result<Offer> {
+        if self.execution_mode == ExecutionMode::Live || self.understanding.is_some() {
+            anyhow::ensure!(
+                self.current_understanding()
+                    .is_some_and(|u| u.readiness == crate::tools::Readiness::Ready),
+                "Private offer needs complete current caller understanding"
+            );
+        }
         anyhow::ensure!(
             !self.inbound_ended
                 && !self.bridge_committed

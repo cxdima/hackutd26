@@ -89,6 +89,222 @@ const measured: CallEvent = {
     },
   },
 };
+it.each([false, true])(
+  "keeps selected Brev protocol proof separate from historical NVIDIA proof: %s",
+  (verified) => {
+    const snapshot = stateSchema.parse({
+      ...state,
+      model_backend: {
+        backend: "brev_hosted",
+        label: "Brev-hosted Nemotron",
+        requested_model: "nvidia/Nemotron-3-Nano-30B-A3B-FP8",
+        configured: true,
+        protocol_verified: verified,
+        detail: "This deployment requires its own native tool-cycle receipt.",
+      },
+      evidence: {
+        model_protocol: {
+          status: "passed",
+          source: "hosted_model_probe",
+          detail: "Recorded hosted NVIDIA native tool/result probe passed.",
+        },
+        inbound_phone: { status: "pending", detail: "Pending" },
+        relay_phone: { status: "pending", detail: "Pending" },
+      },
+    });
+    render(
+      <ConsoleView
+        state={snapshot}
+        events={[]}
+        stale={false}
+        busy={null}
+        onAction={vi.fn()}
+      />,
+    );
+    const selected = screen.getByRole("group", {
+      name: "Current model backend",
+    });
+    expect(selected).toHaveTextContent("Brev-hosted Nemotron");
+    expect(selected).toHaveTextContent("nvidia/Nemotron-3-Nano-30B-A3B-FP8");
+    expect(selected).toHaveTextContent("Configuration: Ready");
+    expect(selected).toHaveTextContent(
+      verified
+        ? "Native protocol: Verified for this backend"
+        : "Native protocol: Pending for this backend",
+    );
+    expect(
+      screen.getByRole("group", { name: "Model protocol" }),
+    ).toHaveTextContent("Recorded pass");
+  },
+);
+it.each([undefined, "nvidia_hosted", "brev_hosted"])(
+  "attributes HTTP evidence only to its own recorded backend: %s",
+  (backend) => {
+    const snapshot = stateSchema.parse({
+      ...state,
+      model_backend: {
+        backend: "brev_hosted",
+        label: "Brev-hosted Nemotron",
+        requested_model: "nvidia/Nemotron-3-Nano-30B-A3B-FP8",
+        configured: false,
+        protocol_verified: false,
+        detail: "Configuration incomplete.",
+      },
+    });
+    const event = {
+      ...measured,
+      payload: {
+        ...measured.payload,
+        observation: {
+          ...(measured.payload.observation as Record<string, unknown>),
+          ...(backend ? { backend } : {}),
+        },
+      },
+    };
+    render(
+      <ConsoleView
+        state={snapshot}
+        events={[event]}
+        stale={false}
+        busy={null}
+        onAction={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole("group", { name: "Current model backend" }),
+    ).toHaveTextContent("Configuration: Incomplete");
+    const observation = screen.getByRole("group", {
+      name: "Model HTTP observation",
+    });
+    expect(observation).toHaveTextContent(
+      backend === "brev_hosted"
+        ? "Backend: Brev hosted"
+        : backend === "nvidia_hosted"
+          ? "Backend: NVIDIA hosted"
+          : "Backend: Not recorded",
+    );
+    if (backend !== "brev_hosted")
+      expect(observation).not.toHaveTextContent("Backend: Brev hosted");
+    if (backend === "nvidia_hosted")
+      expect(observation).toHaveTextContent(
+        "Recorded backend differs from the selected backend",
+      );
+    expect(observation).toHaveTextContent("audible response unverified");
+  },
+);
+function understoodState() {
+  return stateSchema.parse({
+    ...state,
+    sessions: [
+      {
+        ...state.sessions[0],
+        offer: null,
+        legs: [],
+        turn_version: 2,
+        assessed_version: 2,
+        turns: [
+          {
+            id: "opening",
+            speaker: "caller",
+            text: "I’m Alex, Sarah’s son. I’m calling about picking me up.",
+          },
+          {
+            id: "details",
+            speaker: "caller",
+            text: "My train arrives at eight thirty. Please pick me up at the north entrance.",
+          },
+        ],
+        understanding: {
+          generation_id: 3,
+          turn_version: 2,
+          policy_epoch: 2,
+          understanding: {
+            version: 1,
+            claimed_identity: "Alex, Sarah’s son",
+            purpose: "Arrange a pickup",
+            requested_action: "Tell Sarah the pickup details",
+            supplied_facts: [
+              {
+                text: "eight thirty",
+                evidence_refs: [
+                  {
+                    turn_id: "details",
+                    quote: "My train arrives at eight thirty.",
+                  },
+                ],
+              },
+              {
+                text: "north entrance",
+                evidence_refs: [
+                  {
+                    turn_id: "details",
+                    quote: "Please pick me up at the north entrance.",
+                  },
+                ],
+              },
+            ],
+            missing_information: [],
+            readiness: "ready",
+          },
+        },
+      },
+    ],
+  });
+}
+it("shows accepted purpose and grounded supplied facts without verifying a claimed identity or executing the request", () => {
+  render(
+    <ConsoleView
+      state={understoodState()}
+      events={[]}
+      stale={false}
+      busy={null}
+      onAction={vi.fn()}
+    />,
+  );
+  const understanding = screen.getByRole("group", {
+    name: "Accepted call understanding",
+  });
+  expect(understanding).toHaveTextContent("Current accepted understanding");
+  expect(understanding).toHaveTextContent("Arrange a pickup");
+  expect(understanding).toHaveTextContent("Tell Sarah the pickup details");
+  expect(understanding).toHaveTextContent(
+    "Claimed identity (unverified): Alex, Sarah’s son",
+  );
+  expect(understanding).toHaveTextContent("eight thirty");
+  expect(understanding).toHaveTextContent("north entrance");
+  expect(screen.getByText("No execution result received.")).toBeInTheDocument();
+});
+it.each([
+  { generation_id: 4 },
+  { turn_version: 3 },
+  { policy_epoch: 3 },
+  { assessed_version: 1 },
+  { speech_pending: true },
+])(
+  "labels understanding as stale when its current binding changes: %j",
+  (changed) => {
+    const snapshot = understoodState();
+    snapshot.sessions[0] = { ...snapshot.sessions[0], ...changed };
+    render(
+      <ConsoleView
+        state={snapshot}
+        events={[]}
+        stale={false}
+        busy={null}
+        onAction={vi.fn()}
+      />,
+    );
+    const understanding = screen.getByRole("group", {
+      name: "Accepted call understanding",
+    });
+    expect(understanding).toHaveTextContent(
+      "Earlier accepted understanding · not current",
+    );
+    expect(understanding).not.toHaveTextContent(
+      "Current accepted understanding",
+    );
+  },
+);
 it("supports a current risky assessment with its current caller quote while retaining earlier context", () => {
   const snapshot = stateSchema.parse({
     ...state,

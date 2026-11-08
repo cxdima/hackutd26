@@ -12,6 +12,27 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 #[tokio::test]
+async fn hosted_receipt_does_not_verify_a_configured_brev_endpoint() {
+    let mut config = inbound_config();
+    config.model_backend = firstring::config::ModelBackend::BrevHosted;
+    config.model_url = "http://127.0.0.1:18080/v1/chat/completions".into();
+    config.model = "nvidia/Nemotron-3.5-Lightning".into();
+    config.nvidia_key = "local-instance-test-key".into();
+    let app = App::new(config).await.unwrap();
+    app.store.set_metadata("verification.model_protocol", &serde_json::json!({"status":"passed","source":"hosted_model_probe","recorded_at":"2026-11-08T02:00:00Z","checks":{"authenticated":true,"expected_model":true,"native_tool_results":true}}).to_string()).await.unwrap();
+    let (_, state) = get(app.clone(), "/api/state").await;
+    assert_eq!(state["model_backend"]["backend"], "brev_hosted");
+    assert_eq!(state["model_backend"]["label"], "Brev-hosted Nemotron");
+    assert_eq!(state["model_backend"]["protocol_verified"], false);
+    assert_eq!(
+        state["evidence"]["model_protocol"]["status"], "passed",
+        "Historical hosted proof stays visible"
+    );
+    let (_, ready) = get(app, "/health/ready").await;
+    assert_eq!(ready["capabilities"]["model"]["live_verified"], false);
+}
+
+#[tokio::test]
 async fn completed_exchange_remains_partial_until_interruption_is_observed() {
     let app = App::new(inbound_config()).await.unwrap();
     app.store.set_metadata("verification.relay_phone", &serde_json::json!({

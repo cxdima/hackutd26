@@ -5,19 +5,40 @@ use std::time::{Duration, Instant};
 
 #[derive(Clone)]
 pub struct Nemotron {
+    backend: crate::config::ModelBackend,
     api_key: String,
     url: String,
     model: String,
+    max_output_tokens: u32,
+    synthetic_probe_diagnostics: bool,
     client: reqwest::Client,
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct RequestObservation {
+    pub backend: crate::config::ModelBackend,
     pub requested_model: String,
     pub response_model: Option<String>,
+    pub finish_reason: Option<String>,
+    pub completion_tokens: Option<u64>,
+    pub content_chars: Option<usize>,
+    pub reasoning_chars: Option<usize>,
+    pub reasoning_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub native_argument_diagnostic: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_error_diagnostic: Option<Value>,
     pub elapsed_ms: u128,
     pub outcome: String,
     pub error: Option<String>,
+}
+#[derive(Default)]
+struct ProbeDiagnostics {
+    native_argument: Option<Value>,
+    provider_error: Option<Value>,
+    content_chars: Option<usize>,
+    reasoning_chars: Option<usize>,
+    reasoning_tokens: Option<u64>,
 }
 pub struct ObservedToolResponse {
     pub result: Result<ModelToolCall>,
@@ -67,12 +88,12 @@ pub fn conversation_messages(
     let handoff = if capabilities.handoff_available {
         "Private handoff is available only after benign assessment and sufficient caller context."
     } else {
-        "Private handoff is unavailable. Never call offer_handoff. First ask_caller for essential missing information (for a changed appointment, its new time); once supplied, take_message. Do not save an incomplete message when the caller can supply the missing detail. A stated identity and reason to reconnect are enough for a brief social-call message; asking them to confirm their own name cannot verify identity."
+        "Private handoff is unavailable. Never call offer_handoff. Understand the caller's actual purpose and use ask_caller only for essential missing information relevant to that purpose. When the useful message is complete, take_message finalizes it and ends this conversation. Do not save a draft while waiting for essential details. A stated identity and reason to reconnect are enough for a brief social-call message; asking them to confirm their own name cannot verify identity."
     };
     let family = if capabilities.family_callback_available {
         "After an accepted blocked assessment: lookup_trusted_contact(role=family), then start_trusted_callback with its returned contact_id. Do not offer handoff or ask another question about the suspicious request."
     } else {
-        "No family callback is available. If an accepted assessment is blocked, use a categorical incident message as directed by the accepted current-turn action instruction. A benign report or warning requires a normal, honest summary of what the caller reported. Do not repeat credential wording or claim anyone was contacted."
+        "No family callback is available. If an accepted assessment is blocked, use a categorical incident message as directed by the accepted current-turn action instruction. A benign report or warning requires a normal, honest summary of what the caller reported. Keep warnings and incident notes categorical; exclude credential values and never claim anyone was contacted."
     };
     let system = format!(
         "{}\nCURRENT SERVER AUTHORIZATION (trusted): {handoff} {family}",
@@ -91,7 +112,7 @@ pub fn conversation_messages(
     });
     vec![
         json!({"role":"system","content":system}),
-        json!({"role":"user","content":json!({"household":session.household_id,"turns":session.turns,"current_exchange":{"assistant_turn":assistant_turn,"caller_turn":caller_turn},"capabilities":capabilities,"policy_state":{"blocked":session.blocked,"ambiguous":session.ambiguous,"turn_version":session.turn_version,"assessed_version":session.assessed_version},"instruction":"Interpret the latest caller reply in the context of the actual preceding question and earlier caller facts. Assess that caller turn, then choose a useful next tool. Do not ask again for facts already supplied. Continue through required lookups until a useful action or caller reply is requested."}).to_string()}),
+        json!({"role":"user","content":json!({"household":session.household_id,"turns":session.turns,"current_exchange":{"assistant_turn":assistant_turn,"caller_turn":caller_turn},"capabilities":capabilities,"policy_state":{"blocked":session.blocked,"ambiguous":session.ambiguous,"turn_version":session.turn_version,"assessed_version":session.assessed_version,"generation_id":session.generation_id,"policy_epoch":session.policy_epoch,"understanding":session.understanding.as_ref().filter(|_| session.current_understanding().is_some())},"instruction":"Interpret the latest caller reply in the context of the actual preceding question and earlier caller facts. Assess that caller turn, then choose a useful next tool. Do not ask again for facts already supplied. Continue through required lookups until a useful action or caller reply is requested."}).to_string()}),
     ]
 }
 
@@ -108,9 +129,18 @@ pub fn append_tool_result(messages: &mut Vec<Value>, tool: &ModelToolCall, resul
         && context["policy_state"]["turn_version"].as_u64() == Some(version)
         && result["result"]["blocked"].is_boolean()
         && result["result"]["ambiguous"].is_boolean()
+        && (result["result"]["understanding"].is_null()
+            || (result["result"]["understanding"]["generation_id"]
+                == context["policy_state"]["generation_id"]
+                && result["result"]["understanding"]["turn_version"].as_u64() == Some(version)
+                && result["result"]["understanding"]["policy_epoch"] == result["epoch"]))
     {
         for field in ["blocked", "ambiguous", "assessed_version"] {
             context["policy_state"][field] = result["result"][field].clone();
+        }
+        context["policy_state"]["understanding"] = result["result"]["understanding"].clone();
+        if result["epoch"].is_u64() {
+            context["policy_state"]["policy_epoch"] = result["epoch"].clone();
         }
         context_message["content"] = json!(context.to_string());
         let instruction = if result["result"]["blocked"] == true {
@@ -119,10 +149,16 @@ pub fn append_tool_result(messages: &mut Vec<Value>, tool: &ModelToolCall, resul
             } else {
                 "The accepted current assessment is blocked and no family callback is available. Use take_message with summary exactly 'Suspicious request blocked; independent verification recommended.' and current-turn evidence. Do not offer handoff, ask another question about the blocked request, or claim a contact was called."
             }
+        } else if result["result"]["understanding"]["understanding"]["readiness"] == "no_message" {
+            "The accepted understanding says no message is wanted. Use end_call with a supported reason and current caller evidence. Do not save an invented message, repeat an answered question, or claim delivery."
+        } else if result["result"]["understanding"]["understanding"]["readiness"]
+            == "needs_information"
+        {
+            "The accepted understanding identifies essential missing information. Use ask_caller for the most useful missing fact, in one natural question. Do not take_message or offer_handoff yet. Use supplied facts and actual prior answers; do not repeat them. Never request a credential value."
         } else if result["result"]["ambiguous"] == true {
             "Ask one question to clarify the purpose or type of the requested information, using ask_caller. Do not finalize a message or offer a handoff while this ambiguity is unanswered. For an unspecified code, use clarify_code_type and ask about its purpose, never its value."
         } else {
-            "The accepted current assessment is benign. Before choosing an action, check earlier caller facts and the actual latest answer for essential missing information. A changed-appointment announcement without its new day/time is incomplete: use ask_caller to ask for that new day/time. Do not take_message or close on the announcement alone. If the caller already supplied the new day/time, use it and do not ask again. Only if the caller explicitly declines or cannot provide the missing detail may you save an honest incomplete message identifying what is missing. Once those essentials are present, use the available normal message/handoff path. Do not describe this benign call as blocked or claim a protective intervention. Summarize a report as something the caller reported, a warning as a safety reminder, and unverified identity as the caller's claim. Do not turn a reported event into an action FirstRing performed."
+            "The accepted current assessment is benign. First identify the caller's actual purpose and what facts earlier turns and the latest answer already supplied. A complete family update, social callback request, school notice or ordinary financial notice can be finalized without an extra question. Do not impose appointment questions on unrelated calls or ask someone to confirm a relationship they already claimed. If an essential detail is missing, ask only one relevant question: for example the arrival window a late technician wants to pass on, or where a courier seeking entrance help is waiting. For appointment changes specifically: A changed-appointment announcement without its new day/time is incomplete: use ask_caller to ask for that new day/time. Do not take_message or close on the announcement alone. If the caller already supplied the new day/time, use it and do not ask again. Only if the caller explicitly declines or cannot provide the missing detail may you save an honest incomplete message identifying what is missing. take_message is terminal: finalize only after the purpose-specific essentials are present or the caller chooses to stop. Do not describe this benign call as blocked or claim a protective intervention. Summarize reports as caller reports, warnings as safety reminders, and identity/relationships as unverified caller claims. Never turn a reported event into an action FirstRing performed."
         };
         append_system_guidance(messages, "ACCEPTED CURRENT-TURN ACTION:", instruction);
     }
@@ -150,9 +186,12 @@ fn append_system_guidance(messages: &mut [Value], marker: &str, instruction: &st
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ToolPhase {
     Assessment,
+    Clarification,
+    NoMessage,
     NextStep,
     PostCall,
 }
@@ -161,6 +200,8 @@ impl ToolPhase {
     fn permits(self, name: &str) -> bool {
         match self {
             Self::Assessment => name == "record_assessment",
+            Self::Clarification => name == "ask_caller",
+            Self::NoMessage => name == "end_call",
             Self::NextStep => matches!(
                 name,
                 "ask_caller"
@@ -175,7 +216,54 @@ impl ToolPhase {
     }
 }
 
+pub fn next_step_phase(session: &crate::calls::state::Session) -> ToolPhase {
+    use crate::tools::Readiness;
+    if session.speech_pending || session.assessed_version != session.turn_version {
+        return ToolPhase::Assessment;
+    }
+    if session.blocked {
+        return ToolPhase::NextStep;
+    }
+    match session
+        .current_understanding()
+        .map(|understanding| understanding.readiness)
+    {
+        Some(Readiness::NoMessage) => ToolPhase::NoMessage,
+        Some(Readiness::Ready | Readiness::CallerDeclined) if !session.ambiguous => {
+            ToolPhase::NextStep
+        }
+        _ => ToolPhase::Clarification,
+    }
+}
+
 impl Nemotron {
+    /// Only the fixed synthetic preflight enables argument fragments. Runtime
+    /// observations never include provider argument text.
+    pub fn with_synthetic_probe_diagnostics(mut self) -> Self {
+        self.synthetic_probe_diagnostics = true;
+        self
+    }
+    pub fn with_backend(mut self, backend: crate::config::ModelBackend) -> Self {
+        self.backend = backend;
+        self
+    }
+    pub fn backend(&self) -> crate::config::ModelBackend {
+        self.backend
+    }
+    pub fn requested_model(&self) -> &str {
+        &self.model
+    }
+    pub fn max_output_tokens(&self) -> u32 {
+        self.max_output_tokens
+    }
+    pub fn with_max_output_tokens(mut self, tokens: u32) -> Result<Self> {
+        ensure!(
+            (1..=1024).contains(&tokens),
+            "Diagnostic output limit must be within 1..1024 tokens"
+        );
+        self.max_output_tokens = tokens;
+        Ok(self)
+    }
     /// Explicit measurement override for the non-dialing preflight. Runtime
     /// construction keeps its normal 3.5-second request limit.
     pub fn with_request_timeout(mut self, timeout: Duration) -> Result<Self> {
@@ -201,7 +289,19 @@ impl Nemotron {
     ) -> ObservedToolResponse {
         let start = Instant::now();
         let mut response_model = None;
-        let result = self.request(messages, phase, &mut response_model).await;
+        let mut finish_reason = None;
+        let mut completion_tokens = None;
+        let mut diagnostics = ProbeDiagnostics::default();
+        let result = self
+            .request(
+                messages,
+                phase,
+                &mut response_model,
+                &mut finish_reason,
+                &mut completion_tokens,
+                &mut diagnostics,
+            )
+            .await;
         let error = result.as_ref().err().map(ToString::to_string);
         let outcome = match error.as_deref() {
             None => "success",
@@ -218,8 +318,16 @@ impl Nemotron {
         };
         ObservedToolResponse {
             observation: RequestObservation {
+                backend: self.backend,
                 requested_model: self.model.clone(),
                 response_model,
+                finish_reason,
+                completion_tokens,
+                content_chars: diagnostics.content_chars,
+                reasoning_chars: diagnostics.reasoning_chars,
+                reasoning_tokens: diagnostics.reasoning_tokens,
+                native_argument_diagnostic: diagnostics.native_argument,
+                provider_error_diagnostic: diagnostics.provider_error,
                 elapsed_ms: start.elapsed().as_millis(),
                 outcome: outcome.into(),
                 error,
@@ -235,9 +343,12 @@ impl Nemotron {
             .build()
             .expect("static HTTP client configuration is valid");
         Self {
+            backend: crate::config::ModelBackend::NvidiaHosted,
             api_key,
             url,
             model,
+            max_output_tokens: 512,
+            synthetic_probe_diagnostics: false,
             client,
         }
     }
@@ -258,6 +369,9 @@ impl Nemotron {
         messages: &[Value],
         phase: ToolPhase,
         response_model: &mut Option<String>,
+        finish_reason: &mut Option<String>,
+        completion_tokens: &mut Option<u64>,
+        diagnostics: &mut ProbeDiagnostics,
     ) -> Result<ModelToolCall> {
         ensure!(
             !self.api_key.trim().is_empty(),
@@ -292,12 +406,18 @@ impl Nemotron {
             ToolPhase::Assessment => {
                 json!({"type":"function","function":{"name":"record_assessment"}})
             }
+            ToolPhase::Clarification => {
+                json!({"type":"function","function":{"name":"ask_caller"}})
+            }
+            ToolPhase::NoMessage => {
+                json!({"type":"function","function":{"name":"end_call"}})
+            }
             ToolPhase::NextStep => json!("required"),
             ToolPhase::PostCall => json!({"type":"function","function":{"name":"publish_tactic"}}),
         };
         let payload = json!({
             "model":self.model,"messages":messages,"tools":schemas,"tool_choice":choice,
-            "stream":false,"temperature":0.2,"max_tokens":512,"parallel_tool_calls":false,
+            "stream":false,"temperature":0.2,"max_tokens":self.max_output_tokens,"parallel_tool_calls":false,
             "chat_template_kwargs":{"enable_thinking":false}
         });
         let mut response = self
@@ -315,6 +435,16 @@ impl Nemotron {
                 }
             })?;
         let status = response.status();
+        if !status.is_success() && self.synthetic_probe_diagnostics {
+            let mut bytes = Vec::new();
+            while let Ok(Some(chunk)) = response.chunk().await {
+                if bytes.len() + chunk.len() > 8192 {
+                    break;
+                }
+                bytes.extend_from_slice(&chunk);
+            }
+            diagnostics.provider_error = Some(provider_error_diagnostic(&bytes, &self.api_key));
+        }
         ensure!(
             status.is_success(),
             "Nemotron returned HTTP {}",
@@ -351,6 +481,33 @@ impl Nemotron {
                         .all(|b| b.is_ascii_alphanumeric() || b"/._:-".contains(&b))
             })
             .map(str::to_owned);
+        *finish_reason = body["choices"][0]["finish_reason"]
+            .as_str()
+            .filter(|reason| {
+                matches!(
+                    *reason,
+                    "stop" | "length" | "tool_calls" | "content_filter" | "function_call"
+                )
+            })
+            .map(str::to_owned);
+        *completion_tokens = body["usage"]["completion_tokens"]
+            .as_u64()
+            .filter(|count| *count <= 1_000_000);
+        let message = &body["choices"][0]["message"];
+        diagnostics.content_chars = message["content"]
+            .as_str()
+            .map(|value| value.chars().count());
+        diagnostics.reasoning_chars = message["reasoning_content"]
+            .as_str()
+            .or_else(|| message["reasoning"].as_str())
+            .map(|value| value.chars().count());
+        diagnostics.reasoning_tokens =
+            body["usage"]["completion_tokens_details"]["reasoning_tokens"]
+                .as_u64()
+                .filter(|count| *count <= 1_000_000);
+        if self.synthetic_probe_diagnostics && finish_reason.as_deref() == Some("length") {
+            diagnostics.native_argument = Some(native_length_diagnostic(&body));
+        }
         let tool = parse_response(body)?;
         ensure!(
             phase.permits(&tool.name),
@@ -358,6 +515,91 @@ impl Nemotron {
         );
         Ok(tool)
     }
+}
+
+fn native_length_diagnostic(body: &Value) -> Value {
+    // Deliberately never read assistant content or reasoning fields. Argument
+    // fragments are enabled only for fixed, synthetic preflight contexts.
+    let calls = body["choices"][0]["message"]["tool_calls"].as_array();
+    let function = &body["choices"][0]["message"]["tool_calls"][0]["function"];
+    let schemas = tools::schemas();
+    let name = function["name"].as_str().filter(|name| {
+        schemas
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|schema| schema["function"]["name"] == *name)
+    });
+    let mut value = json!({"scope":"fixed_synthetic_probe_only","native_tool_count":calls.map_or(0,Vec::len),"function_name":name});
+    if let Some(arguments) = function["arguments"].as_str() {
+        let sanitize = |c: char| if c.is_control() { ' ' } else { c };
+        let prefix: String = arguments.chars().take(256).map(sanitize).collect();
+        let suffix: String = arguments
+            .chars()
+            .rev()
+            .take(256)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .map(sanitize)
+            .collect();
+        value["argument_chars"] = json!(arguments.chars().count());
+        value["arguments_json_valid"] = json!(serde_json::from_str::<Value>(arguments).is_ok());
+        value["argument_prefix"] = json!(prefix);
+        value["argument_suffix"] = json!(suffix);
+    }
+    value
+}
+
+fn provider_error_diagnostic(bytes: &[u8], key: &str) -> Value {
+    let Ok(body) = serde_json::from_slice::<Value>(bytes) else {
+        return json!({"body_format":"unavailable_or_non_json"});
+    };
+    let source = body
+        .get("error")
+        .filter(|value| value.is_object())
+        .unwrap_or(&body);
+    let mut result = serde_json::Map::new();
+    for name in ["code", "type", "status", "message", "title", "detail"] {
+        if let Some(value) = source.get(name) {
+            if let Some(text) = value.as_str() {
+                let replaced = text.replace(key, "[redacted]");
+                let mut skip = false;
+                let safe = replaced
+                    .split_whitespace()
+                    .map(|word| {
+                        let lower = word.to_ascii_lowercase();
+                        if skip {
+                            skip = false;
+                            return "[redacted]";
+                        }
+                        if lower.contains("bearer") {
+                            skip = true;
+                            return "[redacted]";
+                        }
+                        if lower.contains("nvapi-") || word.contains('@') {
+                            "[redacted]"
+                        } else {
+                            word
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                result.insert(
+                    name.into(),
+                    json!(
+                        safe.chars()
+                            .filter(|c| !c.is_control())
+                            .take(240)
+                            .collect::<String>()
+                    ),
+                );
+            } else if value.is_number() {
+                result.insert(name.into(), value.clone());
+            }
+        }
+    }
+    Value::Object(result)
 }
 
 pub fn system_prompt() -> &'static str {
@@ -368,11 +610,13 @@ pub fn system_prompt() -> &'static str {
         "Authentication secrets are login, password, authentication or account-access codes sought FROM Sarah. Warnings, negated requests, quoted scam reports, and references provided TO Sarah are not extraction. Payment means ordinary bills or on-site copays; payment_diversion means unusual destinations, redirected transfers or gift-card redemption secrets. No keyword alone establishes risk. ",
         "Scope matters: classify what the current caller is doing, not an imperative inside a quotation or a warning. A person reporting that a stranger requested a login code is reporting a quotation, not making that request. A warning never to disclose such a code is negation. appointment_reference means an actual booking identifier, never an appointment or its day/time in general. An unspecified numeric code has requested_object=unknown until its purpose is stated; earlier clinic talk or a digit count does not establish that it is a booking reference. ",
         "A financial notice or request to check whether a purchase is recognized does not itself request an authentication secret, redirected payment or remote access. Identify the object actually requested; urgency, a bank name and an amount are not proof of extraction. Take an unverified message without disclosing household/account facts or adopting a caller-supplied callback number as a trusted contact. ",
+        "COMPACT CALL UNDERSTANDING: record_assessment must include understanding version 1. Use at most TWO concise supplied_facts and ONE missing_information detail. Each fact.text is a short verbatim caller span; its single evidence quote should be that same short span, not a repeated full turn. Top-level evidence must cite the current caller turn with the shortest span supporting the assessment, retaining important negation and request direction. claimed_identity is null if unstated, otherwise the shortest exact claimed phrase. Purpose and requested_action are open-ended summaries of at most eight words each. Use earlier facts and the latest answer with their real turn IDs. Identity remains an unverified claim, never permission. Omit credential values, private numbers and speculative facts; supplied_facts may be empty for sensitive content. Emit compact arguments, no explanation or duplicated transcript. ",
+        "Readiness is a decision about this caller's actual purpose, not whether any sentence could be saved. needs_information means a useful message still needs a caller-suppliable essential fact; name what is missing. An announcement that a detail changed, or an offer to give a detail, does not supply the replacement detail. ready means the purpose-specific essentials are present and missing_information is empty. caller_declined means the current caller explicitly declines further detail or chooses to stop; save an honest incomplete message without pretending missing facts exist. no_message means no household message is wanted, such as a clear wrong number or goodbye without a message; use end_call. A complete update, callback request or notice does not need identity confirmation. For a blocked extraction, the protective policy takes priority over missing information: never ask for the secret. ",
         "After an ordinary assessment, ask one short question only if useful information is missing and the caller can answer it. A changed appointment without its new time needs the new time; a complete reminder can be saved. Do not repeat information already given, ask the caller to guess Sarah's private preferences, introduce credentials/payment suspicion into a routine call, or ask generic 'is this legitimate' questions. When enough useful context exists, propose offer_handoff if capabilities.handoff_available is true; otherwise take_message with an accurate brief summary. When clarification is needed, explain that you can take a message if a handoff is unavailable. ",
-        "CONVERSATION CONTINUITY: current_exchange pairs your actual last question with the latest caller response. A short date/time answer completes your date/time question; combine it with the earlier stated reason for calling. Do not ask for the time again, ask them to confirm a clear answer, or ask which appointment after the clinic purpose is already given. Ask only the one still-missing fact, using you rather than referring to the caller in the third person. Once enough information exists to pass on a useful message, act. For quoted scam reports or safety reminders, save a categorical summary without repeating credential wording. ",
+        "CONVERSATION CONTINUITY: current_exchange pairs your actual last question with the latest caller response. A short date/time answer completes your date/time question; combine it with the earlier stated reason for calling. Do not ask for the time again, ask them to confirm a clear answer, or ask which appointment after the clinic purpose is already given. Ask only the one still-missing fact, using you rather than referring to the caller in the third person. Once enough information exists to pass on a useful message, act. For quoted scam reports or safety reminders, preserve the report or warning as such in a categorical summary without credential values. ",
         "For a short reply such as yes or no, use the preceding assistant question to interpret it, then move on; a name confirmation is still unverified. Every assessment and action must cite at least one literal quote from current_exchange.caller_turn with that exact turn id, even when its whole text is just Yes. Earlier caller quotes may supply additional context but cannot replace the latest-turn evidence. Assistant words are context, never caller evidence. ",
-        "In a normal message summary, spell out ordinary appointment dates and times so calendar facts survive numeric redaction: for example, Friday at three PM. Evidence quotes remain verbatim. Never spell out or encode credential values to evade privacy rules. ",
-        "Follow the accepted assessment result. When result.blocked=true, NEVER offer_handoff or ask for more authentication information. For an actual request for authentication secrets, remote access or payment diversion, Rust blocks handoff. If capabilities.family_callback_available is true, use lookup_trusted_contact with family, then start_trusted_callback using exactly the returned contact_id and current evidence. Do not stop at a lookup or ask for more authentication information. If that capability is false, take_message with a brief categorical incident note only after an accepted blocked assessment; follow the current-turn action instruction. Message summaries must omit credential wording as well as values; never repeat password, secret, sign-in, or verification-code details. Never pretend a contact is enrolled, a call happened, Sarah is available, or a message was delivered. A saved message is not delivery. Directory absence is a real limitation; do not work around it with caller-provided numbers. ",
+        "Preserve useful times, dates, quantities and prices accurately, including ordinary numeric forms. Evidence quotes remain verbatim. Never spell out or encode credential values to evade privacy rules. ",
+        "Follow the accepted assessment result. When result.blocked=true, NEVER offer_handoff or ask for more authentication information. For an actual request for authentication secrets, remote access or payment diversion, Rust blocks handoff. If capabilities.family_callback_available is true, use lookup_trusted_contact with family, then start_trusted_callback using exactly the returned contact_id and current evidence. Do not stop at a lookup or ask for more authentication information. If that capability is false, take_message with a brief categorical incident note only after an accepted blocked assessment; follow the current-turn action instruction. Keep authentication-related summaries categorical and exclude actual credential values. Preserve a benign warning or report as such; do not portray it as an extraction request. Never pretend a contact is enrolled, a call happened, Sarah is available, or a message was delivered. A saved message is not delivery. Directory absence is a real limitation; do not work around it with caller-provided numbers. ",
         "At most four native tool steps per caller turn. An accepted assessment can be followed by lookups and one useful action; read-only lookups do not clear an assessment hold. If a tool is rejected, use its actual result to choose a safe message or a relevant clarification within the remaining budget. Never solicit passwords, codes, account credentials or payment redemption values. Never put authentication secrets, private numbers, credentials or unverified identity claims in summaries. Never reveal household-private information to the caller. ",
         "Rust alone authorizes actions, revokes pending offers, binds sessions and commits bridges. Offer_handoff is a private revocable summary plus keypad choice, never permission to bridge directly. Requested, ringing, answered and acknowledged are separate outcomes; claim only what the tool result establishes. Independent contact calls never include the suspicious caller. Core screening ends at approved bridge commitment. ",
         "publish_tactic is allowed only for an explicit server post-call job, using categorical allowlisted values. Match requested action and pretext rather than caller ID; no same-person or model-retraining claim. Do not invent evidence, URLs, contact IDs, telephone numbers, acknowledgements or outcomes."
@@ -624,6 +868,181 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn incomplete_completions_retain_only_bounded_usage_and_finish_metadata() {
+        let mut body = response();
+        body["choices"][0]["finish_reason"] = json!("length");
+        body["usage"] = json!({"completion_tokens":512});
+        let (url, server) = local_server(200, body.to_string()).await;
+        let observed = Nemotron::new("local-only".into(), url, "fixture".into())
+            .next_tool_observed(&[])
+            .await;
+        assert!(observed.result.is_err());
+        assert_eq!(
+            observed.observation.finish_reason.as_deref(),
+            Some("length")
+        );
+        assert_eq!(observed.observation.completion_tokens, Some(512));
+        server.await.unwrap();
+
+        body["choices"][0]["finish_reason"] = json!("private-provider-free-text");
+        body["usage"]["completion_tokens"] = json!(1_000_001);
+        let (url, server) = local_server(200, body.to_string()).await;
+        let observed = Nemotron::new("local-only".into(), url, "fixture".into())
+            .next_tool_observed(&[])
+            .await;
+        assert!(observed.observation.finish_reason.is_none());
+        assert!(observed.observation.completion_tokens.is_none());
+        assert!(
+            !serde_json::to_string(&observed.observation)
+                .unwrap()
+                .contains("private-provider-free-text")
+        );
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn actual_request_observation_keeps_selected_backend_and_requested_model() {
+        use crate::config::ModelBackend;
+        let (url, server) = local_server(200, response().to_string()).await;
+        let model = Nemotron::new(
+            "local-fixture-only".into(),
+            url,
+            "locally-served-model-id".into(),
+        )
+        .with_backend(ModelBackend::BrevHosted);
+        assert_eq!(model.backend(), ModelBackend::BrevHosted);
+        assert_eq!(model.requested_model(), "locally-served-model-id");
+        let observed = model.next_tool_observed(&[]).await;
+        assert!(observed.result.is_ok());
+        assert_eq!(observed.observation.backend, ModelBackend::BrevHosted);
+        assert_eq!(
+            observed.observation.requested_model,
+            "locally-served-model-id"
+        );
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn explicit_output_override_is_bounded_and_sent_without_changing_default() {
+        let (url, server) = local_server(200, response().to_string()).await;
+        let model = Nemotron::new("local-only".into(), url, "fixture".into());
+        assert_eq!(model.max_output_tokens(), 512);
+        assert!(model.clone().with_max_output_tokens(0).is_err());
+        assert!(model.clone().with_max_output_tokens(1025).is_err());
+        model
+            .with_max_output_tokens(1024)
+            .unwrap()
+            .next_tool(&[])
+            .await
+            .unwrap();
+        let request = server.await.unwrap();
+        let body: Value = serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert_eq!(body["max_tokens"], 1024);
+    }
+
+    #[tokio::test]
+    async fn truncated_argument_fragments_are_probe_only_and_exclude_assistant_reasoning() {
+        let mut body = response();
+        body["choices"][0]["finish_reason"] = json!("length");
+        body["choices"][0]["message"]["content"] = json!("private-assistant-content");
+        body["choices"][0]["message"]["reasoning_content"] = json!("private-hidden-reasoning");
+        body["choices"][0]["message"]["tool_calls"][0]["function"] = json!({"name":"record_assessment","arguments":format!("{{\"observation\":\"{}","schema echo ".repeat(100))});
+        for enabled in [false, true] {
+            let (url, server) = local_server(200, body.to_string()).await;
+            let mut model = Nemotron::new("local-only".into(), url, "fixture".into());
+            if enabled {
+                model = model.with_synthetic_probe_diagnostics();
+            }
+            let observed = model
+                .next_tool_observed_for(&[], ToolPhase::Assessment)
+                .await;
+            assert!(observed.result.is_err());
+            assert_eq!(
+                observed.observation.native_argument_diagnostic.is_some(),
+                enabled
+            );
+            if let Some(diagnostic) = observed.observation.native_argument_diagnostic {
+                assert_eq!(diagnostic["native_tool_count"], 1);
+                assert_eq!(diagnostic["function_name"], "record_assessment");
+                assert_eq!(diagnostic["arguments_json_valid"], false);
+                assert!(
+                    diagnostic["argument_prefix"]
+                        .as_str()
+                        .unwrap()
+                        .chars()
+                        .count()
+                        <= 256
+                );
+                assert!(
+                    diagnostic["argument_suffix"]
+                        .as_str()
+                        .unwrap()
+                        .chars()
+                        .count()
+                        <= 256
+                );
+                assert!(!diagnostic.to_string().contains("private-assistant-content"));
+                assert!(!diagnostic.to_string().contains("private-hidden-reasoning"));
+            }
+            server.await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn access_error_diagnostic_is_probe_only_and_redacts_key_and_header_values() {
+        let body = json!({"request_id":"omit-me","error":{"code":"DENIED","message":"Authorization failed for fixture-private-key Bearer nvapi-partial-token account@example.invalid","unexpected":"private-body-field"}});
+        for enabled in [false, true] {
+            let (url, server) = local_server(403, body.to_string()).await;
+            let mut model = Nemotron::new("fixture-private-key".into(), url, "fixture".into());
+            if enabled {
+                model = model.with_synthetic_probe_diagnostics();
+            }
+            let observed = model.next_tool_observed(&[]).await;
+            assert_eq!(observed.observation.outcome, "authorization");
+            assert_eq!(
+                observed.observation.provider_error_diagnostic.is_some(),
+                enabled
+            );
+            if let Some(error) = observed.observation.provider_error_diagnostic {
+                assert_eq!(error["code"], "DENIED");
+                let raw = error.to_string();
+                for private in [
+                    "fixture-private-key",
+                    "nvapi-partial-token",
+                    "account@example.invalid",
+                    "private-body-field",
+                    "omit-me",
+                ] {
+                    assert!(!raw.contains(private));
+                }
+            }
+            server.await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn completion_channel_counts_never_retain_channel_text() {
+        let mut body = response();
+        body["choices"][0]["finish_reason"] = json!("length");
+        body["choices"][0]["message"]["tool_calls"] = json!([]);
+        body["choices"][0]["message"]["content"] = json!("private-content");
+        body["choices"][0]["message"]["reasoning_content"] = json!("private-reasoning");
+        body["usage"] =
+            json!({"completion_tokens":768,"completion_tokens_details":{"reasoning_tokens":123}});
+        let (url, server) = local_server(200, body.to_string()).await;
+        let observed = Nemotron::new("local-only".into(), url, "fixture".into())
+            .next_tool_observed(&[])
+            .await;
+        assert_eq!(observed.observation.content_chars, Some(15));
+        assert_eq!(observed.observation.reasoning_chars, Some(17));
+        assert_eq!(observed.observation.reasoning_tokens, Some(123));
+        let serialized = serde_json::to_string(&observed.observation).unwrap();
+        assert!(!serialized.contains("private-content"));
+        assert!(!serialized.contains("private-reasoning"));
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
     async fn explicit_diagnostic_timeout_remains_bounded_and_enforced() {
         let (url, server) =
             local_server_delayed(200, response().to_string(), Duration::from_millis(100)).await;
@@ -742,6 +1161,18 @@ mod tests {
         assert_eq!(body["chat_template_kwargs"]["enable_thinking"], false);
         assert_eq!(body["messages"][3]["tool_call_id"], "previous-tool");
         assert_eq!(body["tools"].as_array().unwrap().len(), 6);
+        let message_tool = body["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|tool| tool["function"]["name"] == "take_message")
+            .unwrap();
+        assert!(
+            message_tool["function"]["description"]
+                .as_str()
+                .unwrap()
+                .contains("Ends the caller conversation")
+        );
         assert!(body["tools"].as_array().unwrap().iter().all(|tool| ToolPhase::NextStep.permits(tool["function"]["name"].as_str().unwrap())));
     }
 
@@ -768,6 +1199,27 @@ mod tests {
             assert_eq!(body["tools"].as_array().unwrap().len(), 1);
             assert_eq!(body["tools"][0]["function"]["name"], name);
             assert!(result.is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn readiness_phase_exposes_only_the_permitted_native_action() {
+        for (phase, name) in [
+            (ToolPhase::Clarification, "ask_caller"),
+            (ToolPhase::NoMessage, "end_call"),
+        ] {
+            let (url, received) = local_server(200, response().to_string()).await;
+            let model = Nemotron::new("local-test-only".into(), url, "fixture-model".into());
+            assert!(model.next_tool_for(&[], phase).await.is_err());
+            let request = received.await.unwrap();
+            let body: Value =
+                serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+            assert_eq!(body["tools"].as_array().unwrap().len(), 1);
+            assert_eq!(body["tools"][0]["function"]["name"], name);
+            assert_eq!(
+                body["tool_choice"],
+                json!({"type":"function","function":{"name":name}})
+            );
         }
     }
 

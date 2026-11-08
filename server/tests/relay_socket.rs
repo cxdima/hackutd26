@@ -60,6 +60,7 @@ async fn server() -> Server {
         family_enabled: false,
         max_call_seconds: 180,
         nvidia_key: String::new(),
+        model_backend: firstring::config::ModelBackend::NvidiaHosted,
         model_url: "http://127.0.0.1:1/not-contacted".into(),
         model: "fixture-model".into(),
     };
@@ -129,7 +130,10 @@ async fn wait_event(app: &App, kind: &str) {
     .await
     .expect("Expected socket event was not persisted");
 }
-async fn propose(handle: &Handle, name: &str, args: Value) {
+async fn propose(handle: &Handle, name: &str, mut args: Value) {
+    if name == "record_assessment" && args.get("understanding").is_none() {
+        args["understanding"] = json!({"version":1,"claimed_identity":null,"purpose":"Leave a routine update","requested_action":"Save the caller update","supplied_facts":[],"missing_information":[],"readiness":"ready"});
+    }
     let snapshot = handle.send(Input::Snapshot).await.unwrap();
     let outcome = handle
         .send(Input::ModelTool {
@@ -235,6 +239,16 @@ async fn assessed_socket(server: &Server) -> (Handle, Socket, Value, Value) {
 }
 
 async fn post_voice(server: &Server, path: &str, form: &[(&str, &str)]) -> String {
+    let path = if path == "/voice/after-relay" {
+        let h = server.app.by_sid(CALLER).await.unwrap();
+        let snapshot = h.send(Input::Snapshot).await.unwrap();
+        format!(
+            "{path}?relay_token={}",
+            snapshot["relay_token"].as_str().unwrap()
+        )
+    } else {
+        path.to_owned()
+    };
     let mut pairs = form.to_vec();
     pairs.push(("AccountSid", ACCOUNT));
     pairs.sort_unstable_by_key(|(key, _)| *key);
@@ -297,7 +311,6 @@ async fn assessed_risk_model_failure_ends_relay_without_claiming_a_saved_message
         !response.contains("saved")
             && !response.contains("noted")
             && !response.contains("leave a brief")
-            && !response.contains("<Gather")
     );
     let closing = handle.send(Input::Snapshot).await.unwrap();
     assert_eq!(closing["closing_reason"], "model_failure");
@@ -455,11 +468,8 @@ async fn assessed_risk_model_failure_gather_says_goodbye_before_hangup() {
     };
     let (response, ()) = tokio::join!(work, fail);
     assert!(response.contains("Goodbye."));
-    assert!(
-        !response.contains("saved")
-            && !response.contains("leave a brief")
-            && !response.contains("<Gather")
-    );
+    assert!(!response.contains("saved") && !response.contains("leave a brief"));
+    assert!(response.contains("<Gather input=\"speech\""));
     assert!(response.find("</Say>").unwrap() < response.find("<Hangup/>").unwrap());
     assert_eq!(
         post_voice(
@@ -498,7 +508,7 @@ async fn saved_message_ends_relay_then_speaks_goodbye_in_order_before_hangup() {
     let response = post_voice(&server, "/voice/after-relay", &[("CallSid", CALLER)]).await;
     assert!(response.contains("Your message has been noted."));
     assert!(response.find("</Say>").unwrap() < response.find("<Hangup/>").unwrap());
-    assert!(!response.contains("<Gather"));
+    assert!(response.contains("<Gather input=\"speech\""));
     assert!(!response.contains("connection ended"));
     let retry = post_voice(&server, "/voice/after-relay", &[("CallSid", CALLER)]).await;
     assert_eq!(response, retry);
@@ -564,6 +574,88 @@ async fn committed_message_closing_rejects_new_turn_and_stale_failure() {
 }
 
 #[tokio::test]
+async fn speech_during_acknowledgement_reconnects_and_old_socket_close_is_inert() {
+    let server = server().await;
+    let (handle, mut old_socket, evidence, _) = assessed_socket(&server).await;
+    propose(
+        &handle,
+        "take_message",
+        json!({"summary":"The visit is Wednesday.","evidence_refs":evidence}),
+    )
+    .await;
+    let before = handle.send(Input::Snapshot).await.unwrap();
+    let closing = post_voice(&server, "/voice/after-relay", &[("CallSid", CALLER)]).await;
+    let url = closing
+        .split(" action=\"")
+        .nth(1)
+        .unwrap()
+        .split('"')
+        .next()
+        .unwrap()
+        .replace("&amp;", "&");
+    let path = url.strip_prefix(ORIGIN).unwrap();
+    let reconnect = post_voice(
+        &server,
+        path,
+        &[
+            ("CallSid", CALLER),
+            ("SpeechResult", "Wait, the visit is actually Saturday."),
+        ],
+    )
+    .await;
+    assert!(reconnect.contains("<ConversationRelay"));
+    let pending = handle.send(Input::Snapshot).await.unwrap();
+    let mut new_socket = connect(
+        &server,
+        "/voice/relay",
+        Some("https://relay.fixture.example/voice/relay"),
+    )
+    .await
+    .unwrap();
+    send_json(&mut new_socket, setup(&pending)).await;
+    socket_barrier(&mut new_socket).await;
+    let attached = handle.send(Input::Snapshot).await.unwrap();
+    assert_eq!(
+        attached["turn_version"].as_u64().unwrap(),
+        before["turn_version"].as_u64().unwrap() + 1
+    );
+    assert_eq!(
+        attached["turns"].as_array().unwrap().last().unwrap()["text"],
+        "Wait, the visit is actually Saturday."
+    );
+    old_socket.close(None).await.unwrap();
+    wait_event(&server.app, "relay.telemetry").await;
+    tokio::time::sleep(Duration::from_millis(30)).await;
+    assert_eq!(
+        handle.send(Input::Snapshot).await.unwrap()["generation_id"],
+        attached["generation_id"],
+        "Late detach must not invalidate the new connection"
+    );
+    send_json(
+        &mut new_socket,
+        json!({"type":"prompt","voicePrompt":"Saturday at noon.","last":true,"lang":"en-US"}),
+    )
+    .await;
+    socket_barrier(&mut new_socket).await;
+    let current = handle.send(Input::Snapshot).await.unwrap();
+    assert_eq!(
+        current["turn_version"].as_u64().unwrap(),
+        attached["turn_version"].as_u64().unwrap() + 1
+    );
+    assert_eq!(current["message"], before["message"]);
+    assert!(
+        !server
+            .app
+            .store
+            .events_after(0)
+            .await
+            .unwrap()
+            .iter()
+            .any(|event| event.kind == "dependency.failed")
+    );
+}
+
+#[tokio::test]
 async fn terminal_status_before_closing_callback_never_restarts_goodbye_audio() {
     let server = server().await;
     let (handle, _socket, evidence, _) = assessed_socket(&server).await;
@@ -583,7 +675,8 @@ async fn terminal_status_before_closing_callback_never_restarts_goodbye_audio() 
 }
 
 #[tokio::test]
-async fn saved_message_gather_response_hangs_up_and_retry_cannot_restart_screening() {
+async fn saved_message_gather_response_allows_bounded_interruption_and_retry_cannot_restart_screening()
+ {
     let server = server().await;
     let (handle, initial) = server.app.incoming(CALLER).await.unwrap();
     let path = format!(
@@ -607,8 +700,8 @@ async fn saved_message_gather_response_hangs_up_and_retry_cannot_restart_screeni
     let (response, _) = tokio::join!(work, model);
     assert!(response.contains("Your message has been noted."));
     assert!(
-        !response.contains("<Gather"),
-        "Completed message must not ask for another turn"
+        response.contains("<Gather input=\"speech\"") && response.contains("timeout=\"2\""),
+        "Completed message permits a bounded interruption without soliciting another turn"
     );
     assert!(response.find("</Say>").unwrap() < response.find("<Hangup/>").unwrap());
     let retry = post_voice(

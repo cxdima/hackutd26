@@ -1,0 +1,12 @@
+{
+  "frozen_at": "2026-11-08T05:04:55.293609+00:00",
+  "scope": "8 authored general development cases plus separate exact automated clinic-opening control; no held-out cases",
+  "max_requests": 32,
+  "max_seconds": 120,
+  "sha256": {
+    "fixtures/language-general-purpose-development.json": "35c7c620bfd77eeb1dfa4550f8fee0537e2dc5dadb1e7f282b9a7a47305ce0c0",
+    "server/src/providers/nemotron.rs": "81fd4107335620994e1034f87237b9bd3f4e593d6920baa4b62a09e351e99d85",
+    "server/src/tools.rs": "0ed18c4533cc392588408df7a5dd8c10289de31c9b0f9b47517b96cb8a51cd4e",
+    "server/src/bin/preflight.rs": "cbc256d5d7149cf214d830b539d4922809e6fee72d407b683545050ec030cc21"
+  }
+}

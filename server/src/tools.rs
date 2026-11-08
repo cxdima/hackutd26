@@ -17,6 +17,78 @@ pub struct Observation {
     pub direction: Direction,
 }
 
+/// Open-ended interpretation; caller identity and facts remain claims, not verification.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CallUnderstanding {
+    pub version: u8,
+    pub claimed_identity: Option<String>,
+    pub purpose: String,
+    pub requested_action: String,
+    pub supplied_facts: Vec<GroundedFact>,
+    pub missing_information: Vec<String>,
+    pub readiness: Readiness,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GroundedFact {
+    pub text: String,
+    pub evidence_refs: Vec<EvidenceRef>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Readiness {
+    NeedsInformation,
+    Ready,
+    CallerDeclined,
+    NoMessage,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EndReason {
+    WrongNumber,
+    CallerFinished,
+    NoMessage,
+}
+
+impl CallUnderstanding {
+    pub fn validate(&self) -> Result<()> {
+        ensure!(self.version == 1, "Unsupported understanding version");
+        if let Some(identity) = &self.claimed_identity {
+            validate_speech(identity, 120)?;
+        }
+        validate_speech(&self.purpose, 180)?;
+        validate_speech(&self.requested_action, 180)?;
+        ensure!(
+            self.supplied_facts.len() <= 4 && self.missing_information.len() <= 3,
+            "Understanding exceeds bounds"
+        );
+        for fact in &self.supplied_facts {
+            validate_speech(&fact.text, 180)?;
+            validate_evidence(&fact.evidence_refs)?;
+            ensure!(
+                fact.evidence_refs
+                    .iter()
+                    .any(|r| r.quote.contains(&fact.text)),
+                "Facts must retain literal caller wording"
+            );
+        }
+        for missing in &self.missing_information {
+            validate_speech(missing, 160)?;
+        }
+        ensure!(
+            !matches!(self.readiness, Readiness::Ready | Readiness::NoMessage)
+                || self.missing_information.is_empty(),
+            "Ready or no-message understanding cannot have missing information"
+        );
+        ensure!(
+            self.readiness != Readiness::NeedsInformation || !self.missing_information.is_empty(),
+            "Clarification must identify missing information"
+        );
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SpeechAct {
@@ -100,6 +172,8 @@ pub enum ToolCall {
     RecordAssessment {
         observation: Observation,
         evidence_refs: Vec<EvidenceRef>,
+        #[serde(default)]
+        understanding: Option<CallUnderstanding>,
     },
     AskCaller {
         question: String,
@@ -127,6 +201,10 @@ pub enum ToolCall {
         summary: String,
         evidence_refs: Vec<EvidenceRef>,
     },
+    EndCall {
+        reason: EndReason,
+        evidence_refs: Vec<EvidenceRef>,
+    },
     PublishTactic {
         tactic: TacticKind,
         requested_action: String,
@@ -140,7 +218,17 @@ impl ToolCall {
         let tool: Self = serde_json::from_value(json!({"name":name,"arguments":arguments}))
             .map_err(|_| anyhow!("unknown tool or invalid tool arguments"))?;
         match &tool {
-            Self::RecordAssessment { evidence_refs, .. } => validate_evidence(evidence_refs)?,
+            Self::RecordAssessment {
+                evidence_refs,
+                understanding,
+                ..
+            } => {
+                validate_evidence(evidence_refs)?;
+                if let Some(value) = understanding {
+                    value.validate()?;
+                }
+            }
+            Self::EndCall { evidence_refs, .. } => validate_evidence(evidence_refs)?,
             Self::AskCaller {
                 question,
                 evidence_refs,
@@ -217,6 +305,7 @@ pub fn public_arguments(tool: &ToolCall) -> Value {
         ToolCall::TakeMessage { summary, .. } => {
             json!({"summary_characters":summary.chars().count()})
         }
+        ToolCall::EndCall { reason, .. } => json!({"reason":reason}),
         ToolCall::PublishTactic {
             tactic,
             requested_action,
@@ -346,13 +435,32 @@ pub fn schemas() -> Value {
         }),
     );
     let evidence = json!({"type":"array","minItems":1,"maxItems":8,"items":object(&["turn_id","quote"],json!({"turn_id":string(96),"quote":string(1024)}))});
+    let understanding = object(
+        &[
+            "version",
+            "claimed_identity",
+            "purpose",
+            "requested_action",
+            "supplied_facts",
+            "missing_information",
+            "readiness",
+        ],
+        json!({
+            "version":{"type":"integer","enum":[1]},
+            "claimed_identity":{"type":["string","null"],"maxLength":120,"description":"A literal caller identity/relationship claim, or null; never verified identity."},
+            "purpose":string(180), "requested_action":string(180),
+            "supplied_facts":{"type":"array","maxItems":2,"description":"Optional verbatim caller spans; use [] when not needed. Do not paraphrase facts.","items":object(&["text","evidence_refs"],json!({"text":{"type":"string","minLength":1,"maxLength":180,"description":"Copy an exact substring of the associated evidence quote, including wording and case."},"evidence_refs":evidence}))},
+            "missing_information":{"type":"array","maxItems":3,"items":string(160),"description":"Essential unanswered details for the actual caller purpose; do not invent mandatory intake."},
+            "readiness":enumeration(&["needs_information","ready","caller_declined","no_message"])
+        }),
+    );
     json!([
         function(
             "record_assessment",
             "Required first for every completed caller turn. Describe meaning, direction, quotation and negation using exact caller evidence. This does not authorize bridging.",
             object(
-                &["observation", "evidence_refs"],
-                json!({"observation":observation,"evidence_refs":evidence})
+                &["observation", "evidence_refs", "understanding"],
+                json!({"observation":observation,"evidence_refs":evidence,"understanding":understanding})
             )
         ),
         function(
@@ -361,6 +469,14 @@ pub fn schemas() -> Value {
             object(
                 &["question", "purpose", "evidence_refs"],
                 json!({"question":string(240),"purpose":enumeration(&["clarify_request","clarify_code_type","clarify_identity"]),"evidence_refs":evidence})
+            )
+        ),
+        function(
+            "end_call",
+            "End politely without saving a message, only after a current no_message understanding (for example an explicit wrong number). No delivery, verification or contact claim.",
+            object(
+                &["reason", "evidence_refs"],
+                json!({"reason":enumeration(&["wrong_number","caller_finished","no_message"]),"evidence_refs":evidence})
             )
         ),
         function(
@@ -394,7 +510,7 @@ pub fn schemas() -> Value {
         ),
         function(
             "take_message",
-            "Save a brief minimized message without credentials, authentication digits, links or verification claims.",
+            "Ends the caller conversation after saving a finalized brief message; this is not a draft or intermediate note. First ask for essential missing details relevant to the caller's actual purpose. Finalize when those details are supplied, or the caller explicitly declines further detail or wants to end. Never include credentials, authentication digits, links or verification claims.",
             object(
                 &["summary", "evidence_refs"],
                 json!({"summary":string(360),"evidence_refs":evidence})
@@ -501,7 +617,7 @@ mod tests {
     fn offered_schema_has_required_observation_and_no_dial_parameters() {
         let schemas = schemas();
         let schemas = schemas.as_array().unwrap();
-        assert_eq!(schemas.len(), 8);
+        assert_eq!(schemas.len(), 9);
         for schema in schemas {
             let parameters = &schema["function"]["parameters"];
             assert_eq!(parameters["additionalProperties"], false);

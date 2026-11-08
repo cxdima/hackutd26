@@ -1,0 +1,39 @@
+{
+  "recorded_at": "2026-11-08T05:37:05.215292+00:00",
+  "purpose": "User-specified six existing development prefixes for identical NVIDIA-hosted/Brev native-loop comparison. Supersedes the unexecuted proposed selection; no comparison has run. This is observed development data, not a new held-out benchmark.",
+  "fixture": "fixtures/backend-comparison-development.json",
+  "sha256": "6c282b82c811a7ce6ff413acf7b6075abbcac5bdad49d1c6e9e4b649128547f6",
+  "case_ids": [
+    "general-dev-son-update",
+    "general-dev-delivery-entrance",
+    "conversation-dev-clinic-short-answer",
+    "conversation-dev-code-unspecified-after-clinic",
+    "conversation-dev-negated-safety-reminder",
+    "general-dev-family-claim-then-login"
+  ],
+  "classes": [
+    "complete_family_message",
+    "incomplete_delivery_or_service",
+    "ordinary_numeric_time",
+    "ambiguous_code",
+    "negated_safety_warning",
+    "benign_opening_then_login_extraction"
+  ],
+  "source_files": [
+    {
+      "path": "fixtures/language-general-purpose-development.json",
+      "sha256": "35c7c620bfd77eeb1dfa4550f8fee0537e2dc5dadb1e7f282b9a7a47305ce0c0"
+    },
+    {
+      "path": "fixtures/language-conversation-development.json",
+      "sha256": "c6459a68f77c35a846b3d5272be1ff9c41f4d101c059b959d597c972b90a386a"
+    },
+    {
+      "path": "fixtures/general-purpose-understanding-v1-rubric.json",
+      "sha256": "d3b60326fd61e002a02a8fcdce3ec95c3182ddc9349dd3ecd263436c1ae59d7a"
+    }
+  ],
+  "capabilities": "A-only; all actual caller and assistant prefix history preserved; no handoff/family enrollment/callback",
+  "external_phone_actions": 0,
+  "notes": "Same provider schemas and existing native executor; gold labels never in messages. Preserve prior outcomes. Compare classification, readiness, useful action, actual summary fidelity and latency separately."
+}

@@ -2,10 +2,10 @@ use anyhow::{Result, anyhow, bail, ensure};
 use firstring::{
     calls::actor::{App, Handle, Input},
     calls::state::{Leg, Session, Turn},
-    config::{Config, ExecutionMode},
+    config::{Config, ExecutionMode, ModelBackend, ModelSettings},
     providers::nemotron::{
         ModelCapabilities, ModelToolCall, Nemotron, RequestObservation, ToolPhase,
-        append_tool_result, conversation_messages,
+        append_tool_result, conversation_messages, next_step_phase,
     },
     tools::{
         CallbackReason, ContactRole, Direction, Observation, QuestionPurpose, RequestedObject,
@@ -109,6 +109,7 @@ async fn interactive_actor() -> Result<(App, Handle)> {
         family_enabled: false,
         max_call_seconds: 180,
         nvidia_key: String::new(),
+        model_backend: firstring::config::ModelBackend::NvidiaHosted,
         model_url: "http://127.0.0.1:1/not-contacted".into(),
         model: "injected-native-tools-only".into(),
     })
@@ -178,7 +179,8 @@ async fn interactive_turn(
             result["predicted_classification"] = json!(flags(&observation).0);
             result["observation"] = json!(observation);
             result["evidence_valid"] = json!(true);
-            phase = ToolPhase::NextStep;
+            phase = next_step_phase(&interactive_snapshot(handle).await?);
+            result["understanding"] = outcome["result"]["understanding"].clone();
         }
         if outcome["ok"] == true && outcome["result"]["stop"] == true {
             result["terminal_tool"] = json!(call.name);
@@ -414,10 +416,10 @@ async fn evaluate_interactive(data: &InteractiveDataset) -> Result<()> {
         && withdrawal;
     let report = json!({"status":if passed {"passed"}else{"failed"},
         "recorded_at":chrono::Utc::now().to_rfc3339(),"split":"development_interactive",
-        "fixture":"fixtures/voice-interactive-development.json","requested_model":MODEL,
+        "fixture":"fixtures/voice-interactive-development.json","requested_model":model.requested_model(),"backend":model.backend(),"backend_evidence":"Configured adapter selection; this label alone does not prove GPU execution",
         "execution_mode":"replay","data_origin":"synthetic","executor":"actual App + serialized session actor; isolated SQLite memory per scenario",
         "capability_profile":"fictional enrolled roles enabled only by Replay policy; runtime phone settings and credentials never loaded into actors",
-        "request_timeout_ms":request_timeout_ms,"native_tool_choice":"named_assessment_then_required_next_step",
+        "request_timeout_ms":request_timeout_ms,"max_output_tokens":model.max_output_tokens(),"native_tool_choice":"named_assessment_then_readiness_gated_next_step",
         "limits":{"requests":40,"run_seconds":120,"turn_seconds":6,"steps_per_turn":4},
         "requests_submitted":budget.submitted,"request_observations":budget.observations,
         "totals":{"expected_scenarios":5,"expected_prefixes":10,"reported_prefixes":turns.len(),
@@ -448,6 +450,8 @@ enum Mode {
     EvaluateInteractiveDevelopment,
     EvaluateConversationDevelopment,
     EvaluateConversationRepairs,
+    EvaluateGeneralPurposeDevelopment,
+    EvaluateBackendComparison,
     Help,
 }
 
@@ -473,6 +477,138 @@ struct Case {
     #[serde(default)]
     capabilities: Option<ModelCapabilities>,
     rationale: String,
+    #[serde(default)]
+    understanding_rubric: Option<UnderstandingRubric>,
+    #[serde(default)]
+    comparison_rubric: Option<ComparisonRubric>,
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct FactCheck {
+    label: String,
+    any_of: Vec<String>,
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ComparisonRubric {
+    id: String,
+    expected_purpose: String,
+    required_facts: Vec<String>,
+    expected_closing_requested: bool,
+    literal_fact_checks: Vec<FactCheck>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ComparisonRubrics {
+    schema_version: u32,
+    fixture_sha256: String,
+    authored_before_backend_comparison: bool,
+    scope: String,
+    cases: Vec<ComparisonRubric>,
+}
+
+fn apply_comparison_rubric(data: &mut Dataset, raw: &str) -> Result<()> {
+    let rubrics: ComparisonRubrics = serde_json::from_str(raw)?;
+    ensure!(
+        rubrics.schema_version == 1
+            && rubrics.authored_before_backend_comparison
+            && rubrics.fixture_sha256
+                == "6c282b82c811a7ce6ff413acf7b6075abbcac5bdad49d1c6e9e4b649128547f6"
+            && !rubrics.scope.is_empty()
+            && data.cases.len() == 6
+            && rubrics.cases.len() == 6,
+        "Invalid backend comparison rubric"
+    );
+    let mut ids = std::collections::HashSet::new();
+    for row in rubrics.cases {
+        ensure!(
+            ids.insert(row.id.clone())
+                && !row.expected_purpose.is_empty()
+                && row
+                    .literal_fact_checks
+                    .iter()
+                    .all(|fact| !fact.label.is_empty()
+                        && !fact.any_of.is_empty()
+                        && fact.any_of.iter().all(|text| !text.trim().is_empty())),
+            "Invalid comparison case rubric"
+        );
+        let case = data
+            .cases
+            .iter_mut()
+            .find(|case| case.id == row.id)
+            .ok_or_else(|| anyhow!("Unknown comparison case"))?;
+        case.comparison_rubric = Some(row);
+    }
+    Ok(())
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct UnderstandingRubric {
+    id: String,
+    expected_readiness: String,
+    accepted_next_tools: Vec<String>,
+    required_summary_facts: Vec<String>,
+    forbidden_claims: Vec<String>,
+    rationale: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UnderstandingRubrics {
+    schema_version: u32,
+    contract: String,
+    split: String,
+    data_origin: String,
+    authored_before_model_evaluation: bool,
+    source_fixture_sha256: String,
+    notes: String,
+    cases: Vec<UnderstandingRubric>,
+}
+
+fn apply_understanding_rubric(data: &mut Dataset, raw: &str) -> Result<()> {
+    let rubric: UnderstandingRubrics = serde_json::from_str(raw)?;
+    ensure!(
+        rubric.schema_version == 1
+            && rubric.contract == "call_understanding_v1"
+            && rubric.split == "development"
+            && rubric.data_origin == "synthetic"
+            && rubric.authored_before_model_evaluation
+            && !rubric.notes.is_empty()
+            && rubric.source_fixture_sha256
+                == "35c7c620bfd77eeb1dfa4550f8fee0537e2dc5dadb1e7f282b9a7a47305ce0c0"
+            && data.split == "conversation_development"
+            && rubric.cases.len() == data.cases.len(),
+        "Understanding rubric metadata or coverage is invalid"
+    );
+    let mut ids = std::collections::HashSet::new();
+    for row in rubric.cases {
+        ensure!(
+            ids.insert(row.id.clone())
+                && [
+                    "needs_information",
+                    "ready",
+                    "caller_declined",
+                    "no_message"
+                ]
+                .contains(&row.expected_readiness.as_str())
+                && !row.accepted_next_tools.is_empty()
+                && row.accepted_next_tools.iter().all(|tool| [
+                    "ask_caller",
+                    "take_message",
+                    "end_call"
+                ]
+                .contains(&tool.as_str()))
+                && !row.rationale.is_empty(),
+            "Understanding rubric is invalid"
+        );
+        let case = data
+            .cases
+            .iter_mut()
+            .find(|case| case.id == row.id)
+            .ok_or_else(|| anyhow!("Understanding rubric refers to an unknown case"))?;
+        case.expected.accepted_next_tools = row.accepted_next_tools.clone();
+        case.understanding_rubric = Some(row);
+    }
+    Ok(())
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -524,6 +660,103 @@ struct CaseResult {
     simulated_local_outcome: Option<String>,
     completed_external_action: bool,
     turn_elapsed_ms: u128,
+    expected_readiness: Option<String>,
+    predicted_readiness: Option<String>,
+    readiness_correct: Option<bool>,
+    understanding: Option<Value>,
+    summary_review_rubric: Option<UnderstandingRubric>,
+    recorded_summary: Option<String>,
+    closing_requested: Option<bool>,
+    closure_correct: Option<bool>,
+    literal_fact_coverage: Option<bool>,
+    comparison_review: Option<Value>,
+}
+
+fn apply_comparison_review(case: &Case, result: &mut CaseResult) {
+    let Some(rubric) = &case.comparison_rubric else {
+        return;
+    };
+    let normalize = |text: &str| {
+        format!(
+            " {} ",
+            text.to_lowercase()
+                .chars()
+                .map(|c| if c.is_alphanumeric() { c } else { ' ' })
+                .collect::<String>()
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    };
+    let stored = result.recorded_summary.as_deref().map(normalize);
+    let checks: Vec<_> = rubric
+        .literal_fact_checks
+        .iter()
+        .map(|fact| {
+            let covered = result.closing_requested.map(|_| {
+                stored.as_ref().is_some_and(|summary| {
+                    fact.any_of
+                        .iter()
+                        .any(|variant| summary.contains(&normalize(variant)))
+                })
+            });
+            json!({"fact":fact.label,"covered_in_stored_summary":covered})
+        })
+        .collect();
+    result.literal_fact_coverage = (!checks.is_empty())
+        .then(|| {
+            result.closing_requested.map(|_| {
+                checks
+                    .iter()
+                    .all(|check| check["covered_in_stored_summary"] == true)
+            })
+        })
+        .flatten();
+    result.closure_correct = result
+        .closing_requested
+        .map(|actual| actual == rubric.expected_closing_requested);
+    let observed = result
+        .understanding
+        .as_ref()
+        .map(|value| &value["understanding"]);
+    result.comparison_review = Some(json!({
+        "purpose":{"expected":rubric.expected_purpose,"observed":observed.map(|value|&value["purpose"]),"requested_action":observed.map(|value|&value["requested_action"]),"correct":null,"method":"Independent human semantic review required"},
+        "facts":{"required":rubric.required_facts,"actual_stored_summary":result.recorded_summary,"literal_checks":checks,"literal_coverage":result.literal_fact_coverage,"semantically_correct":null,"method":"Literal phrase coverage is not entailment; review negation, attribution and invented outcomes independently"},
+        "closure":{"expected_local_closing_request":rubric.expected_closing_requested,"actual_local_closing_request":result.closing_requested,"correct":result.closure_correct,"provider_completed":false}
+    }));
+}
+
+fn comparison_report_path(backend: ModelBackend) -> &'static str {
+    match backend {
+        ModelBackend::NvidiaHosted => ".tools/backend-comparison-nvidia_hosted-results.json",
+        ModelBackend::BrevHosted => ".tools/backend-comparison-brev_hosted-results.json",
+    }
+}
+
+fn comparison_latency(observations: &[RequestObservation], results: &[CaseResult]) -> Value {
+    fn summary(mut values: Vec<u128>) -> Value {
+        values.sort_unstable();
+        let count = values.len();
+        let median =
+            (count > 0).then(|| (values[(count - 1) / 2] + values[count / 2]) as f64 / 2.0);
+        json!({"count":count,"min_ms":values.first(),"median_ms":median,"max_ms":values.last()})
+    }
+    json!({"successful_native_http":summary(observations.iter().filter(|observation|observation.outcome=="success").map(|observation|observation.elapsed_ms).collect()),
+        "completed_native_turn":summary(results.iter().filter(|result|result.error.is_none() && result.simulated_local_outcome.is_some()).map(|result|result.turn_elapsed_ms).collect()),
+        "authorization_failures":observations.iter().filter(|observation|matches!(observation.outcome.as_str(),"authorization"|"authentication")).count(),
+        "timeouts_censored_at_request_limit":observations.iter().filter(|observation|observation.outcome=="timeout").count(),
+        "scope":"Authorization failures are access failures, not fast model responses. Completed local native turns do not measure audible or phone latency."})
+}
+
+fn contract_fingerprint(data: &Dataset) -> Value {
+    use sha2::{Digest, Sha256};
+    let hash = |text: &str| format!("{:x}", Sha256::digest(text.as_bytes()));
+    json!({"base_prompt_sha256":hash(firstring::providers::nemotron::system_prompt()),
+        "tool_schema_sha256":hash(&firstring::tools::schemas().to_string()),
+        "case_prompts":data.cases.iter().map(|case|{
+            let request_messages=messages(case,"");
+            json!({"id":case.id,"actual_system_prompt_sha256":hash(request_messages[0]["content"].as_str().unwrap()),"initial_native_messages_sha256":hash(&serde_json::to_string(&request_messages).expect("model messages serialize"))})
+        }).collect::<Vec<_>>()})
 }
 
 fn parse_args(args: &[String]) -> Result<Mode> {
@@ -538,6 +771,8 @@ fn parse_args(args: &[String]) -> Result<Mode> {
             "--evaluate-interactive-development" => Ok(Mode::EvaluateInteractiveDevelopment),
             "--evaluate-conversation-development" => Ok(Mode::EvaluateConversationDevelopment),
             "--evaluate-conversation-repairs" => Ok(Mode::EvaluateConversationRepairs),
+            "--evaluate-general-purpose-development" => Ok(Mode::EvaluateGeneralPurposeDevelopment),
+            "--evaluate-backend-comparison" => Ok(Mode::EvaluateBackendComparison),
             "--help" | "-h" => Ok(Mode::Help),
             _ => bail!("Unknown flag. Use --help."),
         },
@@ -799,6 +1034,14 @@ fn execute_inert(
                 json!({"message_recorded":true,"recorded_summary":session.message.as_ref().map(|message|message.summary.as_str()),"closing":true,"stop":true}),
             )
         }
+        ToolCall::EndCall { evidence_refs, .. } => {
+            session.require_end_call(evidence_refs)?;
+            session.closing_reason = Some("no_message".into());
+            session.state = "closing".into();
+            session.speech_pending = true;
+            session.generation_id += 1;
+            Ok(json!({"closing":true,"message_recorded":false,"stop":true}))
+        }
         _ => bail!("Tool is not available in the next-step phase"),
     }
 }
@@ -807,12 +1050,16 @@ fn assess(case: &Case, call: &ModelToolCall) -> Result<(Session, Observation)> {
     let ToolCall::RecordAssessment {
         observation,
         evidence_refs,
+        understanding,
     } = ToolCall::parse(&call.name, call.arguments.clone())?
     else {
         bail!("First native tool was not record_assessment");
     };
     let mut session = case_session(case);
+    let understanding =
+        understanding.ok_or_else(|| anyhow!("Native assessment requires call understanding"))?;
     session.assess(1, session.turn_version, &observation, &evidence_refs)?;
+    session.accept_understanding(understanding)?;
     Ok((session, observation))
 }
 
@@ -876,6 +1123,9 @@ fn case_passes(result: &CaseResult) -> bool {
     result.error.is_none()
         && result.evidence_valid
         && result.classification_correct != Some(false)
+        && (result.expected_readiness.is_none() || result.readiness_correct == Some(true))
+        && result.literal_fact_coverage != Some(false)
+        && result.closure_correct != Some(false)
         && result
             .expected_authentication_request
             .is_none_or(|expected| result.authentication_request == Some(expected))
@@ -925,8 +1175,8 @@ fn totals(results: &[CaseResult]) -> Value {
         "benign_false_positive_rate":ratio(benign.iter().filter(|r|r.predicted_classification.as_deref()==Some("risky")).count(),benign.len()),
         "clarification_rate":ratio(next.iter().filter(|r|r.clarification==Some(true)).count(),next.len()),
         "required_clarification_rate":ratio(required.iter().filter(|r|r.clarification==Some(true)).count(),required.len()),
-        "evidence_valid_cases":results.iter().filter(|r|r.evidence_valid).count(),"evidence_valid_rate":ratio(results.iter().filter(|r|r.evidence_valid).count(),results.len()),
-        "next_tool_allowed_cases":results.iter().filter(|r|r.next_tool_allowed==Some(true)).count(),"classification_scored_cases":results.iter().filter(|r|r.classification_correct.is_some()).count(),"classification_correct_cases":results.iter().filter(|r|r.classification_correct==Some(true)).count(),"composite_case_passes":results.iter().filter(|r|case_passes(r)).count(),"useful_action_cases":results.iter().filter(|r|r.useful_action==Some(true)).count(),"simulated_local_outcomes":results.iter().filter(|r|r.simulated_local_outcome.is_some()).count(),"completed_external_actions":results.iter().filter(|r|r.completed_external_action).count()})
+        "readiness_expected_cases":results.iter().filter(|r|r.expected_readiness.is_some()).count(),"readiness_scored_cases":results.iter().filter(|r|r.readiness_correct.is_some()).count(),"readiness_correct_cases":results.iter().filter(|r|r.readiness_correct==Some(true)).count(),"evidence_valid_cases":results.iter().filter(|r|r.evidence_valid).count(),"evidence_valid_rate":ratio(results.iter().filter(|r|r.evidence_valid).count(),results.len()),
+        "next_tool_allowed_cases":results.iter().filter(|r|r.next_tool_allowed==Some(true)).count(),"classification_scored_cases":results.iter().filter(|r|r.classification_correct.is_some()).count(),"classification_correct_cases":results.iter().filter(|r|r.classification_correct==Some(true)).count(),"composite_case_passes":results.iter().filter(|r|case_passes(r)).count(),"useful_action_cases":results.iter().filter(|r|r.useful_action==Some(true)).count(),"simulated_local_outcomes":results.iter().filter(|r|r.simulated_local_outcome.is_some()).count(),"closure_scored_cases":results.iter().filter(|r|r.closure_correct.is_some()).count(),"closure_correct_cases":results.iter().filter(|r|r.closure_correct==Some(true)).count(),"literal_fact_scored_cases":results.iter().filter(|r|r.literal_fact_coverage.is_some()).count(),"literal_fact_covered_cases":results.iter().filter(|r|r.literal_fact_coverage==Some(true)).count(),"purpose_review_available_cases":results.iter().filter(|r|r.comparison_review.is_some() && r.understanding.is_some()).count(),"completed_external_actions":results.iter().filter(|r|r.completed_external_action).count()})
 }
 
 struct Budget {
@@ -989,21 +1239,55 @@ fn request_timeout_ms(mode: Mode, probe_override: Option<&str>) -> Result<u64> {
 }
 
 fn model(mode: Mode) -> Result<(Nemotron, u64)> {
-    let key = std::env::var("NVIDIA_API_KEY").unwrap_or_default();
-    ensure!(
-        !key.trim().is_empty(),
-        "Pending: NVIDIA_API_KEY is missing; no model requests submitted"
-    );
-    let url = std::env::var("NEMOTRON_CHAT_URL").unwrap_or_else(|_| ENDPOINT.into());
-    let model = std::env::var("NEMOTRON_MODEL").unwrap_or_else(|_| MODEL.into());
-    ensure!(
-        url == ENDPOINT && model == MODEL,
-        "This preflight requires the documented NEMOTRON_CHAT_URL and NEMOTRON_MODEL; configuration was not changed"
-    );
+    let settings = ModelSettings::from_env()?;
     let override_value = std::env::var("NEMOTRON_PROBE_TIMEOUT_MS").ok();
-    let milliseconds = request_timeout_ms(mode, override_value.as_deref())?;
-    let model =
-        Nemotron::new(key, url, model).with_request_timeout(Duration::from_millis(milliseconds))?;
+    let output_override = std::env::var("NEMOTRON_PROBE_MAX_OUTPUT_TOKENS").ok();
+    let (mut model, milliseconds) = model_from_settings(mode, settings, override_value.as_deref())?;
+    if mode == Mode::ModelProbe {
+        model = model.with_synthetic_probe_diagnostics();
+    }
+    Ok((
+        model.with_max_output_tokens(max_output_tokens(mode, output_override.as_deref())?)?,
+        milliseconds,
+    ))
+}
+
+fn max_output_tokens(mode: Mode, probe_override: Option<&str>) -> Result<u32> {
+    if mode != Mode::ModelProbe {
+        return Ok(512);
+    }
+    let Some(value) = probe_override else {
+        return Ok(512);
+    };
+    let tokens = value.parse::<u32>().map_err(|_| {
+        anyhow!("NEMOTRON_PROBE_MAX_OUTPUT_TOKENS must be an integer within 1..1024")
+    })?;
+    ensure!(
+        (1..=1024).contains(&tokens),
+        "NEMOTRON_PROBE_MAX_OUTPUT_TOKENS must be within 1..1024"
+    );
+    Ok(tokens)
+}
+
+fn model_from_settings(
+    mode: Mode,
+    settings: ModelSettings,
+    probe_override: Option<&str>,
+) -> Result<(Nemotron, u64)> {
+    ensure!(
+        !settings.key.trim().is_empty(),
+        "Pending: selected model backend API key is missing; no model requests submitted"
+    );
+    if settings.backend == ModelBackend::NvidiaHosted {
+        ensure!(
+            settings.url == ENDPOINT && settings.model == MODEL,
+            "Hosted preflight requires the documented NEMOTRON_CHAT_URL and NEMOTRON_MODEL; configuration was not changed"
+        );
+    }
+    let milliseconds = request_timeout_ms(mode, probe_override)?;
+    let model = Nemotron::new(settings.key, settings.url, settings.model)
+        .with_backend(settings.backend)
+        .with_request_timeout(Duration::from_millis(milliseconds))?;
     Ok((model, milliseconds))
 }
 
@@ -1017,9 +1301,11 @@ async fn followup(
     append_tool_result(
         messages,
         &first,
-        &json!({"ok":true,"result":{"blocked":session.blocked,"ambiguous":session.ambiguous,"assessed_version":session.assessed_version},"epoch":session.policy_epoch}),
+        &json!({"ok":true,"result":{"blocked":session.blocked,"ambiguous":session.ambiguous,"assessed_version":session.assessed_version,"understanding":session.understanding},"epoch":session.policy_epoch}),
     );
-    budget.request(model, messages, ToolPhase::NextStep).await
+    budget
+        .request(model, messages, next_step_phase(session))
+        .await
 }
 
 fn validate_next(session: &Session, call: &ModelToolCall) -> Result<ToolCall> {
@@ -1028,6 +1314,7 @@ fn validate_next(session: &Session, call: &ModelToolCall) -> Result<ToolCall> {
         ToolCall::AskCaller { evidence_refs, .. }
         | ToolCall::OfferHandoff { evidence_refs, .. }
         | ToolCall::StartTrustedCallback { evidence_refs, .. }
+        | ToolCall::EndCall { evidence_refs, .. }
         | ToolCall::TakeMessage { evidence_refs, .. } => {
             session.evidence_valid(evidence_refs, true)?
         }
@@ -1039,8 +1326,25 @@ fn validate_next(session: &Session, call: &ModelToolCall) -> Result<ToolCall> {
 
 async fn probe(data: &Dataset) -> Result<()> {
     let (model, request_timeout_ms) = model(Mode::ModelProbe)?;
-    let mut budget = Budget::new(4);
+    let selection = std::env::var("NEMOTRON_PROBE_ASSESSMENT_CONTEXT").ok();
+    let assessment_context = probe_assessment_context(selection.as_deref())?;
+    let reuse = std::env::var("NEMOTRON_PROBE_REUSE_WARM_ASSESSMENT").ok();
+    ensure!(
+        reuse.as_deref().is_none_or(|value| value == "1"),
+        "NEMOTRON_PROBE_REUSE_WARM_ASSESSMENT accepts only 1"
+    );
+    let reuse = reuse.is_some();
+    ensure!(
+        !reuse || (assessment_context.is_none() && model.backend() == ModelBackend::BrevHosted),
+        "Saved-prefix diagnostic requires Brev and no assessment-only selection"
+    );
+    let mut budget = Budget::new(if assessment_context.is_some() || reuse {
+        1
+    } else {
+        4
+    });
     let mut questions = Vec::new();
+    let mut assessments = Vec::new();
     let outcome = async {
     for (index, text) in [
         "The clinic appointment time has changed, and I need to give her the new time.",
@@ -1049,6 +1353,7 @@ async fn probe(data: &Dataset) -> Result<()> {
     .iter()
     .enumerate()
     {
+        if assessment_context.is_some_and(|selected| selected != index) || (reuse && index != 0) {continue;}
         let mut case = data.cases[0].clone();
         case.id = format!("synthetic-access-probe-{index}");
         case.turns[0].text = (*text).into();
@@ -1056,35 +1361,68 @@ async fn probe(data: &Dataset) -> Result<()> {
             &case,
             "Assess the latest caller turn first. For this access probe, then ask one short context-specific clarifying question using ask_caller.",
         );
-        let first = budget.request(&model, &messages, ToolPhase::Assessment).await?;
+        let first = if reuse {
+            reused_warm_assessment(include_str!("../../../fixtures/results/2026-11-08-brev-native-warm.json"))?
+        } else { budget.request(&model, &messages, ToolPhase::Assessment).await? };
+        assessments.push(json!({"context_index":index,"tool_call_id":first.id,"name":first.name,"arguments":first.arguments}));
         let (session, observation) = assess(&case, &first)?;
         ensure!(
             flags(&observation).0 == "benign",
             "Probe benign detail was not assessed as benign"
         );
+        if assessment_context.is_some() {break;}
         let next = followup(&model, &mut budget, &mut messages, first, &session).await?;
         let ToolCall::AskCaller { question, .. } = validate_next(&session, &next)? else {
             bail!("Probe follow-up was not ask_caller");
         };
         retain_probe_question(index, question, &mut questions)?;
     }
-    ensure!(
+    if assessment_context.is_none() && !reuse {ensure!(
         questions[0].to_lowercase() != questions[1].to_lowercase(),
         "Probe produced identical follow-ups for different details"
-    );
+    );}
     Ok::<(), anyhow::Error>(())
     }.await;
-    let report = json!({"status":if outcome.is_ok(){"model_probe_passed"}else{"model_probe_failed"},
-        "recorded_at":chrono::Utc::now().to_rfc3339(),"requested_model":MODEL,"data_origin":"synthetic",
-        "request_timeout_ms":request_timeout_ms,"native_tool_choice":"named_assessment_then_required_next_step",
+    let report = json!({"status":if outcome.is_err(){"model_probe_failed"}else if reuse {"reused_prefix_continuation_complete"}else if assessment_context.is_some(){"assessment_diagnostic_complete"}else{"model_probe_passed"},"reused_prefix":reuse,"reused_prefix_source":if reuse {Some("fixtures/results/2026-11-08-brev-native-warm.json")}else{None},"assessment_only":assessment_context.is_some(),"selected_context_index":assessment_context,
+        "recorded_at":chrono::Utc::now().to_rfc3339(),"requested_model":model.requested_model(),"backend":model.backend(),"backend_evidence":"Configured adapter selection; this label alone does not prove GPU execution","data_origin":"synthetic",
+        "request_timeout_ms":request_timeout_ms,"max_output_tokens":model.max_output_tokens(),"native_tool_choice":"named_assessment_then_readiness_gated_next_step",
         "requests_submitted":budget.submitted,"request_observations":budget.observations,
-        "native_result_roundtrips":budget.observations.iter().enumerate().filter(|(i,o)|i%2==1 && o.outcome=="success").count(),
-        "observed_followups":questions,"error":outcome.as_ref().err().map(ToString::to_string),
+        "native_result_roundtrips":if reuse {budget.observations.iter().filter(|observation| observation.outcome == "success").count()} else {budget.observations.iter().enumerate().filter(|(i,o)|i%2==1 && o.outcome=="success").count()},
+        "observed_followups":questions,"observed_assessments":assessments,"retained_arguments_scope":"Synthetic native assessment arguments only; no assistant content or hidden reasoning","error":outcome.as_ref().err().map(ToString::to_string),
         "relevance_check":"prewritten lexical anchors; human review still required","phone_tested":false,
         "latency_boundary":"HTTP request through complete response and tool parsing; not audible latency"});
     save_report_to(".tools/model-probe-results.json", &report)?;
     println!("{report}");
     outcome
+}
+
+fn reused_warm_assessment(raw: &str) -> Result<ModelToolCall> {
+    let report: Value = serde_json::from_str(raw)?;
+    ensure!(
+        report["data_origin"] == "synthetic" && report["backend"] == "brev_hosted",
+        "Only the saved synthetic Brev assessment may be reused"
+    );
+    ensure!(
+        report["request_observations"][0]["outcome"] == "success",
+        "Reused assessment must have succeeded"
+    );
+    let saved = &report["observed_assessments"][0];
+    ensure!(
+        saved["context_index"] == 0 && saved["name"] == "record_assessment",
+        "Reused prefix must be the clinic assessment"
+    );
+    firstring::providers::nemotron::parse_response(
+        json!({"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":null,"tool_calls":[{"id":saved["tool_call_id"],"type":"function","function":{"name":"record_assessment","arguments":saved["arguments"].to_string()}}]}}]}),
+    )
+}
+
+fn probe_assessment_context(value: Option<&str>) -> Result<Option<usize>> {
+    match value {
+        None => Ok(None),
+        Some("clinic") => Ok(Some(0)),
+        Some("grocery") => Ok(Some(1)),
+        Some(_) => bail!("NEMOTRON_PROBE_ASSESSMENT_CONTEXT must be clinic or grocery"),
+    }
 }
 
 async fn evaluate_case(
@@ -1113,12 +1451,23 @@ async fn evaluate_case(
         result.classification_correct = Some(classification == case.expected.classification);
     }
     result.predicted_classification = Some(classification);
-    let outcome = json!({"ok":true,"result":{"blocked":session.blocked,"ambiguous":session.ambiguous,"assessed_version":session.assessed_version},"epoch":session.policy_epoch});
+    result.understanding = session
+        .understanding
+        .as_ref()
+        .map(|accepted| json!(accepted));
+    result.predicted_readiness = session
+        .current_understanding()
+        .and_then(|understanding| serde_json::to_value(understanding.readiness).ok())
+        .and_then(|value| value.as_str().map(str::to_owned));
+    result.readiness_correct = case.understanding_rubric.as_ref().map(|rubric| {
+        result.predicted_readiness.as_deref() == Some(rubric.expected_readiness.as_str())
+    });
+    let outcome = json!({"ok":true,"result":{"blocked":session.blocked,"ambiguous":session.ambiguous,"assessed_version":session.assessed_version,"understanding":session.understanding},"epoch":session.policy_epoch});
     result.trace.push(json!({"step":1,"tool_call_id":first.id,"name":first.name,"arguments":first.arguments,"result":outcome}));
     append_tool_result(&mut messages, &first, &outcome);
     for step in 2..=4 {
         let next = budget
-            .request(model, &messages, ToolPhase::NextStep)
+            .request(model, &messages, next_step_phase(&session))
             .await?;
         let tool = match validate_next(&session, &next) {
             Ok(tool) => tool,
@@ -1150,11 +1499,18 @@ async fn evaluate_case(
         result.next_tool_allowed = Some(case.expected.accepted_next_tools.contains(&next.name));
         result.clarification = Some(matches!(tool, ToolCall::AskCaller { .. }) && accepted);
         if accepted && outcome["result"]["stop"] == true {
+            result.recorded_summary = session
+                .message
+                .as_ref()
+                .map(|message| message.summary.clone());
+            result.closing_requested =
+                Some(outcome["result"]["closing"].as_bool().unwrap_or(false));
             result.useful_action = result.next_tool_allowed;
             result.simulated_local_outcome = Some(
                 match tool {
                     ToolCall::AskCaller { .. } => "question_requested",
                     ToolCall::TakeMessage { .. } => "message_recorded",
+                    ToolCall::EndCall { .. } => "closing_requested_without_message",
                     ToolCall::OfferHandoff { .. } => "offer_pending",
                     ToolCall::StartTrustedCallback { .. } => "callback_reserved",
                     _ => unreachable!(),
@@ -1185,11 +1541,41 @@ fn save_report_to(path: &str, value: &Value) -> Result<()> {
     Ok(())
 }
 
-async fn evaluate(data: &Dataset, output: &str) -> Result<()> {
+fn evaluation_request_cap(ceiling: usize, supplied: Option<&str>) -> Result<usize> {
+    let Some(raw) = supplied else {
+        return Ok(ceiling);
+    };
+    let cap: usize = raw
+        .parse()
+        .map_err(|_| anyhow!("Evaluation cap must be a positive integer"))?;
+    ensure!(
+        cap > 0 && cap <= ceiling,
+        "Evaluation cap may only reduce the existing ceiling"
+    );
+    Ok(cap)
+}
+
+async fn evaluate(data: &Dataset, output: &str, max_requests: usize) -> Result<()> {
     let (model, request_timeout_ms) = model(Mode::Evaluate)?;
-    let mut budget = Budget::new(data.cases.len() * 4);
+    let request_cap = std::env::var("NEMOTRON_EVALUATION_REQUEST_CAP").ok();
+    let max_requests = evaluation_request_cap(max_requests, request_cap.as_deref())?;
+    let fingerprint = contract_fingerprint(data);
+    if data
+        .cases
+        .iter()
+        .all(|case| case.comparison_rubric.is_some())
+    {
+        save_report_to(
+            &output.replace("-results.json", "-inputs.json"),
+            &json!({"recorded_at":chrono::Utc::now().to_rfc3339(),"backend":model.backend(),"requested_model":model.requested_model(),"fixture_sha256":"6c282b82c811a7ce6ff413acf7b6075abbcac5bdad49d1c6e9e4b649128547f6","request_timeout_ms":request_timeout_ms,"turn_deadline_ms":6000,"max_output_tokens":model.max_output_tokens(),"max_requests":max_requests,"contract_fingerprint":fingerprint,"scope":"Frozen before first inference request. Configuration and hashes are not execution proof."}),
+        )?;
+    }
+    let mut budget = Budget::new(max_requests);
     let mut results = Vec::new();
     for case in &data.cases {
+        if budget.remaining == 0 {
+            break;
+        }
         let mut result = CaseResult {
             id: case.id.clone(),
             category: case.category.clone(),
@@ -1197,6 +1583,11 @@ async fn evaluate(data: &Dataset, output: &str) -> Result<()> {
             expected_authentication_request: case.expected.authentication_request,
             clarification_required: case.expected.clarification == "required",
             capabilities: Some(capabilities(case)),
+            expected_readiness: case
+                .understanding_rubric
+                .as_ref()
+                .map(|rubric| rubric.expected_readiness.clone()),
+            summary_review_rubric: case.understanding_rubric.clone(),
             unscored: vec![
                 "Phone delivery, acknowledgement, consent and stale acceptance are not simulated."
                     .into(),
@@ -1232,21 +1623,43 @@ async fn evaluate(data: &Dataset, output: &str) -> Result<()> {
             Ok(Err(e)) => result.error = Some(e.to_string()),
             Err(_) => result.error = Some("Runtime six-second turn deadline reached".into()),
         }
+        apply_comparison_review(case, &mut result);
         println!(
             "{}",
             json!({"case":result.id,"predicted":result.predicted_classification,"next_tool":result.next_tool,"local_outcome":result.simulated_local_outcome,"error":result.error})
         );
         results.push(result);
+        if budget.observations.last().is_some_and(|observation| {
+            matches!(
+                observation.outcome.as_str(),
+                "authentication" | "authorization"
+            )
+        }) {
+            break;
+        }
     }
     let metrics = totals(&results);
-    let report = json!({"status":"completed_with_observations","recorded_at":chrono::Utc::now().to_rfc3339(),"model":MODEL,"data_origin":"synthetic","request_timeout_ms":request_timeout_ms,"turn_deadline_ms":6000,"max_steps_per_case":4,"native_tool_choice":"named_assessment_then_required_next_step","split":data.split,"case_count":data.cases.len(),"requests_submitted":budget.submitted,"request_observations":budget.observations,"metrics":metrics,"cases":results,"phone_tested":false,"external_actions_executed":0,"executor":"in-memory policy-validated simulation; native tool results are returned to the same bounded model loop","interpretation":"Classification, allowed useful proposal, and simulated local outcome are separate. No provider calls, delivery, or acknowledgement are inferred. Synthetic typed arguments/replies are retained; no raw model reasoning. Null rates have no scored denominator."});
+    let timings = comparison_latency(&budget.observations, &results);
+    let authorization_blocked = budget.observations.iter().any(|observation| {
+        matches!(
+            observation.outcome.as_str(),
+            "authentication" | "authorization"
+        )
+    });
+    let skipped_case_ids = data
+        .cases
+        .iter()
+        .skip(results.len())
+        .map(|case| case.id.clone())
+        .collect::<Vec<_>>();
+    let report = json!({"status":if authorization_blocked{"blocked_authorization"}else{"completed_with_observations"},"contract_fingerprint":fingerprint,"latency_summary":timings,"skipped_case_ids":skipped_case_ids,"recorded_at":chrono::Utc::now().to_rfc3339(),"model":model.requested_model(),"requested_model":model.requested_model(),"backend":model.backend(),"backend_evidence":"Configured adapter selection; this label alone does not prove GPU execution","data_origin":"synthetic","request_timeout_ms":request_timeout_ms,"max_output_tokens":model.max_output_tokens(),"turn_deadline_ms":6000,"max_steps_per_case":4,"max_requests":max_requests,"native_tool_choice":"named_assessment_then_readiness_gated_next_step","split":data.split,"case_count":data.cases.len(),"requests_submitted":budget.submitted,"request_observations":budget.observations,"metrics":metrics,"cases":results,"phone_tested":false,"external_actions_executed":0,"executor":"in-memory policy-validated simulation; native tool results are returned to the same bounded model loop","assessment_contract":"call_understanding_v1","interpretation":"Classification, readiness, allowed useful proposal, and simulated local outcome are separate. Readiness is scored only where an independently authored rubric exists; fact preservation and claim truth require human review. No provider calls, delivery, or acknowledgement are inferred. Synthetic typed arguments/replies are retained; no raw model reasoning. Null rates have no scored denominator."});
     save_report_to(output, &report)?;
     println!(
         "{}",
         json!({"report":output,"metrics":metrics,"requests_submitted":budget.submitted})
     );
     ensure!(
-        results.iter().all(case_passes),
+        results.len() == data.cases.len() && results.iter().all(case_passes),
         "Evaluation contains errors or rubric mismatches; inspect the preserved report"
     );
     Ok(())
@@ -1268,6 +1681,10 @@ fn status() {
         "NVIDIA_API_KEY",
         "NEMOTRON_CHAT_URL",
         "NEMOTRON_MODEL",
+        "NEMOTRON_BACKEND",
+        "BREV_NEMOTRON_API_KEY",
+        "BREV_NEMOTRON_CHAT_URL",
+        "BREV_NEMOTRON_MODEL",
         "TEST_CALLS_AUTHORIZED",
         "HANDOFF_CALLS_ENABLED",
         "FAMILY_CALLS_ENABLED",
@@ -1292,7 +1709,7 @@ async fn main() -> Result<()> {
         }
         Mode::Help => {
             println!(
-                "FirstRing preflight\n  (no flags)           Report environment NAMES only; no external calls.\n  --model-probe        Opt in to up to 4 NVIDIA requests; native tool/result roundtrip for two synthetic contexts.\n  --evaluate-held-out  Up to 48 NVIDIA requests on frozen v2; .tools/evaluation-v2-results.json.\n  --evaluate-regression  Original 12 cases; .tools/regression-results.json.\n  --evaluate-development  One case per development category; .tools/development-results.json.\n  --evaluate-a-only    Three development cases with no enrolled/calling contacts; .tools/a-only-development-results.json.\n  --evaluate-interactive-development  Five two-turn kit scenarios through real replay actors; up to 40 NVIDIA requests; .tools/interactive-development-results.json.\n  --evaluate-conversation-development  Eight authored continuity/scope cases with actual assistant history; up to 32 NVIDIA requests.\n  --evaluate-conversation-repairs  Two remaining development cases only; up to 8 NVIDIA requests.\n  --help              Show usage.\nModel requests require NVIDIA_API_KEY and the documented endpoint/model; named record_assessment first, then required next-step tool selection, with 3.5-second request, 6-second turn, four-step turn and 120-second run limits. NEMOTRON_PROBE_TIMEOUT_MS=1..15000 overrides only --model-probe; held-out evaluation and runtime retain their normal deadlines. Reports record request_timeout_ms and native_tool_choice=named_assessment_then_required_next_step. Evaluation uses an in-memory policy executor; no command dials phones or changes application data. Run from repository root."
+                "FirstRing preflight\n  (no flags)           Report environment NAMES only; no external calls.\n  --model-probe        Opt in to up to 4 selected-backend inference requests; native tool/result roundtrip for two synthetic contexts.\n  --evaluate-held-out  Up to 48 selected-backend inference requests on frozen v2; .tools/evaluation-v2-results.json.\n  --evaluate-regression  Original 12 cases; .tools/regression-results.json.\n  --evaluate-development  One case per development category; .tools/development-results.json.\n  --evaluate-a-only    Three development cases with no enrolled/calling contacts; .tools/a-only-development-results.json.\n  --evaluate-interactive-development  Five two-turn kit scenarios through real replay actors; up to 40 selected-backend inference requests; .tools/interactive-development-results.json.\n  --evaluate-conversation-development  Eight authored continuity/scope cases with actual assistant history; up to 32 selected-backend inference requests.\n  --evaluate-conversation-repairs  Two remaining development cases only; up to 8 selected-backend inference requests.\n  --evaluate-general-purpose-development  Eight frozen general-call cases plus one clinic control, with versioned readiness rubric; up to 32 selected-backend inference requests; .tools/general-purpose-understanding-v1-results.json.\n  --evaluate-backend-comparison  Six frozen development prefixes through the same native loop, up to 24 requests; separate backend-prefixed reports, actual stored-summary review and local closure checks.\n  --help              Show usage.\nModel requests use ModelSettings selected by NEMOTRON_BACKEND (default nvidia_hosted, or brev_hosted); that backend must have its own key, endpoint and actual served model configured. Configuration is not proof of GPU execution; named record_assessment with understanding v1 first, then readiness-gated native tool selection, with 3.5-second request, 6-second turn, four-step turn and 120-second run limits. NEMOTRON_PROBE_TIMEOUT_MS=1..15000 and NEMOTRON_PROBE_MAX_OUTPUT_TOKENS=1..1024 override only --model-probe; defaults are 3500ms and 512 tokens. NEMOTRON_PROBE_ASSESSMENT_CONTEXT=clinic|grocery limits the probe to one fixed synthetic assessment request and never reports a full protocol pass. NEMOTRON_PROBE_REUSE_WARM_ASSESSMENT=1 continues the fixed saved synthetic Brev assessment with its original native tool ID; this labels reused-prefix evidence and never reports a full fresh-probe pass. NEMOTRON_EVALUATION_REQUEST_CAP may only lower an evaluation request ceiling; skipped cases remain unproved. Evaluation and runtime retain their normal limits. Reports record request_timeout_ms and native_tool_choice=named_assessment_then_readiness_gated_next_step. Evaluation uses an in-memory policy executor; no command dials phones or changes application data. Run from repository root."
             );
             Ok(())
         }
@@ -1306,7 +1723,9 @@ async fn main() -> Result<()> {
         | Mode::EvaluateDevelopment
         | Mode::EvaluateAOnly
         | Mode::EvaluateConversationDevelopment
-        | Mode::EvaluateConversationRepairs => {
+        | Mode::EvaluateConversationRepairs
+        | Mode::EvaluateGeneralPurposeDevelopment
+        | Mode::EvaluateBackendComparison => {
             let (path, split, output) = match mode {
                 Mode::Evaluate => (
                     "fixtures/language-held-out-v2.json",
@@ -1320,6 +1739,16 @@ async fn main() -> Result<()> {
                     "fixtures/language-conversation-development.json",
                     "conversation_development",
                     ".tools/conversation-development-results.json",
+                ),
+                Mode::EvaluateGeneralPurposeDevelopment => (
+                    "fixtures/language-general-purpose-development.json",
+                    "conversation_development",
+                    ".tools/general-purpose-understanding-v1-results.json",
+                ),
+                Mode::EvaluateBackendComparison => (
+                    "fixtures/backend-comparison-development.json",
+                    "conversation_development",
+                    ".tools/backend-comparison-results.json",
                 ),
                 Mode::EvaluateConversationRepairs => (
                     "fixtures/language-conversation-development.json",
@@ -1341,6 +1770,32 @@ async fn main() -> Result<()> {
             let raw = std::fs::read_to_string(path)
                 .map_err(|_| anyhow!("Cannot read fixture file; run from repository root"))?;
             let mut data = dataset_for(&raw, split)?;
+            if mode == Mode::EvaluateBackendComparison {
+                apply_comparison_rubric(
+                    &mut data,
+                    include_str!("../../../fixtures/backend-comparison-review-v1.json"),
+                )?;
+            }
+            if mode == Mode::EvaluateGeneralPurposeDevelopment {
+                // A separately labeled known live failure, not part of the
+                // frozen eight-case general-purpose development fixture.
+                let mut control = dataset_for(
+                    include_str!("../../../fixtures/language-a-only-development.json"),
+                    "development",
+                )?
+                .cases
+                .remove(0);
+                control.id = "automated-clinic-opening-control".into();
+                control.category = "automated-clinic-opening-control".into();
+                control.turns[0].text =
+                    "I'm calling from the clinic because Sarah's appointment time changed.".into();
+                control.rationale="Previously observed automated-call failure: a changed appointment lacks its replacement time; ask once before finalizing. Separate control, not a new held-out case.".into();
+                data.cases.push(control);
+                apply_understanding_rubric(
+                    &mut data,
+                    include_str!("../../../fixtures/general-purpose-understanding-v1-rubric.json"),
+                )?;
+            }
             if mode == Mode::EvaluateConversationRepairs {
                 data.cases.retain(|case| {
                     ["code-unspecified-after-clinic", "quoted-suspicious-report"]
@@ -1363,7 +1818,17 @@ async fn main() -> Result<()> {
             if mode == Mode::ModelProbe {
                 probe(&data).await
             } else {
-                evaluate(&data, output).await
+                let max_requests = if mode == Mode::EvaluateGeneralPurposeDevelopment {
+                    32
+                } else {
+                    data.cases.len() * 4
+                };
+                let output = if mode == Mode::EvaluateBackendComparison {
+                    comparison_report_path(ModelSettings::from_env()?.backend)
+                } else {
+                    output
+                };
+                evaluate(&data, output, max_requests).await
             }
         }
     }
@@ -1371,9 +1836,449 @@ async fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn evaluation_budget_override_can_only_reduce_the_original_ceiling() {
+        assert_eq!(super::evaluation_request_cap(24, None).unwrap(), 24);
+        assert_eq!(super::evaluation_request_cap(24, Some("15")).unwrap(), 15);
+        for value in ["0", "25", "-1", "invalid"] {
+            assert!(super::evaluation_request_cap(24, Some(value)).is_err());
+        }
+    }
+
+    #[test]
+    fn reused_probe_prefix_preserves_real_native_id_and_validates_scope() {
+        let raw = include_str!("../../../fixtures/results/2026-11-08-brev-native-warm.json");
+        let call = super::reused_warm_assessment(raw).unwrap();
+        let report: serde_json::Value = serde_json::from_str(raw).unwrap();
+        assert_eq!(call.id, report["observed_assessments"][0]["tool_call_id"]);
+        assert_eq!(call.assistant_message["tool_calls"][0]["id"], call.id);
+        assert_eq!(call.name, "record_assessment");
+        let mut changed = report;
+        changed["data_origin"] = serde_json::json!("real");
+        assert!(super::reused_warm_assessment(&changed.to_string()).is_err());
+    }
+
     use super::*;
     #[test]
-    fn evaluation_retains_the_validated_message_summary_including_numeric_redaction() {
+    fn authorization_failure_is_not_a_fast_model_or_completed_turn_measurement() {
+        let denied = RequestObservation {
+            backend: ModelBackend::NvidiaHosted,
+            requested_model: "fixture".into(),
+            response_model: None,
+            finish_reason: None,
+            completion_tokens: None,
+            content_chars: None,
+            reasoning_chars: None,
+            reasoning_tokens: None,
+            native_argument_diagnostic: None,
+            provider_error_diagnostic: None,
+            elapsed_ms: 100,
+            outcome: "authorization".into(),
+            error: Some("HTTP403".into()),
+        };
+        let accepted = RequestObservation {
+            outcome: "success".into(),
+            error: None,
+            elapsed_ms: 2000,
+            ..denied.clone()
+        };
+        let results = vec![
+            CaseResult {
+                error: Some("HTTP403".into()),
+                turn_elapsed_ms: 100,
+                ..CaseResult::default()
+            },
+            CaseResult {
+                simulated_local_outcome: Some("message_recorded".into()),
+                turn_elapsed_ms: 3000,
+                ..CaseResult::default()
+            },
+        ];
+        let summary = comparison_latency(&[denied, accepted], &results);
+        assert_eq!(summary["successful_native_http"]["count"], 1);
+        assert_eq!(summary["successful_native_http"]["median_ms"], 2000.0);
+        assert_eq!(summary["completed_native_turn"]["median_ms"], 3000.0);
+        assert_eq!(summary["authorization_failures"], 1);
+        assert_ne!(
+            comparison_report_path(ModelBackend::NvidiaHosted),
+            comparison_report_path(ModelBackend::BrevHosted)
+        );
+        assert_eq!(
+            parse_args(&["--evaluate-backend-comparison".into()]).unwrap(),
+            Mode::EvaluateBackendComparison
+        );
+    }
+    #[test]
+    fn comparison_reviews_actual_saved_numeric_facts_and_local_closure_not_proposal_text() {
+        let mut data = dataset_for(
+            include_str!("../../../fixtures/backend-comparison-development.json"),
+            "conversation_development",
+        )
+        .unwrap();
+        apply_comparison_rubric(
+            &mut data,
+            include_str!("../../../fixtures/backend-comparison-review-v1.json"),
+        )
+        .unwrap();
+        let case = data
+            .cases
+            .iter()
+            .find(|case| case.id == "conversation-dev-clinic-short-answer")
+            .unwrap();
+        let caller = case.turns.last().unwrap();
+        let call = ModelToolCall {
+            id: "numeric-assessment".into(),
+            name: "record_assessment".into(),
+            arguments: json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":[{"turn_id":caller.id,"quote":caller.text}],"understanding":test_understanding()}),
+            assistant_message: json!({"role":"assistant"}),
+        };
+        let (mut session, _) = assess(case, &call).unwrap();
+        let proposal = json!({"summary":"Clinic visit changed to Friday at 3 PM.","evidence_refs":call.arguments["evidence_refs"]});
+        let tool = ToolCall::parse("take_message", proposal.clone()).unwrap();
+        let outcome = execute_inert(&mut session, &capabilities(case), &tool).unwrap();
+        let mut result = CaseResult {
+            recorded_summary: session
+                .message
+                .as_ref()
+                .map(|message| message.summary.clone()),
+            closing_requested: outcome["closing"].as_bool(),
+            understanding: session
+                .understanding
+                .as_ref()
+                .map(|understanding| json!(understanding)),
+            trace: vec![json!({"arguments":proposal})],
+            ..CaseResult::default()
+        };
+        apply_comparison_review(case, &mut result);
+        assert_eq!(result.literal_fact_coverage, Some(true));
+        assert_eq!(result.closure_correct, Some(true));
+        assert!(result.comparison_review.as_ref().unwrap()["purpose"]["correct"].is_null());
+        session.message.as_mut().unwrap().summary =
+            "Clinic visit changed to Friday at [redacted] PM.".into();
+        result.recorded_summary = session
+            .message
+            .as_ref()
+            .map(|message| message.summary.clone());
+        apply_comparison_review(case, &mut result);
+        assert_eq!(result.literal_fact_coverage, Some(false));
+        assert!(
+            result.trace[0]["arguments"]["summary"]
+                .as_str()
+                .unwrap()
+                .contains("3 PM")
+        );
+        let incomplete = data
+            .cases
+            .iter()
+            .find(|case| case.id == "general-dev-delivery-entrance")
+            .unwrap();
+        apply_comparison_review(incomplete, &mut result);
+        assert_eq!(result.closure_correct, Some(false));
+    }
+    #[test]
+    fn single_assessment_selection_uses_only_fixed_synthetic_contexts() {
+        assert_eq!(probe_assessment_context(None).unwrap(), None);
+        assert_eq!(probe_assessment_context(Some("clinic")).unwrap(), Some(0));
+        assert_eq!(probe_assessment_context(Some("grocery")).unwrap(), Some(1));
+        assert!(probe_assessment_context(Some("arbitrary caller content")).is_err());
+    }
+    #[test]
+    fn backend_comparison_freezes_six_requested_development_classes_and_complete_prefixes() {
+        let data = dataset_for(
+            include_str!("../../../fixtures/backend-comparison-development.json"),
+            "conversation_development",
+        )
+        .unwrap();
+        assert_eq!(data.cases.len(), 6);
+        let numeric = data
+            .cases
+            .iter()
+            .find(|case| case.id == "conversation-dev-clinic-short-answer")
+            .unwrap();
+        assert_eq!(numeric.turns.len(), 3);
+        assert_eq!(numeric.turns.last().unwrap().text, "Friday at 3 PM.");
+        let shift = data
+            .cases
+            .iter()
+            .find(|case| case.id == "general-dev-family-claim-then-login")
+            .unwrap();
+        assert_eq!(shift.turns.len(), 3);
+        for case in &data.cases {
+            assert!(case.understanding_rubric.is_some());
+            assert!(!capabilities(case).family_callback_available);
+            assert!(
+                !messages(case, "")[1]["content"]
+                    .as_str()
+                    .unwrap()
+                    .contains("expected_readiness")
+            );
+        }
+    }
+    #[test]
+    fn output_override_is_probe_only_bounded_and_preserves_evaluation_defaults() {
+        assert_eq!(
+            max_output_tokens(Mode::ModelProbe, Some("1024")).unwrap(),
+            1024
+        );
+        assert_eq!(max_output_tokens(Mode::ModelProbe, None).unwrap(), 512);
+        for mode in [
+            Mode::Evaluate,
+            Mode::EvaluateRegression,
+            Mode::EvaluateDevelopment,
+            Mode::EvaluateAOnly,
+            Mode::EvaluateInteractiveDevelopment,
+            Mode::EvaluateConversationDevelopment,
+            Mode::EvaluateConversationRepairs,
+            Mode::EvaluateGeneralPurposeDevelopment,
+        ] {
+            for value in [None, Some("1024"), Some("invalid"), Some("0")] {
+                assert_eq!(max_output_tokens(mode, value).unwrap(), 512);
+            }
+        }
+        for invalid in ["0", "1025", "invalid", "-1"] {
+            assert!(max_output_tokens(Mode::ModelProbe, Some(invalid)).is_err());
+        }
+    }
+    #[test]
+    fn preflight_uses_selected_backend_settings_without_env_mutation_or_phone_configuration() {
+        let (model, limit) = model_from_settings(
+            Mode::Evaluate,
+            ModelSettings {
+                backend: ModelBackend::BrevHosted,
+                key: "fixture-key".into(),
+                url: "http://127.0.0.1:1/not-called".into(),
+                model: "actual-instance-model-id".into(),
+            },
+            Some("10000"),
+        )
+        .unwrap();
+        assert_eq!(model.backend(), ModelBackend::BrevHosted);
+        assert_eq!(model.requested_model(), "actual-instance-model-id");
+        assert_eq!(limit, 3500);
+        let (hosted, _) = model_from_settings(
+            Mode::ModelProbe,
+            ModelSettings {
+                backend: ModelBackend::NvidiaHosted,
+                key: "fixture-key".into(),
+                url: ENDPOINT.into(),
+                model: MODEL.into(),
+            },
+            Some("10000"),
+        )
+        .unwrap();
+        assert_eq!(hosted.backend(), ModelBackend::NvidiaHosted);
+        assert_eq!(hosted.requested_model(), MODEL);
+        assert!(
+            model_from_settings(
+                Mode::Evaluate,
+                ModelSettings {
+                    backend: ModelBackend::BrevHosted,
+                    key: String::new(),
+                    url: "http://127.0.0.1:1/not-called".into(),
+                    model: "fixture".into()
+                },
+                None
+            )
+            .is_err()
+        );
+    }
+    fn test_understanding() -> Value {
+        json!({"version":1,"claimed_identity":null,"purpose":"Synthetic caller request","requested_action":"Pass along a brief message","supplied_facts":[],"missing_information":[],"readiness":"ready"})
+    }
+    #[test]
+    fn versioned_readiness_rubric_is_separate_from_model_messages_and_legacy_reports() {
+        let mut data = dataset_for(
+            include_str!("../../../fixtures/language-general-purpose-development.json"),
+            "conversation_development",
+        )
+        .unwrap();
+        let original_wrong_number = data
+            .cases
+            .iter()
+            .find(|case| case.id == "general-dev-wrong-number")
+            .unwrap()
+            .expected
+            .accepted_next_tools
+            .clone();
+        let mut control = data.cases[0].clone();
+        control.id = "automated-clinic-opening-control".into();
+        data.cases.push(control);
+        apply_understanding_rubric(
+            &mut data,
+            include_str!("../../../fixtures/general-purpose-understanding-v1-rubric.json"),
+        )
+        .unwrap();
+        assert_eq!(original_wrong_number, vec!["take_message"]);
+        assert_eq!(
+            data.cases
+                .iter()
+                .find(|case| case.id == "general-dev-wrong-number")
+                .unwrap()
+                .expected
+                .accepted_next_tools,
+            vec!["end_call"]
+        );
+        for case in &data.cases {
+            assert!(case.understanding_rubric.is_some());
+            let context = messages(case, "")[1]["content"]
+                .as_str()
+                .unwrap()
+                .to_owned();
+            for label in [
+                "expected_readiness",
+                "required_summary_facts",
+                "accepted_next_tools",
+                "forbidden_claims",
+            ] {
+                assert!(!context.contains(label));
+            }
+        }
+        let mut report = CaseResult {
+            error: None,
+            evidence_valid: true,
+            classification_correct: Some(true),
+            next_tool_allowed: Some(true),
+            expected_readiness: Some("needs_information".into()),
+            readiness_correct: Some(false),
+            ..CaseResult::default()
+        };
+        assert!(!case_passes(&report));
+        report.readiness_correct = Some(true);
+        assert!(case_passes(&report));
+    }
+
+    #[test]
+    fn native_evaluation_requires_understanding_even_for_inert_legacy_session_data() {
+        let case = fixture().cases.remove(0);
+        let mut call = assessment(
+            observation(SpeechAct::Statement, RequestedObject::RoutineInformation),
+            &case.turns[0].text,
+        );
+        call.arguments
+            .as_object_mut()
+            .unwrap()
+            .remove("understanding");
+        assert!(
+            assess(&case, &call)
+                .unwrap_err()
+                .to_string()
+                .contains("requires call understanding")
+        );
+    }
+
+    #[tokio::test]
+    async fn evaluator_uses_accepted_missing_information_to_limit_the_actual_next_request() {
+        use axum::{Json, Router, routing::post};
+        use std::sync::{Arc, Mutex};
+        let seen = Arc::new(Mutex::new(Vec::<Value>::new()));
+        let captured = seen.clone();
+        let app=Router::new().route("/chat",post(move |Json(request):Json<Value>| {
+            let captured=captured.clone();
+            async move {
+                let mut seen=captured.lock().unwrap();
+                let index=seen.len();
+                seen.push(request.clone());
+                let context:Value=serde_json::from_str(request["messages"][1]["content"].as_str().unwrap()).unwrap();
+                let turn=&context["current_exchange"]["caller_turn"];
+                let evidence=json!([{"turn_id":turn["id"],"quote":turn["text"]}]);
+                let mut understanding=test_understanding();
+                understanding["readiness"]=json!("needs_information");
+                understanding["missing_information"]=json!(["Replacement appointment time"]);
+                let (name,args)=if index==0 {
+                    ("record_assessment",json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":evidence,"understanding":understanding}))
+                } else {
+                    ("ask_caller",json!({"question":"What is the replacement appointment time?","purpose":"clarify_request","evidence_refs":evidence}))
+                };
+                Json(json!({"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":format!("readiness-{index}"),"type":"function","function":{"name":name,"arguments":args.to_string()}}]}}]}))
+            }
+        }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let model = Nemotron::new(
+            "local-only".into(),
+            format!("http://{}/chat", listener.local_addr().unwrap()),
+            "fixture".into(),
+        );
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let data = dataset_for(
+            include_str!("../../../fixtures/language-a-only-development.json"),
+            "development",
+        )
+        .unwrap();
+        let mut result = CaseResult::default();
+        evaluate_case(&model, &mut Budget::new(4), &data.cases[0], &mut result)
+            .await
+            .unwrap();
+        server.abort();
+        let requests = seen.lock().unwrap();
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[1]["tools"].as_array().unwrap().len(), 1);
+        assert_eq!(requests[1]["tools"][0]["function"]["name"], "ask_caller");
+        assert_eq!(
+            result.predicted_readiness.as_deref(),
+            Some("needs_information")
+        );
+        assert_eq!(
+            result.simulated_local_outcome.as_deref(),
+            Some("question_requested")
+        );
+        assert!(!result.completed_external_action);
+    }
+    #[test]
+    fn general_purpose_development_is_explicit_and_keeps_family_claims_out_of_authorization() {
+        assert!(parse_args(&["--evaluate-general-purpose-development".into()]).is_ok());
+        let data = dataset_for(
+            include_str!("../../../fixtures/language-general-purpose-development.json"),
+            "conversation_development",
+        )
+        .unwrap();
+        assert_eq!(data.cases.len(), 8);
+        assert_eq!(
+            data.cases
+                .iter()
+                .filter(|case| case.expected.classification == "risky")
+                .count(),
+            1
+        );
+        for case in &data.cases {
+            let caps = capabilities(case);
+            assert!(
+                !caps.handoff_available
+                    && !caps.family_contact_enrolled
+                    && !caps.family_callback_available
+            );
+            let messages = messages(case, "");
+            let context: Value =
+                serde_json::from_str(messages[1]["content"].as_str().unwrap()).unwrap();
+            assert_eq!(
+                context["current_exchange"]["caller_turn"]["text"],
+                case.turns.last().unwrap().text
+            );
+            assert!(!messages[1]["content"].as_str().unwrap().contains(&case.id));
+            assert!(
+                !messages[1]["content"]
+                    .as_str()
+                    .unwrap()
+                    .contains("accepted_next_tools")
+            );
+            assert!(
+                !messages[1]["content"]
+                    .as_str()
+                    .unwrap()
+                    .contains(&case.rationale)
+            );
+        }
+        let family = data
+            .cases
+            .iter()
+            .find(|case| case.category == "family-claim-then-login")
+            .unwrap();
+        let session = case_session(family);
+        assert_eq!(session.turn_version, 2);
+        assert_eq!(session.turns.len(), 3);
+        assert!(session.legs.is_empty());
+    }
+    #[test]
+    fn evaluation_retains_actual_numeric_facts_and_long_identifier_redaction() {
         let case = fixture().cases.remove(0);
         let call = assessment(
             observation(SpeechAct::Statement, RequestedObject::RoutineInformation),
@@ -1383,11 +2288,15 @@ mod tests {
         for (summary, expected) in [
             (
                 "Clinic visit Friday at 3 PM.",
-                "Clinic visit Friday at [redacted] PM.",
+                "Clinic visit Friday at 3 PM.",
             ),
             (
                 "Clinic visit Friday at three PM.",
                 "Clinic visit Friday at three PM.",
+            ),
+            (
+                "Caller supplied number +1-202-555-0123.",
+                "Caller supplied number [redacted]",
             ),
         ] {
             let mut session = base.clone();
@@ -1458,7 +2367,7 @@ mod tests {
                 let turn = &context["turns"][0];
                 let evidence = json!([{"turn_id":turn["id"],"quote":turn["text"]}]);
                 let (name,args) = if index == 0 {
-                    ("record_assessment",json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":evidence}))
+                    ("record_assessment",json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":evidence,"understanding":test_understanding()}))
                 } else {
                     ("take_message",json!({"summary":"A fictional clinic caller requested Thursday morning.","evidence_refs":evidence}))
                 };
@@ -1553,7 +2462,7 @@ mod tests {
                     json!({"speech_act":"request","requested_object":"authentication_secret","direction":"caller_requests_from_sarah"})
                 };
                 let (name, args) = match index {
-                    0 | 2 => ("record_assessment", json!({"observation":obs,"evidence_refs":evidence})),
+                    0 | 2 => ("record_assessment", json!({"observation":obs,"evidence_refs":evidence,"understanding":test_understanding()})),
                     1 => ("offer_handoff", json!({"summary":"A fictional clinic caller requests an appointment change.","observation":obs,"evidence_refs":evidence})),
                     _ => ("start_trusted_callback", json!({"contact_id":"sarah:family","reason":"authentication_request","evidence_refs":evidence})),
                 };
@@ -1615,7 +2524,7 @@ mod tests {
         ModelToolCall {
             id: "native-id".into(),
             name: "record_assessment".into(),
-            arguments: json!({"observation":observation,"evidence_refs":[{"turn_id":"turn-1","quote":quote}]}),
+            arguments: json!({"observation":observation,"evidence_refs":[{"turn_id":"turn-1","quote":quote}],"understanding":test_understanding()}),
             assistant_message: json!({"role":"assistant"}),
         }
     }
@@ -1838,7 +2747,7 @@ mod tests {
                 let turn=&context["turns"][0];
                 let evidence=json!([{"turn_id":turn["id"],"quote":turn["text"]}]);
                 let (name,args)=match index {
-                    0=>("record_assessment",json!({"observation":{"speech_act":"request","requested_object":"authentication_secret","direction":"caller_requests_from_sarah"},"evidence_refs":evidence})),
+                    0=>("record_assessment",json!({"observation":{"speech_act":"request","requested_object":"authentication_secret","direction":"caller_requests_from_sarah"},"evidence_refs":evidence,"understanding":test_understanding()})),
                     1=>("lookup_trusted_contact",json!({"role":"family"})),
                     _=>("start_trusted_callback",json!({"contact_id":"sarah:family","reason":"authentication_request","evidence_refs":evidence})),
                 };
@@ -1882,7 +2791,7 @@ mod tests {
     async fn rejected_initial_evidence_retains_proposal_and_failure_without_a_second_request() {
         use axum::{Json, Router, routing::post};
         let app=Router::new().route("/chat",post(|| async {
-            Json(json!({"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"bad-evidence","type":"function","function":{"name":"record_assessment","arguments":json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":[{"turn_id":"turn-1","quote":"This quote was invented."}]}).to_string()}}]}}]}))
+            Json(json!({"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"bad-evidence","type":"function","function":{"name":"record_assessment","arguments":json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":[{"turn_id":"turn-1","quote":"This quote was invented."}],"understanding":test_understanding()}).to_string()}}]}}]}))
         }));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url = format!("http://{}/chat", listener.local_addr().unwrap());

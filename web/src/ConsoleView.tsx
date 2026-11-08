@@ -205,6 +205,16 @@ export function ConsoleView({
   const modelHttp = active
     ? modelHttpEvidence(active, sessionEvents)
     : undefined;
+  const acceptedUnderstanding = active?.understanding;
+  const understanding = acceptedUnderstanding?.understanding;
+  const understandingCurrent =
+    !!active &&
+    !!acceptedUnderstanding &&
+    acceptedUnderstanding.generation_id === active.generation_id &&
+    acceptedUnderstanding.turn_version === active.turn_version &&
+    acceptedUnderstanding.policy_epoch === active.policy_epoch &&
+    active.assessed_version === active.turn_version &&
+    !active.speech_pending;
   const toolNames: Record<string, string> = {
     record_assessment: "Assess the caller’s request",
     ask_caller: "Ask a follow-up",
@@ -315,6 +325,13 @@ export function ConsoleView({
                     : "Pending"}
               </span>
               <p>{proof?.detail ?? "No verified receipt received."}</p>
+              {key === "model_protocol" &&
+                state.model_backend?.backend === "brev_hosted" && (
+                  <small>
+                    NVIDIA-hosted history; selected Brev verification is
+                    separate.
+                  </small>
+                )}
               {proof?.recorded_at && (
                 <time dateTime={proof.recorded_at}>
                   Recorded {new Date(proof.recorded_at).toLocaleString()}
@@ -324,6 +341,29 @@ export function ConsoleView({
           );
         })}
       </section>
+      {state.model_backend && (
+        <div
+          className="speech-configuration"
+          role="group"
+          aria-label="Current model backend"
+        >
+          <strong>Selected model backend · {state.model_backend.label}</strong>
+          <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>
+            Requested model: {state.model_backend.requested_model}
+          </span>
+          <span>
+            Configuration:{" "}
+            {state.model_backend.configured ? "Ready" : "Incomplete"}
+          </span>
+          <span>
+            Native protocol:{" "}
+            {state.model_backend.protocol_verified
+              ? "Verified for this backend"
+              : "Pending for this backend"}
+          </span>
+          <small>{state.model_backend.detail}</small>
+        </div>
+      )}
       {state.speech && (
         <div
           className="speech-configuration"
@@ -512,6 +552,55 @@ export function ConsoleView({
                   ? "Explore the private handoff, then the moment a new request withdraws it."
                   : `FirstRing will ask what the caller needs before offering ${name} a private choice.`}
             </p>
+            {understanding && acceptedUnderstanding && (
+              <div
+                className="understanding-summary"
+                role="group"
+                aria-label="Accepted call understanding"
+              >
+                <strong>
+                  {understandingCurrent
+                    ? "Current accepted understanding"
+                    : "Earlier accepted understanding · not current"}
+                </strong>
+                <p>
+                  <span>Purpose:</span> {understanding.purpose}
+                </p>
+                <p>
+                  <span>Requested action:</span>{" "}
+                  {understanding.requested_action}
+                </p>
+                <p>
+                  Claimed identity (unverified):{" "}
+                  {understanding.claimed_identity ?? "None stated"}
+                </p>
+                {understanding.supplied_facts.length > 0 && (
+                  <>
+                    <span>Supplied facts · caller’s words</span>
+                    <ul>
+                      {understanding.supplied_facts.map((fact, index) => (
+                        <li key={index}>{fact.text}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {understanding.missing_information.length > 0 && (
+                  <p>
+                    <span>Still needed:</span>{" "}
+                    {understanding.missing_information.join("; ")}
+                  </p>
+                )}
+                <p>
+                  <span>Readiness:</span> {readable(understanding.readiness)}
+                </p>
+                <small>
+                  Turn {acceptedUnderstanding.turn_version} · generation{" "}
+                  {acceptedUnderstanding.generation_id} · policy{" "}
+                  {acceptedUnderstanding.policy_epoch}. Action permission and
+                  completion are shown separately.
+                </small>
+              </div>
+            )}
             {active && (
               <dl className="decision-trace">
                 <div>
@@ -578,6 +667,25 @@ export function ConsoleView({
                     <dd>
                       {modelHttp.completed ? (
                         <>
+                          Backend:{" "}
+                          {modelHttp.completed.observation.backend ===
+                          "brev_hosted"
+                            ? "Brev hosted"
+                            : modelHttp.completed.observation.backend ===
+                                "nvidia_hosted"
+                              ? "NVIDIA hosted"
+                              : "Not recorded"}
+                          <br />
+                          {modelHttp.completed.observation.backend &&
+                            state.model_backend &&
+                            modelHttp.completed.observation.backend !==
+                              state.model_backend.backend && (
+                              <>
+                                Recorded backend differs from the selected
+                                backend
+                                <br />
+                              </>
+                            )}
                           <span style={{ overflowWrap: "anywhere" }}>
                             {modelHttp.completed.observation.response_model ??
                               "Response model not reported"}

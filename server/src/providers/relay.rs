@@ -181,6 +181,19 @@ fn valid_sid(value: &str, prefix: &str) -> bool {
 }
 
 pub fn connect_twiml(base_url: &str, session_token: &str, display_name: &str) -> String {
+    connect_with_greeting(base_url, session_token, Some(display_name))
+}
+
+/// Same call, new authenticated socket; do not repeat the initial disclosure.
+pub fn reconnect_twiml(base_url: &str, session_token: &str) -> String {
+    connect_with_greeting(base_url, session_token, None)
+}
+
+fn connect_with_greeting(
+    base_url: &str,
+    session_token: &str,
+    display_name: Option<&str>,
+) -> String {
     let Ok(base) = public_origin(base_url) else {
         return super::twilio::say_end("The assistant is temporarily unavailable.");
     };
@@ -192,12 +205,23 @@ pub fn connect_twiml(base_url: &str, session_token: &str, display_name: &str) ->
     ws.set_path("/voice/relay");
     let mut after = base;
     after.set_path("/voice/after-relay");
-    let greeting = format!("I'm {display_name}'s automated assistant. What is the call about?");
+    after
+        .query_pairs_mut()
+        .append_pair("relay_token", session_token);
+    let greeting = display_name
+        .map(|name| {
+            format!(
+                " welcomeGreeting=\"{}\"",
+                escape(&format!(
+                    "I'm {name}'s automated assistant. What is the call about?"
+                ))
+            )
+        })
+        .unwrap_or_default();
     format!(
-        "<Response><Connect action=\"{}\" method=\"POST\"><ConversationRelay url=\"{}\" welcomeGreeting=\"{}\" interruptible=\"any\" reportInputDuringAgentSpeech=\"any\" ignoreBackchannel=\"true\" dtmfDetection=\"true\" partialPrompts=\"true\" speechTimeout=\"1000\" language=\"en-US\" transcriptionProvider=\"{TRANSCRIPTION_PROVIDER}\" speechModel=\"{TRANSCRIPTION_MODEL}\" ttsProvider=\"{TTS_PROVIDER}\" voice=\"{TTS_VOICE}\"><Parameter name=\"session_token\" value=\"{}\"/></ConversationRelay></Connect></Response>",
+        "<Response><Connect action=\"{}\" method=\"POST\"><ConversationRelay url=\"{}\"{greeting} interruptible=\"any\" reportInputDuringAgentSpeech=\"any\" ignoreBackchannel=\"true\" dtmfDetection=\"true\" partialPrompts=\"true\" speechTimeout=\"1000\" language=\"en-US\" transcriptionProvider=\"{TRANSCRIPTION_PROVIDER}\" speechModel=\"{TRANSCRIPTION_MODEL}\" ttsProvider=\"{TTS_PROVIDER}\" voice=\"{TTS_VOICE}\"><Parameter name=\"session_token\" value=\"{}\"/></ConversationRelay></Connect></Response>",
         escape(after.as_str()),
         escape(ws.as_str()),
-        escape(&greeting),
         escape(session_token)
     )
 }
@@ -365,7 +389,7 @@ mod tests {
             "opaque<&\"token",
             "Sarah & Maya",
         );
-        assert!(xml.contains("action=\"https://firstring.example/voice/after-relay\""));
+        assert!(xml.contains("action=\"https://firstring.example/voice/after-relay?relay_token=opaque%3C%26%22token\""));
         assert!(xml.contains("url=\"wss://firstring.example/voice/relay\""));
         assert!(xml.contains("reportInputDuringAgentSpeech=\"any\""));
         assert!(xml.contains("partialPrompts=\"true\""));

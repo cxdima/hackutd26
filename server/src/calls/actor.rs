@@ -26,6 +26,7 @@ pub enum AudioPurpose {
     Response,
     MessageClosing,
     ModelFailureClosing,
+    NoMessageClosing,
     PendingSpeechRecovery,
 }
 #[derive(Clone, Debug)]
@@ -53,6 +54,10 @@ impl AudioFrame {
             }
             AudioPurpose::ModelFailureClosing => {
                 session.closing_reason.as_deref() == Some("model_failure")
+                    && self.payload["type"] == "end"
+            }
+            AudioPurpose::NoMessageClosing => {
+                session.closing_reason.as_deref() == Some("no_message")
                     && self.payload["type"] == "end"
             }
             AudioPurpose::PendingSpeechRecovery => {
@@ -113,6 +118,11 @@ pub enum Input {
         sid: String,
         token: String,
     },
+    RelaySpeech {
+        token: String,
+        text: Option<String>,
+        last: bool,
+    },
     Speech {
         partial: Option<String>,
     },
@@ -158,8 +168,17 @@ pub enum Input {
     PostCallTool {
         tool: crate::providers::nemotron::ModelToolCall,
     },
-    RelayDisconnected,
+    RelayDisconnected {
+        token: String,
+    },
     ClosingResponse,
+    ClosingResponseForRelay {
+        token: String,
+    },
+    ClosingInput {
+        nonce: String,
+        text: String,
+    },
     RelayTelemetry {
         event: &'static str,
         elapsed_ms: u64,
@@ -234,6 +253,8 @@ impl App {
             handle: handle.clone(),
             model_task: None,
             relay_attached: false,
+            active_relay_token: None,
+            pending_relay_prompt: None,
             pending_speech: None,
             speech_recovery_task: None,
         };
@@ -286,6 +307,8 @@ impl App {
             handle: h.clone(),
             model_task: None,
             relay_attached: false,
+            active_relay_token: None,
+            pending_relay_prompt: None,
             pending_speech: None,
             speech_recovery_task: None,
         };
@@ -347,6 +370,8 @@ pub(crate) struct Actor {
     pub(crate) handle: Handle,
     pub(crate) model_task: Option<tokio::task::JoinHandle<()>>,
     pub(crate) relay_attached: bool,
+    pub(crate) active_relay_token: Option<String>,
+    pub(crate) pending_relay_prompt: Option<String>,
     pub(crate) pending_speech: Option<PendingSpeechEpisode>,
     pub(crate) speech_recovery_task: Option<tokio::task::JoinHandle<()>>,
 }

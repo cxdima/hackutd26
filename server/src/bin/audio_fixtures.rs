@@ -76,16 +76,15 @@ fn validate(data: &Dataset) -> Result<()> {
         "Unexpected audio model/format"
     );
     ensure!(
-        data.scenarios.len() == 12 && data.voice_slots.len() == 3,
-        "Plan must contain 12 scenarios and three voice slots"
+        (1..=12).contains(&data.scenarios.len()) && (1..=3).contains(&data.voice_slots.len()),
+        "Plan must contain 1..12 scenarios and 1..3 voice slots"
     );
     ensure!(
         data.voice_slots.iter().all(|s| token(s))
-            && data.voice_slots.iter().collect::<HashSet<_>>().len() == 3,
+            && data.voice_slots.iter().collect::<HashSet<_>>().len() == data.voice_slots.len(),
         "Voice slots must be unique safe identifiers"
     );
-    let mut seen = HashMap::<&str, (&str, usize)>::new();
-    let mut segments = HashSet::new();
+    let mut seen = HashMap::<&str, &Scenario>::new();
     for case in &data.scenarios {
         ensure!(
             token(&case.id) && token(&case.group_id) && !seen.contains_key(case.id.as_str()),
@@ -103,16 +102,16 @@ fn validate(data: &Dataset) -> Result<()> {
             "Invalid bounded plain-text utterance"
         );
         ensure!(
-            segments.insert((&case.group_id, case.segment_index)),
-            "Duplicate group segment index"
-        );
-        ensure!(
             case.segment_index == case.prior_segments.len(),
             "Segment context is incomplete"
         );
         for (index, prior) in case.prior_segments.iter().enumerate() {
             ensure!(
-                seen.get(prior.as_str()) == Some(&(case.group_id.as_str(), index)),
+                seen.get(prior.as_str()).is_some_and(|segment| {
+                    segment.group_id == case.group_id
+                        && segment.segment_index == index
+                        && segment.prior_segments == case.prior_segments[..index]
+                }),
                 "Prior segments must exist in order within the same development group"
             );
         }
@@ -136,7 +135,7 @@ fn validate(data: &Dataset) -> Result<()> {
                 && !case.expected.rationale.trim().is_empty(),
             "Missing policy expectation"
         );
-        seen.insert(&case.id, (&case.group_id, case.segment_index));
+        seen.insert(&case.id, case);
     }
     Ok(())
 }
@@ -144,12 +143,12 @@ fn plan(data: &Dataset, voices: &[String]) -> Result<Vec<Clip>> {
     validate(data)?;
     ensure!(
         voices.is_empty()
-            || (voices.len() == 3
+            || (voices.len() == data.voice_slots.len()
                 && voices.iter().all(|v| v.len() >= 8
                     && v.len() <= 64
                     && v.bytes().all(|b| b.is_ascii_alphanumeric()))
-                && voices.iter().collect::<HashSet<_>>().len() == 3),
-        "Choose three distinct provider voice IDs, or omit them for dry-run"
+                && voices.iter().collect::<HashSet<_>>().len() == voices.len()),
+        "Choose one distinct provider voice ID per selected slot, or omit them for dry-run"
     );
     let mut clips = Vec::new();
     for case in &data.scenarios {
@@ -235,12 +234,18 @@ struct Options {
     generate: bool,
     voices: Vec<String>,
     limit: usize,
+    dataset: String,
+    scenarios: Vec<String>,
+    voice_slot: Option<String>,
 }
 fn options(args: &[String]) -> Result<Options> {
     let mut result = Options {
         generate: false,
         voices: vec![],
         limit: MAX_CLIPS,
+        dataset: "fixtures/audio-development.json".into(),
+        scenarios: vec![],
+        voice_slot: None,
     };
     let mut mode = None;
     let mut i = 0;
@@ -255,10 +260,40 @@ fn options(args: &[String]) -> Result<Options> {
                 i += 1;
                 result.voices = args
                     .get(i)
-                    .ok_or_else(|| anyhow!("--voice-ids requires three comma-separated IDs"))?
+                    .ok_or_else(|| anyhow!("--voice-ids requires comma-separated IDs"))?
                     .split(',')
                     .map(str::to_owned)
                     .collect();
+            }
+            "--dataset" => {
+                i += 1;
+                result.dataset = args
+                    .get(i)
+                    .filter(|value| !value.trim().is_empty())
+                    .ok_or_else(|| anyhow!("--dataset requires a local JSON path"))?
+                    .clone();
+            }
+            "--scenario" => {
+                i += 1;
+                let id = args
+                    .get(i)
+                    .filter(|value| token(value))
+                    .ok_or_else(|| anyhow!("--scenario requires a safe scenario ID"))?;
+                ensure!(
+                    !result.scenarios.contains(id),
+                    "Duplicate scenario selection"
+                );
+                result.scenarios.push(id.clone());
+            }
+            "--voice-slot" => {
+                i += 1;
+                ensure!(result.voice_slot.is_none(), "Choose at most one voice slot");
+                result.voice_slot = Some(
+                    args.get(i)
+                        .filter(|value| token(value))
+                        .ok_or_else(|| anyhow!("--voice-slot requires a safe slot name"))?
+                        .clone(),
+                );
             }
             "--limit" => {
                 i += 1;
@@ -277,6 +312,31 @@ fn options(args: &[String]) -> Result<Options> {
         i += 1;
     }
     Ok(result)
+}
+fn selected_plan(data: &Dataset, options: &Options) -> Result<Vec<Clip>> {
+    // Validate all authored paths/rubrics before selecting render-only subsets.
+    // An unselected opening stays in the source; selection never reauthors it.
+    validate(data)?;
+    let mut selected = data.clone();
+    if let Some(slot) = &options.voice_slot {
+        ensure!(data.voice_slots.contains(slot), "Unknown voice slot");
+        selected.voice_slots = vec![slot.clone()];
+    }
+    for id in &options.scenarios {
+        ensure!(
+            data.scenarios.iter().any(|scenario| &scenario.id == id),
+            "Unknown scenario selection"
+        );
+    }
+    let mut clips = plan(&selected, &options.voices)?;
+    if !options.scenarios.is_empty() {
+        clips.retain(|clip| options.scenarios.contains(&clip.scenario_id));
+    }
+    ensure!(
+        !clips.is_empty() && clips.len() <= MAX_CLIPS,
+        "Invalid selected request count"
+    );
+    Ok(clips)
 }
 async fn metadata(client: &reqwest::Client, key: &str, path: &str) -> Result<Value> {
     let mut response = client
@@ -426,21 +486,21 @@ async fn main() -> Result<()> {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     if args == ["--help"] {
         println!(
-            "Optional FirstRing development audio fixtures. Default/--dry-run writes a 36-clip plan with zero network requests. --generate --voice-ids ID1,ID2,ID3 [--limit 1..36] explicitly authorizes up to 36 sequential billable TTS requests plus four metadata reads; no retries, 20s/request and 180s/run. Requires local ELEVENLABS_API_KEY. Output: ignored .tools/audio-fixtures/<run>/. Never dials, executes model tools, changes live configuration, or grades held-out data."
+            "Optional FirstRing development audio fixtures. Default/--dry-run writes a 36-clip plan with zero network requests. --dataset PATH selects an authored development JSON file; repeat --scenario ID to render selected segments; --voice-slot NAME selects one slot. --voice-ids ID1[,ID2,ID3] must map one distinct ID per selected slot. --generate [--limit 1..36] explicitly authorizes up to 36 sequential billable TTS requests plus one model and up to three voice metadata reads; no retries, 20s/request and 180s/run. Requires local ELEVENLABS_API_KEY. Output: ignored .tools/audio-fixtures/<run>/. Never dials, executes model tools, changes live configuration, or grades held-out data."
         );
         return Ok(());
     }
     let options = options(&args)?;
     dotenvy::dotenv().ok();
     let key = generation_key(options.generate, std::env::var("ELEVENLABS_API_KEY").ok())?;
-    let raw = std::fs::read("fixtures/audio-development.json")
-        .map_err(|_| anyhow!("Run from the repository root; audio-development.json is required"))?;
+    let raw = std::fs::read(&options.dataset)
+        .map_err(|_| anyhow!("Cannot read the selected local audio development dataset"))?;
     let data: Dataset =
         serde_json::from_slice(&raw).map_err(|_| anyhow!("Audio fixture schema is invalid"))?;
-    let clips = plan(&data, &options.voices)?;
+    let clips = selected_plan(&data, &options)?;
     ensure!(
         !options.generate || clips.iter().all(|c| c.voice_id.is_some()),
-        "--generate requires three distinct --voice-ids; zero provider requests submitted"
+        "--generate requires one --voice-ids mapping per selected slot; zero provider requests submitted"
     );
     let dir = std::path::PathBuf::from(".tools/audio-fixtures").join(format!(
         "{}-{}",
@@ -458,7 +518,7 @@ async fn main() -> Result<()> {
         .iter()
         .map(|c| c.text.split_whitespace().count())
         .sum();
-    let manifest = json!({"total_characters":total_characters,"selected_characters":selected_characters,"estimated_duration_seconds":{"min":total_words as f64/3.0,"max":total_words as f64/2.0,"method":"120-180 spoken words/minute estimate; not measured audio"},"schema_version":1,"split":"development","data_origin":"synthetic","operation":"fixture_synthesis","phone_tested":false,"telephony_actions":0,"provider":"elevenlabs","model_id":data.model_id,"output_format":data.output_format,"voice_settings":voice_settings(),"render_hash_scheme":"sha256:compact-utf8-json-recursively-sorted-keys:v1","source_sha256":format!("{:x}",Sha256::digest(&raw)),"planned_clips":clips.len(),"selected_request_limit":options.limit,"mode":if options.generate{"generate"}else{"dry_run"},"voice_mapping_pending":options.voices.is_empty(),"clips":clips,"rubric_file":"fixtures/audio-development.json","expected_labels_sent_to_tts":false});
+    let manifest = json!({"total_characters":total_characters,"selected_characters":selected_characters,"estimated_duration_seconds":{"min":total_words as f64/3.0,"max":total_words as f64/2.0,"method":"120-180 spoken words/minute estimate; not measured audio"},"schema_version":1,"split":"development","data_origin":"synthetic","operation":"fixture_synthesis","phone_tested":false,"telephony_actions":0,"provider":"elevenlabs","model_id":data.model_id,"output_format":data.output_format,"voice_settings":voice_settings(),"render_hash_scheme":"sha256:compact-utf8-json-recursively-sorted-keys:v1","source_sha256":format!("{:x}",Sha256::digest(&raw)),"planned_clips":clips.len(),"selected_request_limit":options.limit,"mode":if options.generate{"generate"}else{"dry_run"},"voice_mapping_pending":options.voices.is_empty(),"clips":clips,"rubric_file":options.dataset,"selected_scenario_ids":options.scenarios,"selected_voice_slot":options.voice_slot,"expected_labels_sent_to_tts":false});
     atomic_create(
         &dir.join("manifest.json"),
         &serde_json::to_vec_pretty(&manifest)?,
@@ -496,6 +556,100 @@ mod tests {
     use super::*;
     fn data() -> Dataset {
         serde_json::from_str(include_str!("../../../fixtures/audio-development.json")).unwrap()
+    }
+    fn family_data() -> Dataset {
+        serde_json::from_str(include_str!(
+            "../../../fixtures/audio-family-development.json"
+        ))
+        .unwrap()
+    }
+    #[test]
+    fn small_family_dataset_renders_one_shared_opening_and_two_authored_branch_clips() {
+        let data = family_data();
+        let clips = plan(&data, &["JBFqnCBsd6RMkjVDRZzb".into()]).unwrap();
+        assert_eq!(clips.len(), 3);
+        assert!(clips.iter().all(
+            |clip| clip.voice_id.as_deref() == Some("JBFqnCBsd6RMkjVDRZzb")
+                && clip.group_id == "family_pickup"
+        ));
+        assert_eq!(
+            clips.iter().filter(|clip| clip.segment_index == 0).count(),
+            1
+        );
+        assert_eq!(
+            clips.iter().filter(|clip| clip.segment_index == 1).count(),
+            2
+        );
+        assert!(payload(&data, &clips[2]).get("expected").is_none());
+        let mut invalid = data.clone();
+        invalid.scenarios[2].prior_segments = vec!["family_benign_details".into()];
+        assert!(validate(&invalid).is_err());
+        invalid = data;
+        invalid.scenarios[2].split = "held_out".into();
+        assert!(validate(&invalid).is_err());
+    }
+    #[test]
+    fn selector_options_accept_small_authored_source_without_enabling_generation() {
+        let args = [
+            "--dataset",
+            "fixtures/audio-family-development.json",
+            "--scenario",
+            "family_benign_details",
+            "--voice-slot",
+            "caller_george",
+            "--voice-ids",
+            "JBFqnCBsd6RMkjVDRZzb",
+            "--dry-run",
+        ]
+        .map(str::to_owned);
+        let mut selected = options(&args).unwrap();
+        assert!(!selected.generate);
+        assert_eq!(selected.voices, ["JBFqnCBsd6RMkjVDRZzb"]);
+        let clips = selected_plan(&family_data(), &selected).unwrap();
+        assert_eq!(clips.len(), 1);
+        assert_eq!(clips[0].scenario_id, "family_benign_details");
+        assert_eq!(clips[0].segment_index, 1);
+        assert_eq!(clips[0].voice_slot, "caller_george");
+        // Full source validation still rejects invalid unselected context.
+        let mut invalid = family_data();
+        invalid.scenarios[0].split = "held_out".into();
+        assert!(selected_plan(&invalid, &selected).is_err());
+        selected.scenarios = vec!["missing".into()];
+        assert!(selected_plan(&family_data(), &selected).is_err());
+        selected.scenarios.clear();
+        selected.voice_slot = Some("missing".into());
+        assert!(selected_plan(&family_data(), &selected).is_err());
+        assert!(
+            options(&[
+                "--scenario".into(),
+                "family_opening".into(),
+                "--scenario".into(),
+                "family_opening".into()
+            ])
+            .is_err()
+        );
+    }
+    #[test]
+    fn one_voice_subset_preserves_default_source_and_request_ceiling() {
+        let args = [
+            "--voice-slot",
+            "caller_brisk",
+            "--voice-ids",
+            "JBFqnCBsd6RMkjVDRZzb",
+            "--scenario",
+            "clinic_details",
+        ]
+        .map(str::to_owned);
+        let selected = options(&args).unwrap();
+        let data = data();
+        let clips = selected_plan(&data, &selected).unwrap();
+        assert_eq!(clips.len(), 1);
+        assert_eq!(clips[0].id, "clinic_details_caller_brisk");
+        assert_eq!(data.voice_slots.len(), 3);
+        assert_eq!(plan(&data, &[]).unwrap().len(), 36);
+        let mut excessive = data;
+        excessive.scenarios.push(family_data().scenarios[0].clone());
+        assert!(selected_plan(&excessive, &selected).is_err());
     }
     #[test]
     fn planned_render_identity_binds_text_and_voice_but_excludes_authored_labels() {

@@ -1,0 +1,103 @@
+{
+  "recorded_at": "2026-11-08T05:25:34.400687+00:00",
+  "status": "synthesized_not_listened",
+  "split": "development",
+  "group_id": "family_pickup",
+  "data_origin": "synthetic",
+  "authored_before_generation": true,
+  "source": "fixtures/audio-family-development.json",
+  "source_sha256": "780339c1c882643bc530eb6a2e576ebe2ec614722b117fc2e5e6835b8dccb56f",
+  "manifest": ".tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e/manifest.json",
+  "manifest_sha256": "746c24709df3d41565a5e9a86e47b94a6489ebd61fa33ecf353cb5e71f326059",
+  "results": ".tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e/results.json",
+  "provider": "elevenlabs",
+  "voice": "George",
+  "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+  "model_id": "eleven_multilingual_v2",
+  "output_format": "mp3_44100_128",
+  "voice_settings": {
+    "similarity_boost": 0.75,
+    "stability": 0.5,
+    "style": 0.0,
+    "use_speaker_boost": true
+  },
+  "synthesis_requests": 3,
+  "successful_synthesis_receipts": 3,
+  "metadata_reads": 2,
+  "retries": 0,
+  "errors_or_unknown_attempts": 0,
+  "submitted_text_characters": 233,
+  "billing_or_quota_usage_measured": false,
+  "total_audio_bytes": 219557,
+  "preservation": {
+    "original_cache_files_verified_unchanged": 110,
+    "other_source_and_evaluation_fixture_files_verified_unchanged": 6
+  },
+  "listened": false,
+  "asr_tested": false,
+  "phone_tested": false,
+  "telephony_actions": 0,
+  "clips": [
+    {
+      "scenario_id": "family_opening",
+      "group_id": "family_pickup",
+      "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+      "text_characters": 59,
+      "text_sha256": "d51d548c59136a7f41089ff6e38530e420952af65a00bf1be764eb80f9de1ad9",
+      "render_sha256": "fbd8c248db13e871a185756ccf3e023016d122169db98bf63cc1eb5177b5ad73",
+      "audio_path": ".tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e/family_opening_caller_george.mp3",
+      "audio_sha256": "18ee6db29e55948535d1fab7eb8cb757d0cf5cfa326d5a84ed065d205765d387",
+      "bytes": 59811,
+      "duration_seconds": 3.668753,
+      "audio_format": {
+        "codec_name": "mp3",
+        "sample_rate": "44100",
+        "channels": 1
+      },
+      "http_through_transfer_ms": 526,
+      "attempt_receipt": ".tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e/family_opening_caller_george.attempt.json",
+      "success_receipt": ".tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e/family_opening_caller_george.receipt.json"
+    },
+    {
+      "scenario_id": "family_benign_details",
+      "group_id": "family_pickup",
+      "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+      "text_characters": 85,
+      "text_sha256": "89afd2cd5c66e6c733f496e8139927e652b087edc2ea09a7252f9127c249ac2b",
+      "render_sha256": "b5a5167a419fe14817ac130bbb81d5643c5f3934cf1cc9891bfe583cb5d28852",
+      "audio_path": ".tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e/family_benign_details_caller_george.mp3",
+      "audio_sha256": "1470a7008be863bd48d327c08f26cca3b5d4d3d52d8bee1c4b92f93b02e69994",
+      "bytes": 77783,
+      "duration_seconds": 4.783311,
+      "audio_format": {
+        "codec_name": "mp3",
+        "sample_rate": "44100",
+        "channels": 1
+      },
+      "http_through_transfer_ms": 565,
+      "attempt_receipt": ".tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e/family_benign_details_caller_george.attempt.json",
+      "success_receipt": ".tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e/family_benign_details_caller_george.receipt.json"
+    },
+    {
+      "scenario_id": "family_risky_details",
+      "group_id": "family_pickup",
+      "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+      "text_characters": 89,
+      "text_sha256": "86f71443edda522114c9f21878ece146db88e2dfd9cbe5072acd49af0fe63952",
+      "render_sha256": "2c4c6b9f18dec5efa406afca362d9b233b4c18b0b7c7c24bf114799c8464ba8a",
+      "audio_path": ".tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e/family_risky_details_caller_george.mp3",
+      "audio_sha256": "171b514138fdb6c332fae46ec58e37f449cc65df5621f769ffc931521aead451",
+      "bytes": 81963,
+      "duration_seconds": 5.06195,
+      "audio_format": {
+        "codec_name": "mp3",
+        "sample_rate": "44100",
+        "channels": 1
+      },
+      "http_through_transfer_ms": 610,
+      "attempt_receipt": ".tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e/family_risky_details_caller_george.attempt.json",
+      "success_receipt": ".tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e/family_risky_details_caller_george.receipt.json"
+    }
+  ],
+  "command": "bash scripts/cargo.sh run --bin audio_fixtures -- --dataset fixtures/audio-family-development.json --voice-slot caller_george --voice-ids JBFqnCBsd6RMkjVDRZzb --limit 3 --generate"
+}

@@ -1,0 +1,15 @@
+{
+  "checkpoint": "fa2b05ba6138d59249e928160d839f1bca1bd229",
+  "archive_source_matches_checkpoint": true,
+  "binary_sha256": "b06811fec3eebe65ac7ce3e5286895b5fbe91b205de30aa8e624e9b4b21a2ff8",
+  "source_sha256": "8ce4cb45aae2557d7461a47f943f695f9d084c6f4c987943f943ce1fb309e9bc",
+  "verified_old_help": true,
+  "binary_path": ".tools/fallback-checkpoint/.tools/preflight-fa2b05b",
+  "report": "fixtures/results/2026-11-08-fallback-fa2b05b-native.json",
+  "key_scope": "User-supplied candidate loaded process-only; .env unchanged",
+  "provider": "NVIDIA hosted",
+  "phone_tested": false,
+  "gpu_allocated": false,
+  "source_changes": "None; archive source timestamps touched only to invalidate shared Cargo artifacts",
+  "invalidated_prior_attempt": "fixtures/results/2026-11-08-fallback-build-attribution-invalid.json"
+}

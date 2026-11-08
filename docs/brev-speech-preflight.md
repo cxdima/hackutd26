@@ -1,24 +1,28 @@
 # Optional Brev speech preflight
 
-User screenshot confirms a **$60 Brev balance**; it does not establish a GPU quote, Magpie access or NGC entitlement. Provisioning remains deferred. The current [NVIDIA sponsor challenge](https://zeroday.hackutd.co/#tracks) requires Nemotron and multi-step tool/API workflows, but does not require Brev or self-hosting. Hosted Nemotron is consistent with that deployment-neutral wording; no private booth/portal amendment has been verified. Preserve credits for an optional speech experiment after the core phone gate, rather than moving the already working hosted decision model.
+**Current authorization supersedes the historical deferral below:** up to the lower of $60 total or remaining existing Brev credits is authorized for actual GPU-hosted Nemotron serving, including storage and other charges. No extra credits or auto-recharge. Decision-model deployment now takes priority over optional speech; see [deployment evidence](brev-nemotron-deployment.md). The earlier $10 speech-only proposal below is historical, not the current spending authorization.
+
+User screenshot confirms a **$60 Brev balance**; it does not establish a GPU quote, Magpie access or NGC entitlement. Speech provisioning has not occurred. The current [NVIDIA sponsor challenge](https://zeroday.hackutd.co/#tracks) requires Nemotron and multi-step tool/API workflows, but does not require Brev or self-hosting. Hosted Nemotron is consistent with that deployment-neutral wording; no private booth/portal amendment has been verified. Preserve credits for an optional speech experiment after the core phone gate, while retaining hosted inference as the known-working fallback.
 
 
-Checked 2026-11-07. **User explicitly deferred GPU provisioning while core phone integration proceeds. Preparation only: no GPU provisioned, image pulled, account changed, purchase/top-up made, or adapter implemented.** The reported $60 Brev credits are a budget input, not verified model access or permission to spend. If later resumed, first experiment target: at most $10 including storage/other charges. Core phone work keeps native Relay speech.
+Rechecked 2026-11-07 at 23:04 Central (2026-11-08 05:04 UTC). **The user requested Brev readiness while phone work continues. This check is read-only: no GPU provisioned, image layer pulled, account changed, purchase/top-up made, or adapter implemented.** The reported $60 Brev credits are a budget input, not verified model access or permission to spend. If later resumed, first experiment target: at most $10 including storage/other charges. Core phone work keeps native Relay speech.
 
 ## Step 1/5 — Establish access and the actual quote
 
 | Gate | Observed status / next evidence |
 |---|---|
-| Brev account inventory and quote | Unavailable: no Brev CLI/config/connector or authenticated account session. Public console requires JavaScript; no account-specific price obtained. |
+| Brev account inventory and quote | Still unavailable: no Brev CLI/config/API key, connector or authenticated browser session accessible to these tools. The $60 screenshot establishes a displayed balance, not a current available GPU offer. No account-specific provider, region, compute rate or storage price was obtained. |
 | Local tools | Docker client/daemon 29.7.2 available, daemon `aarch64 / linux`; no `nvidia-smi`. The `ngc` found on PATH is Angular's compiler, **not** NVIDIA NGC CLI. Local Docker is not a compatible GPU deployment. |
-| Local secrets/config | `BREV_API_KEY`, `BREV_TOKEN`, `NGC_API_KEY`, `NVIDIA_API_KEY`, `MAGPIE_ZERO_SHOT_URL` absent during inspection. Root subsequently created `.env` from the example without provider secrets. No NGC config or `nvcr.io` Docker entry found; credential-store values were not read. |
-| NVIDIA entitlement | Self-hosted Speech NIM requires NVIDIA AI Enterprise. Entitlement, developer/trial terms if applicable, and gated Zeroshot approval are unverified. |
-| Supported accessible tag | NVIDIA's current blueprint pins `magpie-tts-zeroshot:1.2.0`; registry tag access returned 402. The public NGC page also displays an end-of-support notice. Resolve this inconsistency with NVIDIA/NGC before paying for a GPU. |
+| Local secrets/config | `NVIDIA_API_KEY` is configured and already powers hosted inference. `BREV_API_KEY`, `BREV_TOKEN` and the separate `NGC_API_KEY` alias are absent. No NVIDIA NGC CLI/config or `nvcr.io` Docker auth entry was found; credential-store values were not read. The existing NVIDIA key succeeded in the registry probe below, so a replacement key is not required for manifest access. |
+| NVIDIA entitlement | The registry issued the existing key a pull grant for this repository, and authenticated manifest access passed. This does not verify the model-weight download, startup/readiness or applicable self-hosted NVAIE/developer entitlement terms. |
+| Accessible tag / support status | The pinned `magpie-tts-zeroshot:1.2.0` OCI index returned HTTP 200 with authenticated access and includes Linux amd64/arm64. This supersedes the earlier unauthenticated catalogue 402 observation. The public catalogue still displays an end-of-support notice despite the current tutorial/blueprint; support status remains unresolved. |
 | Voice reference | A consenting performer's fictional-Sarah reference is not enrolled. No recording requested or uploaded in this audit. |
+
+The bounded manifest probe made **three GET requests to `nvcr.io`**: anonymous manifest 401/`UNAUTHORIZED`, authenticated token exchange 200 with the requested repository pull grant, then authenticated manifest 200. It downloaded no layers or model weights and wrote no Docker login/global credential storage. The credential and issued token remained in process memory and were never printed. OCI index digest: `sha256:3e96aa19549d0a9ba7dc500f7aeb5eb22586df6640615ba65eaa2c24a14d341c`. Sanitized receipt: `.tools/magpie-registry-probe.json` (ignored). The [official blueprint](https://github.com/NVIDIA-AI-Blueprints/nemotron-voice-agent/blob/main/docker/docker-compose.magpie-zeroshot-tts.yaml) maps `NVIDIA_API_KEY` to `NGC_API_KEY`; [NGC setup](https://docs.nvidia.com/nim/speech/latest/get-started/ngc-access-setup.html) documents the registry credential convention. No raw authentication challenges, keys or bearer tokens were retained in the receipt.
 
 The [Speech prerequisites](https://docs.nvidia.com/nim/speech/latest/get-started/prerequisites.html) and [gated model catalogue](https://catalog.ngc.nvidia.com/orgs/nim/teams/nvidia/containers/magpie-tts-zeroshot) establish separate entitlement/access requirements. The [approval link](https://developer.nvidia.com/riva-tts-zeroshot-models) currently requires NVIDIA login. Do not infer access from Brev credits, a build.nvidia.com inference key, or successful access to another model.
 
-One bundled account check is needed: approved/supported Zeroshot tag and entitlement; Brev organization with usable credits; exact single-GPU offer (provider/region, GPU, usable VRAM, CPU/RAM/disk, compute rate, storage rate while stopped, billing minimum and other fees); and where FirstRing's Rust process will run. Keep API keys local. Provisioning authorization should identify that concrete quote, a <=$10 total ceiling, maximum runtime, and cleanup of only the dedicated experiment instance.
+Remaining checks are a supported Zeroshot release and successful weight download/readiness under the applicable entitlement; authenticated access to the Brev organization with usable credits; exact single-GPU offer (provider/region, GPU, usable VRAM, CPU/RAM/disk, compute rate, storage rate while stopped, billing minimum and other fees); and where FirstRing's Rust process will run. Keep API keys local. Provisioning authorization should identify that concrete quote, a <=$10 total ceiling, maximum runtime, and cleanup of only the dedicated experiment instance.
 
 After authenticated CLI access is independently established, these are read-only searches; they do **not** create instances:
 
@@ -36,7 +40,7 @@ Proposed candidate: one dedicated L4 or A10G, x86_64 Ubuntu 22.04+, with no LLM/
 
 | Item | Verified recipe / constraint |
 |---|---|
-| Image pin | `nvcr.io/nim/nvidia/magpie-tts-zeroshot:1.2.0` — current official blueprint pin, **not** a claim that inaccessible registry tags were inspected |
+| Image pin | `nvcr.io/nim/nvidia/magpie-tts-zeroshot:1.2.0` — official blueprint pin with authenticated OCI index access verified; digest recorded above. No layers were pulled. |
 | Selector | `name=magpie-tts-zeroshot,batch_size=8` |
 | Profile memory | 13.06 GB GPU / 4.00 GB host; batch 32 instead needs 41.30 GB GPU / 7.08 GB host |
 | GPU requirement | Compute capability >=8.0, at least 16 GB VRAM; avoid T4 even though it has 16 GB |
@@ -67,7 +71,7 @@ docker version
 docker info --format '{{json .Runtimes}}'
 ```
 
-Require the approved license/access and `NGC_API_KEY` provisioned locally through a secret manager or private environment file. NGC personal keys need **NGC Catalog** scope. Disable shell tracing; never put a literal key in a command, log, screenshot, or repository. The [official NGC setup](https://docs.nvidia.com/nim/speech/latest/get-started/ngc-access-setup.html) documents registry authentication; keep its username literal:
+Require the applicable license/access and a local secret-manager/private-file mapping of the existing `NVIDIA_API_KEY` to `NGC_API_KEY` on the approved host. The registry probe established that this existing key can read the pinned manifest; do not create another key merely because the alias is unset. Model-weight access is still a separate gate. NGC personal keys need **NGC Catalog** scope. Disable shell tracing; never put a literal key in a command, log, screenshot, or repository. The [official NGC setup](https://docs.nvidia.com/nim/speech/latest/get-started/ngc-access-setup.html) documents registry authentication; keep its username literal:
 
 ```bash
 printf '%s' "$NGC_API_KEY" | docker login nvcr.io --username '$oauthtoken' --password-stdin
