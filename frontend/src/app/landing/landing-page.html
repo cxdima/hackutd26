@@ -1,0 +1,947 @@
+<div #root class="overflow-x-clip">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <app-site-header />
+
+  <main id="main">
+    <!-- HERO -->
+    <section id="top" data-hero class="relative isolate" aria-labelledby="hero-heading">
+      <!-- Wide art: a 16:9 stage anchored right, empty left half sits behind the copy. -->
+      <div
+        class="pointer-events-none absolute -right-[12vw] top-0 hidden aspect-video h-[min(60vw,calc(100svh-4.5rem),64rem)] lg:block"
+        aria-hidden="true"
+      >
+        <div data-hero-art class="hero-mask h-full w-full">
+          <picture>
+            <source
+              type="image/avif"
+              srcset="media/ringo-hero-1920.avif 1920w, media/ringo-hero-2688.avif 2688w"
+              sizes="100vw"
+            />
+            <img
+              src="media/ringo-hero-1920.webp"
+              srcset="
+                media/ringo-hero-1280.webp 1280w,
+                media/ringo-hero-1920.webp 1920w,
+                media/ringo-hero-2688.webp 2688w
+              "
+              sizes="100vw"
+              width="2688"
+              height="1520"
+              alt=""
+              fetchpriority="high"
+              class="absolute inset-0 h-full w-full object-cover"
+            />
+          </picture>
+          <app-loop-video
+            class="pointer-events-auto absolute inset-0"
+            [wide]="heroVideo"
+            [eager]="true"
+            [playingOverride]="heroPlaying()"
+            [showControl]="false"
+          />
+        </div>
+        <svg
+          data-hero-rings
+          viewBox="0 0 1600 900"
+          class="absolute inset-0 h-full w-full overflow-visible"
+        >
+          <g fill="none" stroke-linecap="round">
+            <path
+              data-hero-ring
+              d="M1109.1 378.5 A 165 165 0 0 0 1109.1 543.5"
+              stroke="#76b900"
+              stroke-width="5"
+              opacity="0.85"
+            />
+            <path
+              data-hero-ring
+              d="M1052.8 346 A 230 230 0 0 0 1052.8 576"
+              stroke="#76b900"
+              stroke-width="4"
+              opacity="0.55"
+            />
+            <path
+              data-hero-ring
+              d="M1076.8 313.7 A 230 230 0 0 0 1052.8 346"
+              stroke="#e20074"
+              stroke-width="4"
+              opacity="0.8"
+            />
+            <path
+              data-hero-ring
+              d="M996.5 313.5 A 295 295 0 0 0 996.5 608.5"
+              stroke="#76b900"
+              stroke-width="3"
+              opacity="0.32"
+            />
+            <circle
+              data-hero-ring-pulse
+              cx="1252"
+              cy="461"
+              r="111"
+              stroke="#76b900"
+              stroke-width="3"
+              opacity="0"
+              style="transform-box: fill-box; transform-origin: center"
+            />
+            <circle
+              data-hero-ring-pulse
+              cx="1252"
+              cy="461"
+              r="111"
+              stroke="#76b900"
+              stroke-width="3"
+              opacity="0"
+              style="transform-box: fill-box; transform-origin: center"
+            />
+          </g>
+        </svg>
+      </div>
+
+      <div
+        class="relative mx-auto grid max-w-[86rem] px-4 sm:px-6 lg:min-h-[min(60vw,calc(100svh-4.5rem),64rem)] lg:grid-cols-12 lg:items-center lg:px-10"
+      >
+        <button
+          type="button"
+          class="btn btn-quiet absolute right-10 top-6 z-30 hidden !min-h-11 lg:inline-flex"
+          (click)="toggleHero()"
+        >
+          {{ heroPlaying() ? 'Pause animation' : 'Play animation' }}
+        </button>
+        <div class="relative z-10 pt-10 pb-8 sm:pt-14 lg:col-span-6 lg:py-20 xl:col-span-6">
+          <h1 id="hero-heading" class="text-display font-extrabold">
+            Before you answer, FirstRing checks.
+          </h1>
+          <p class="mt-6 max-w-[33ch] text-lede text-ink-3">
+            A calm voice answers unfamiliar callers, spots suspicious requests, and helps protect
+            you and the people you love.
+          </p>
+          <div class="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <a class="btn btn-primary !min-h-14 !px-7 text-[1.125rem]" href="#how">
+              See how it works <svg lucideArrowDown [size]="19" aria-hidden="true"></svg>
+            </a>
+            <a
+              class="btn btn-secondary !min-h-14 !px-7 text-[1.125rem]"
+              routerLink="/console"
+              [queryParams]="{ view: 'demo' }"
+            >
+              Explore the demo <svg lucideArrowRight [size]="19" aria-hidden="true"></svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Narrow art: square crop of the same loop, copy above it. -->
+        <div class="relative -mx-4 sm:mx-auto sm:w-full sm:max-w-[36rem] lg:hidden">
+          <button
+            type="button"
+            class="btn btn-quiet absolute right-4 top-3 z-30 !min-h-11"
+            (click)="toggleHero()"
+          >
+            {{ heroPlaying() ? 'Pause animation' : 'Play animation' }}
+          </button>
+          <div class="hero-mask-narrow relative aspect-square" aria-hidden="true">
+            <app-loop-video
+              class="absolute inset-0"
+              [wide]="heroVideo"
+              [narrow]="heroVideoNarrow"
+              narrowQuery="(max-width: 1023px)"
+              [playingOverride]="heroPlaying()"
+              [showControl]="false"
+            />
+            <svg viewBox="0 0 1000 1000" class="absolute inset-0 h-full w-full overflow-visible">
+              <g fill="none" stroke-linecap="round">
+                <path
+                  d="M501.8 419.5 A 185 185 0 0 0 501.8 604.5"
+                  stroke="#76b900"
+                  stroke-width="7"
+                  opacity="0.85"
+                />
+                <path
+                  d="M441.2 384.5 A 255 255 0 0 0 441.2 639.5"
+                  stroke="#76b900"
+                  stroke-width="5"
+                  opacity="0.5"
+                />
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Lower-third: one screened call. Overlaps Ringo on desktop, the art edge on mobile. -->
+        <figure
+          data-hero-caption
+          class="relative z-20 -mt-16 mb-10 w-full max-w-[27rem] justify-self-center overflow-hidden rounded-[var(--radius-band)] shadow-[var(--shadow-lift)] sm:-mt-20 lg:absolute lg:bottom-[9%] lg:left-[47%] lg:mt-0 lg:mb-0 lg:w-[min(27rem,30vw)]"
+          aria-label="Example of a screened call"
+        >
+          <div class="flex items-center justify-between bg-lime px-4 py-2">
+            <span class="text-[0.8125rem] font-extrabold uppercase tracking-[0.08em]"
+              >Screened call</span
+            >
+            <span class="text-[0.8125rem] font-extrabold uppercase tracking-[0.08em]">Example</span>
+          </div>
+          <div class="caption-band on-ink !rounded-none px-4 py-4">
+            <p class="text-[1.0625rem] leading-snug">
+              <span class="caption-speaker mr-1.5">&gt;&gt; Caller</span>“Read me the code we just
+              texted you.”
+            </p>
+            <p
+              class="mt-3 flex items-start gap-2.5 border-t border-white/12 pt-3 text-[1.0625rem] font-semibold leading-snug"
+            >
+              <svg
+                lucideShieldCheck
+                [size]="20"
+                class="mt-0.5 shrink-0 text-lime"
+                aria-hidden="true"
+              ></svg>
+              FirstRing declined. A note is saved for you.
+            </p>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <!-- WHY IT MATTERS -->
+    <section class="on-ink bg-ink text-paper" aria-labelledby="why-heading">
+      <div
+        class="mx-auto grid max-w-[86rem] gap-12 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-12 lg:px-10"
+      >
+        <div class="lg:col-span-6">
+          <h2 id="why-heading" class="text-section font-extrabold">
+            Scams depend on speed. FirstRing adds a pause.
+          </h2>
+        </div>
+        <div class="space-y-6 text-body text-paper/88 lg:col-span-5 lg:col-start-8 lg:pt-3">
+          <p>
+            A scam call can put savings at risk, and with them, the independence of running your own
+            affairs. Scammers don’t succeed because people aren’t careful. They succeed by rushing:
+            a code “right now,” a payment “before it’s too late.”
+          </p>
+          <p>
+            FirstRing takes that pressure off. It answers first, lets the caller explain, and leaves
+            you a clear summary, so you decide what happens next with time to think.
+          </p>
+          <p>
+            For families and caregivers, it means knowing what happened on a call without listening
+            in on every conversation.
+          </p>
+        </div>
+        <ul
+          class="grid gap-px overflow-hidden rounded-[var(--radius-card)] bg-white/12 sm:grid-cols-3 lg:col-span-12"
+          aria-label="Things FirstRing never does for a caller"
+        >
+          <li class="flex items-start gap-4 bg-ink-2 p-6">
+            <svg lucideBan [size]="26" class="mt-0.5 shrink-0 text-lime" aria-hidden="true"></svg>
+            <p class="text-[1.1875rem] font-bold leading-snug">
+              Never reads out a sign-in or verification code.
+            </p>
+          </li>
+          <li class="flex items-start gap-4 bg-ink-2 p-6">
+            <svg lucideBan [size]="26" class="mt-0.5 shrink-0 text-lime" aria-hidden="true"></svg>
+            <p class="text-[1.1875rem] font-bold leading-snug">
+              Never agrees to gift cards, wires or unusual payments.
+            </p>
+          </li>
+          <li class="flex items-start gap-4 bg-ink-2 p-6">
+            <svg lucideBan [size]="26" class="mt-0.5 shrink-0 text-lime" aria-hidden="true"></svg>
+            <p class="text-[1.1875rem] font-bold leading-snug">
+              Never lets anyone into your computer or phone.
+            </p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section id="how" class="scroll-mt-20" aria-labelledby="how-heading">
+      <div
+        class="mx-auto grid max-w-[86rem] gap-14 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-12 lg:px-10"
+      >
+        <div class="lg:col-span-5">
+          <h2 id="how-heading" class="text-section font-extrabold">How it works</h2>
+          <ol class="mt-12 space-y-10">
+            <li class="grid grid-cols-[3.25rem_1fr] gap-5">
+              <span
+                class="grid size-13 place-items-center rounded-full border-[3px] border-lime text-[1.25rem] font-extrabold tabular"
+                aria-hidden="true"
+                >1</span
+              >
+              <div>
+                <h3 class="text-[1.75rem] font-extrabold leading-tight tracking-[-0.02em]">
+                  FirstRing answers.
+                </h3>
+                <p class="mt-2 text-body text-ink-3">
+                  A calm, clearly synthetic voice picks up unfamiliar calls, so you don’t have to.
+                </p>
+              </div>
+            </li>
+            <li class="grid grid-cols-[3.25rem_1fr] gap-5">
+              <span
+                class="grid size-13 place-items-center rounded-full border-[3px] border-lime text-[1.25rem] font-extrabold tabular"
+                aria-hidden="true"
+                >2</span
+              >
+              <div>
+                <h3 class="text-[1.75rem] font-extrabold leading-tight tracking-[-0.02em]">
+                  It checks the request.
+                </h3>
+                <p class="mt-2 text-body text-ink-3">
+                  It listens for what the caller actually wants and stops requests for codes,
+                  unusual payments or device access.
+                </p>
+              </div>
+            </li>
+            <li class="grid grid-cols-[3.25rem_1fr] gap-5">
+              <span
+                class="grid size-13 place-items-center rounded-full border-[3px] border-lime text-[1.25rem] font-extrabold tabular"
+                aria-hidden="true"
+                >3</span
+              >
+              <div>
+                <h3 class="text-[1.75rem] font-extrabold leading-tight tracking-[-0.02em]">
+                  You stay in control.
+                </h3>
+                <p class="mt-2 text-body text-ink-3">
+                  You read a short, plain summary of each call and decide whether to call back, on a
+                  number you already trust.
+                </p>
+              </div>
+            </li>
+          </ol>
+          <div
+            class="mt-12 flex items-center gap-5 rounded-[var(--radius-card)] bg-paper-2 p-4 pr-6"
+          >
+            <img
+              src="media/ringo-listening-480.webp"
+              width="480"
+              height="480"
+              alt=""
+              loading="lazy"
+              class="size-24 shrink-0 object-contain"
+            />
+            <p class="text-[1.0625rem] text-ink-3">
+              <strong class="text-ink">Ringo</strong> is FirstRing’s mascot. The voice on the phone
+              is an assistant, and says so when asked.
+            </p>
+          </div>
+        </div>
+        <div class="lg:col-span-6 lg:col-start-7 lg:pt-4">
+          <app-screening-stage />
+        </div>
+      </div>
+    </section>
+
+    <!-- INTERACTIVE EXAMPLE -->
+    <section id="example" class="scroll-mt-20 bg-paper-2" aria-labelledby="example-heading">
+      <div class="mx-auto max-w-[86rem] px-4 py-20 sm:px-6 sm:py-28 lg:px-10">
+        <div class="max-w-[46rem]">
+          <h2 id="example-heading" class="text-section font-extrabold">
+            Two calls. Two very different requests.
+          </h2>
+          <p class="mt-5 text-lede text-ink-3">
+            Choose one to see what FirstRing hears and what it does. These are written examples:
+            nothing here places a call.
+          </p>
+        </div>
+        <div class="mt-12">
+          <app-call-example />
+        </div>
+      </div>
+    </section>
+
+    <!-- RING TRANSITION: personal → community -->
+    <section data-bridge class="relative" aria-labelledby="bridge-heading">
+      <div
+        class="mx-auto grid max-w-[86rem] items-center gap-10 px-4 pt-20 pb-6 sm:px-6 sm:pt-28 lg:grid-cols-12 lg:px-10"
+      >
+        <h2
+          id="bridge-heading"
+          class="text-[clamp(1.75rem,1.3rem+1.6vw,2.75rem)] leading-[1.1] font-extrabold tracking-[-0.025em] lg:col-span-5"
+        >
+          Your protection is the first ring. What it learns can help the next one.
+        </h2>
+        <svg
+          viewBox="0 0 900 320"
+          class="w-full lg:col-span-7"
+          role="img"
+          aria-label="One household's ring connects to four other participating households"
+        >
+          <g fill="none" stroke-linecap="round">
+            <path
+              data-bridge-link
+              pathLength="1"
+              stroke-dasharray="1"
+              d="M246 138 C 330 80, 410 76, 481 88"
+              stroke="#171c18"
+              stroke-width="3"
+              opacity="0.35"
+            />
+            <path
+              data-bridge-link
+              pathLength="1"
+              stroke-dasharray="1"
+              d="M248 172 C 360 175, 470 196, 553 204"
+              stroke="#171c18"
+              stroke-width="3"
+              opacity="0.35"
+            />
+            <path
+              data-bridge-link
+              pathLength="1"
+              stroke-dasharray="1"
+              d="M561 88 C 630 80, 700 96, 746 112"
+              stroke="#171c18"
+              stroke-width="3"
+              opacity="0.35"
+            />
+            <path
+              data-bridge-link
+              pathLength="1"
+              stroke-dasharray="1"
+              d="M647 218 C 700 236, 745 246, 779 248"
+              stroke="#171c18"
+              stroke-width="3"
+              opacity="0.35"
+            />
+            <g data-bridge-home>
+              <circle cx="150" cy="160" r="92" stroke="#76b900" stroke-width="22" />
+              <path d="M215 95 A 92 92 0 0 1 236 125" stroke="#e20074" stroke-width="22" />
+            </g>
+            <circle data-bridge-ring cx="520" cy="92" r="40" stroke="#76b900" stroke-width="12" />
+            <circle data-bridge-ring cx="600" cy="210" r="46" stroke="#76b900" stroke-width="12" />
+            <circle data-bridge-ring cx="780" cy="120" r="34" stroke="#76b900" stroke-width="10" />
+            <circle data-bridge-ring cx="810" cy="250" r="30" stroke="#76b900" stroke-width="10" />
+          </g>
+          <text
+            x="150"
+            y="168"
+            text-anchor="middle"
+            font-size="26"
+            font-weight="800"
+            fill="#171c18"
+          >
+            You
+          </text>
+        </svg>
+      </div>
+    </section>
+
+    <!-- COMMUNITY -->
+    <section id="community" class="scroll-mt-20" aria-labelledby="community-heading">
+      <div class="mx-auto max-w-[86rem] px-4 pt-14 pb-20 sm:px-6 sm:pb-28 lg:px-10">
+        <div class="grid gap-10 lg:grid-cols-12">
+          <div class="lg:col-span-6">
+            <h2 id="community-heading" class="text-section font-extrabold">
+              One warning can help the next family.
+            </h2>
+          </div>
+          <div class="space-y-5 text-body text-ink-3 lg:col-span-5 lg:col-start-8 lg:pt-3">
+            <p>
+              When FirstRing stops a suspicious request, it can share a short, expiring description
+              of the trick with other participating households: what was asked for, what the caller
+              claimed to be, and how they pushed. Never your name, your number, or a recording.
+            </p>
+            <p>
+              Other households’ FirstRing checks new calls against it. Scammers change phone numbers
+              easily. Changing the trick is harder.
+            </p>
+          </div>
+        </div>
+
+        <!-- Same tactic, different number -->
+        <div class="mt-14 grid items-stretch gap-6 lg:grid-cols-12">
+          <figure
+            class="rounded-[var(--radius-card)] border-2 border-ink bg-paper p-6 sm:p-8 lg:col-span-5"
+            aria-labelledby="same-tactic"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <figcaption
+                id="same-tactic"
+                class="text-[1.375rem] font-extrabold leading-tight tracking-[-0.015em]"
+              >
+                Same tactic, different number
+              </figcaption>
+              <span class="bug bug-example">Example</span>
+            </div>
+            <ul
+              class="mt-6 space-y-2.5"
+              aria-label="Three different caller IDs (fictional 555 numbers)"
+            >
+              @for (number of exampleNumbers; track number) {
+                <li
+                  class="flex flex-wrap items-center justify-between gap-x-4 rounded-xl bg-paper-2 px-4 py-3 text-[1.125rem] font-bold tabular"
+                >
+                  <span class="whitespace-nowrap">{{ number }}</span>
+                  <span class="text-[0.95rem] font-semibold text-muted">Caller ID, unverified</span>
+                </li>
+              }
+            </ul>
+            <div class="mx-auto my-3 h-8 w-0.5 bg-ink" aria-hidden="true"></div>
+            <div class="overflow-hidden rounded-xl">
+              <p
+                class="flex items-center gap-2 bg-magenta-ink px-4 py-2 text-[0.8125rem] font-extrabold uppercase tracking-[0.08em] text-paper"
+              >
+                <svg lucideShieldAlert [size]="16" aria-hidden="true"></svg> Suspected fraud tactic
+              </p>
+              <dl
+                class="caption-band on-ink grid gap-x-4 gap-y-2 !rounded-none px-4 py-4 sm:grid-cols-[auto_1fr]"
+              >
+                <dt class="caption-speaker">Asks for</dt>
+                <dd class="font-semibold">A sign-in code</dd>
+                <dt class="caption-speaker">Claims to be</dt>
+                <dd class="font-semibold">The clinic</dd>
+                <dt class="caption-speaker">Pressure</dt>
+                <dd class="font-semibold">Rushes you</dd>
+              </dl>
+            </div>
+            <p class="mt-5 text-[1.25rem] font-extrabold leading-snug">
+              The number changes. The trick doesn’t.
+            </p>
+            <p class="mt-2 text-[1.0625rem] text-muted">
+              Caller ID is a clue, not proof. Numbers can be faked, so FirstRing matches the tactic,
+              not the person.
+            </p>
+          </figure>
+
+          <div
+            class="relative min-h-80 overflow-hidden rounded-[var(--radius-card)] bg-water lg:col-span-7"
+          >
+            <picture>
+              <source
+                type="image/avif"
+                srcset="media/community-rings-960.avif 960w, media/community-rings-1600.avif 1600w"
+                sizes="(min-width: 1024px) 58vw, 100vw"
+              />
+              <img
+                src="media/community-rings-1600.webp"
+                srcset="
+                  media/community-rings-960.webp   960w,
+                  media/community-rings-1600.webp 1600w,
+                  media/community-rings-2400.webp 2400w
+                "
+                sizes="(min-width: 1024px) 58vw, 100vw"
+                width="2688"
+                height="1520"
+                alt=""
+                loading="lazy"
+                class="absolute inset-0 h-full w-full object-cover"
+              />
+            </picture>
+            <app-loop-video
+              class="absolute inset-0"
+              [wide]="communityVideo"
+              label="water animation"
+              controlClass="bottom-4 right-4"
+            />
+            <p
+              class="absolute left-4 top-4 max-w-[22rem] rounded-xl bg-paper px-4 py-3 text-[1.0625rem] font-semibold leading-snug shadow-[var(--shadow-soft)]"
+            >
+              A warning spreads like a ripple, reaching households that haven’t seen the trick yet.
+            </p>
+          </div>
+        </div>
+
+        <!-- Spam, suspected fraud, unwanted -->
+        <div class="mt-16 grid gap-10 border-t-2 border-ink pt-10 lg:grid-cols-12">
+          <h3 class="text-[1.75rem] font-extrabold leading-tight tracking-[-0.02em] lg:col-span-3">
+            Not every unwanted call is a scam.
+          </h3>
+          <dl class="grid gap-8 sm:grid-cols-3 lg:col-span-9">
+            <div>
+              <dt class="flex items-center gap-2 text-[1.25rem] font-extrabold">
+                <svg
+                  lucideMessageSquareText
+                  [size]="22"
+                  class="text-ink-3"
+                  aria-hidden="true"
+                ></svg>
+                Unwanted call
+              </dt>
+              <dd class="mt-2 text-[1.0625rem] text-ink-3">
+                A real caller you’d rather not talk to right now. FirstRing takes a message; you
+                decide.
+              </dd>
+            </div>
+            <div>
+              <dt class="flex items-center gap-2 text-[1.25rem] font-extrabold">
+                <svg lucidePhoneOff [size]="22" class="text-ink-3" aria-hidden="true"></svg> Spam
+              </dt>
+              <dd class="mt-2 text-[1.0625rem] text-ink-3">
+                Repeated sales or robocalls. Annoying, but usually not after your accounts.
+              </dd>
+            </div>
+            <div>
+              <dt class="flex items-center gap-2 text-[1.25rem] font-extrabold text-magenta-ink">
+                <svg lucideShieldAlert [size]="22" aria-hidden="true"></svg> Suspected fraud
+              </dt>
+              <dd class="mt-2 text-[1.0625rem] text-ink-3">
+                Asks for codes, unusual payments or device access. FirstRing declines, saves a note,
+                and can share the tactic.
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <!-- Reputation concept -->
+        <div class="mt-16 rounded-[var(--radius-card)] bg-paper-2 p-6 sm:p-10">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <h3 class="text-[1.75rem] font-extrabold leading-tight tracking-[-0.02em]">
+              How a warning could grow stronger
+            </h3>
+            <span class="bug bug-example">Concept · not live yet</span>
+          </div>
+          <p class="mt-3 max-w-[60ch] text-[1.0625rem] text-ink-3">
+            An illustration of a planned design for reported numbers. Today’s prototype shares
+            tactic warnings only; it does not score or block phone numbers.
+          </p>
+          <ol
+            class="mt-6 divide-y-2 divide-paper-3 border-y-2 border-paper-3"
+            aria-label="Example progression of a reported number"
+          >
+            <li class="grid gap-x-6 gap-y-1 py-5 sm:grid-cols-[3rem_16rem_1fr] sm:items-baseline">
+              <span class="text-[1.5rem] font-extrabold tabular text-lime-ink" aria-hidden="true"
+                >1</span
+              >
+              <p class="text-[1.1875rem] font-extrabold">One report</p>
+              <p class="max-w-[60ch] text-[1.0625rem] text-ink-3">
+                A blocked call creates a minimized report. On its own, it changes nothing for anyone
+                else.
+              </p>
+            </li>
+            <li class="grid gap-x-6 gap-y-1 py-5 sm:grid-cols-[3rem_16rem_1fr] sm:items-baseline">
+              <span class="text-[1.5rem] font-extrabold tabular text-lime-ink" aria-hidden="true"
+                >2</span
+              >
+              <p class="text-[1.1875rem] font-extrabold">Independent reports agree</p>
+              <p class="max-w-[60ch] text-[1.0625rem] text-ink-3">
+                Separate households report the same tactic. Each household counts once.
+              </p>
+            </li>
+            <li class="grid gap-x-6 gap-y-1 py-5 sm:grid-cols-[3rem_16rem_1fr] sm:items-baseline">
+              <span class="text-[1.5rem] font-extrabold tabular text-lime-ink" aria-hidden="true"
+                >3</span
+              >
+              <p class="text-[1.1875rem] font-extrabold">A warning appears</p>
+              <p class="max-w-[60ch] text-[1.0625rem] text-ink-3">
+                Calls showing that number are screened more carefully and labeled “reported number.”
+              </p>
+            </li>
+            <li class="grid gap-x-6 gap-y-1 py-5 sm:grid-cols-[3rem_16rem_1fr] sm:items-baseline">
+              <span class="text-[1.5rem] font-extrabold tabular text-lime-ink" aria-hidden="true"
+                >4</span
+              >
+              <p class="text-[1.1875rem] font-extrabold">Stronger screening</p>
+              <p class="max-w-[60ch] text-[1.0625rem] text-ink-3">
+                Inside participating FirstRing services only. FirstRing can’t shut down a number or
+                a carrier account.
+              </p>
+            </li>
+          </ol>
+          <details class="group mt-6 rounded-xl border-2 border-rule bg-paper">
+            <summary
+              class="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 text-[1.125rem] font-bold"
+            >
+              How this would stay fair
+              <svg
+                lucideChevronDown
+                [size]="22"
+                class="shrink-0 transition-transform group-open:rotate-180"
+                aria-hidden="true"
+              ></svg>
+            </summary>
+            <dl class="grid gap-6 px-5 pb-6 pt-1 sm:grid-cols-2">
+              <div>
+                <dt class="font-extrabold">No duplicate counting</dt>
+                <dd class="mt-1 text-[1.0625rem] text-ink-3">
+                  Repeat reports from one household, or about one call, count once.
+                </dd>
+              </div>
+              <div>
+                <dt class="font-extrabold">Corrections</dt>
+                <dd class="mt-1 text-[1.0625rem] text-ink-3">
+                  Anyone flagged by mistake can ask for a review, and a correction removes the
+                  warning everywhere.
+                </dd>
+              </div>
+              <div>
+                <dt class="font-extrabold">Expiry</dt>
+                <dd class="mt-1 text-[1.0625rem] text-ink-3">
+                  Warnings fade unless new, independent reports renew them. Today’s tactic warnings
+                  expire after 24 hours.
+                </dd>
+              </div>
+              <div>
+                <dt class="font-extrabold">Spoofed and reused numbers</dt>
+                <dd class="mt-1 text-[1.0625rem] text-ink-3">
+                  A number can be faked or reassigned, so a warning never claims who called. The
+                  tactic check keeps working when the number changes.
+                </dd>
+              </div>
+            </dl>
+          </details>
+        </div>
+
+        <blockquote
+          class="mt-20 max-w-[30ch] text-[clamp(2rem,1.4rem+2.2vw,3.25rem)] leading-[1.18] font-extrabold tracking-[-0.03em]"
+        >
+          Our goal: help put phone scammers out of business by making their tricks harder to repeat.
+        </blockquote>
+      </div>
+    </section>
+
+    <!-- PRIVACY & VOICE -->
+    <section id="privacy" class="scroll-mt-20 bg-lime" aria-labelledby="privacy-heading">
+      <div
+        class="mx-auto grid max-w-[86rem] gap-12 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-12 lg:px-10"
+      >
+        <div class="lg:col-span-5">
+          <h2 id="privacy-heading" class="text-section font-extrabold">
+            Could someone copy my voice?
+          </h2>
+          <p class="mt-6 text-lede font-medium">
+            Any audio played to another person can be recorded. That includes a voice assistant’s
+            voice, and yours. So FirstRing doesn’t put your voice on the line.
+          </p>
+        </div>
+        <ul
+          class="space-y-px overflow-hidden rounded-[var(--radius-card)] lg:col-span-6 lg:col-start-7"
+        >
+          <li class="flex gap-5 bg-paper p-6 sm:p-7">
+            <svg lucideAudioLines [size]="28" class="mt-1 shrink-0" aria-hidden="true"></svg>
+            <div>
+              <h3 class="text-[1.375rem] font-extrabold leading-tight">
+                A distinct synthetic voice, by default
+              </h3>
+              <p class="mt-2 text-[1.0625rem] text-ink-3">
+                FirstRing answers in its own preset assistant voice. Custom voice cloning is turned
+                off in this prototype.
+              </p>
+            </div>
+          </li>
+          <li class="flex gap-5 bg-paper p-6 sm:p-7">
+            <svg lucideFingerprint [size]="28" class="mt-1 shrink-0" aria-hidden="true"></svg>
+            <div>
+              <h3 class="text-[1.375rem] font-extrabold leading-tight">Familiar isn’t proof</h3>
+              <p class="mt-2 text-[1.0625rem] text-ink-3">
+                Voices can be imitated. Sounding like a grandchild, a bank or a doctor never permits
+                a code, a payment or access. When in doubt, hang up and call back on a number you
+                already know.
+              </p>
+            </div>
+          </li>
+          <li class="flex gap-5 bg-paper p-6 sm:p-7">
+            <svg lucideEarOff [size]="28" class="mt-1 shrink-0" aria-hidden="true"></svg>
+            <div>
+              <h3 class="text-[1.375rem] font-extrabold leading-tight">
+                Only what’s needed is shared
+              </h3>
+              <p class="mt-2 text-[1.0625rem] text-ink-3">
+                Call summaries stay private to your dashboard. Community warnings carry the tactic
+                only, never names, numbers, recordings or transcripts.
+              </p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- WORKS TODAY / NEXT -->
+    <section
+      id="today"
+      class="scroll-mt-20 border-b-2 border-paper-3"
+      aria-labelledby="today-heading"
+    >
+      <div
+        class="mx-auto grid max-w-[86rem] gap-12 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-12 lg:px-10"
+      >
+        <div class="lg:col-span-4">
+          <h2 id="today-heading" class="text-section font-extrabold">What works today</h2>
+          <p class="mt-5 max-w-[34ch] text-lede text-ink-3">
+            A working prototype, and an honest list of what comes next.
+          </p>
+        </div>
+        <div class="grid gap-10 sm:grid-cols-2 lg:col-span-8">
+          <div>
+            <h3 class="border-b-2 border-ink pb-3 text-[1.375rem] font-extrabold">Working now</h3>
+            <ul class="divide-y divide-paper-3" aria-label="Working now">
+              @for (item of today; track item) {
+                <li class="flex gap-3 py-4 text-[1.0625rem]">
+                  <span
+                    class="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-lime text-ink"
+                    ><svg lucideCheck [size]="16" aria-hidden="true"></svg
+                  ></span>
+                  <span>{{ item }}</span>
+                </li>
+              }
+            </ul>
+          </div>
+          <div>
+            <div class="flex items-center justify-between gap-3 border-b-2 border-ink pb-3">
+              <h3 class="text-[1.375rem] font-extrabold">Next</h3>
+              <span class="bug bug-example">Not live yet</span>
+            </div>
+            <ul class="divide-y divide-paper-3" aria-label="Next">
+              @for (item of next; track item.title) {
+                <li class="flex gap-3 py-4">
+                  <span class="mt-0.5 grid size-7 shrink-0 place-items-center text-muted"
+                    ><svg lucideCircleDashed [size]="20" aria-hidden="true"></svg
+                  ></span>
+                  <span>
+                    <span class="block text-[1.0625rem] font-bold">{{ item.title }}</span>
+                    <span class="block text-[1rem] text-ink-3">{{ item.text }}</span>
+                  </span>
+                </li>
+              }
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" class="scroll-mt-20" aria-labelledby="faq-heading">
+      <div
+        class="mx-auto grid max-w-[86rem] gap-12 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-12 lg:px-10"
+      >
+        <h2 id="faq-heading" class="text-section font-extrabold lg:col-span-4">
+          Questions, answered plainly
+        </h2>
+        <div class="divide-y-2 divide-paper-3 border-y-2 border-paper-3 lg:col-span-8">
+          @for (faq of faqs; track faq.q) {
+            <details class="group">
+              <summary
+                class="flex min-h-[4.5rem] cursor-pointer list-none items-center justify-between gap-6 py-4 text-[1.3125rem] font-extrabold leading-snug"
+              >
+                {{ faq.q }}
+                <span
+                  class="grid size-11 shrink-0 place-items-center rounded-full bg-paper-2 transition-colors group-open:bg-lime"
+                >
+                  <svg
+                    lucideChevronDown
+                    [size]="22"
+                    class="transition-transform group-open:rotate-180"
+                    aria-hidden="true"
+                  ></svg>
+                </span>
+              </summary>
+              <div class="prose-plain max-w-[64ch] pb-7 text-body text-ink-3">
+                @for (paragraph of faq.a; track $index) {
+                  <p>{{ paragraph }}</p>
+                }
+              </div>
+            </details>
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- FINAL ACTION -->
+    <section class="on-ink bg-ink text-paper" aria-labelledby="cta-heading">
+      <div
+        class="mx-auto grid max-w-[86rem] items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-12 lg:px-10"
+      >
+        <img
+          src="media/ringo-greeting-960.webp"
+          srcset="media/ringo-greeting-480.webp 480w, media/ringo-greeting-960.webp 960w"
+          sizes="(min-width: 1024px) 22rem, 14rem"
+          width="960"
+          height="960"
+          alt="Ringo the sea lion waving, holding a lime ring"
+          loading="lazy"
+          class="mx-auto w-56 lg:col-span-4 lg:w-[22rem]"
+        />
+        <div class="lg:col-span-7 lg:col-start-6">
+          <h2 id="cta-heading" class="text-section font-extrabold">See FirstRing at work.</h2>
+          <p class="mt-5 max-w-[46ch] text-lede text-paper/88">
+            Explore the dashboard with fictional calls, or open the live dashboard on the presenting
+            computer.
+          </p>
+          <div class="mt-9 flex flex-col gap-3 sm:flex-row">
+            <a
+              class="btn btn-primary !min-h-14 !px-7 text-[1.125rem]"
+              routerLink="/console"
+              [queryParams]="{ view: 'demo' }"
+            >
+              Explore the demo <svg lucideArrowRight [size]="19" aria-hidden="true"></svg>
+            </a>
+            <a
+              class="btn !min-h-14 border-paper !px-7 text-[1.125rem] text-paper hover:bg-paper hover:text-ink"
+              routerLink="/console"
+              >Open dashboard</a
+            >
+          </div>
+          <p class="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-[1.0625rem] font-semibold">
+            <a
+              class="inline-flex items-center gap-2 text-paper underline-offset-4"
+              href="https://github.com/cxdima/hackutd26"
+              target="_blank"
+              rel="noopener"
+              ><svg lucideCode [size]="18" aria-hidden="true"></svg> Read the code on GitHub<span
+                class="visually-hidden"
+                >(opens in a new tab)</span
+              ></a
+            >
+            <a
+              class="inline-flex items-center gap-2 text-paper underline-offset-4"
+              href="https://devpost.com/software/firstring"
+              target="_blank"
+              rel="noopener"
+              ><svg lucideExternalLink [size]="18" aria-hidden="true"></svg> See the Devpost
+              entry<span class="visually-hidden">(opens in a new tab)</span></a
+            >
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="on-ink bg-ink-2 text-paper/85">
+    <div class="mx-auto grid max-w-[86rem] gap-10 px-4 py-14 sm:px-6 lg:grid-cols-12 lg:px-10">
+      <div class="lg:col-span-4">
+        <app-wordmark [inverse]="true" />
+        <p class="mt-4 max-w-[34ch] text-[1.0625rem]">
+          Before you answer, FirstRing checks. A HackUTD 2026 prototype with fictional households.
+        </p>
+      </div>
+      <div class="lg:col-span-5">
+        <h2 class="text-[1rem] font-extrabold uppercase tracking-[0.08em] text-paper">
+          Built with
+        </h2>
+        <p class="mt-3 text-[1.0625rem] leading-relaxed">
+          NVIDIA Nemotron for call decisions · Photon and Twilio for the demonstrated phone path ·
+          ElevenLabs voices and Deepgram transcription for speech. An independent prototype, not
+          operated or endorsed by these providers.
+        </p>
+      </div>
+      <nav class="lg:col-span-3" aria-label="Footer">
+        <ul class="space-y-2 text-[1.0625rem] font-semibold">
+          <li><a class="text-paper" href="#how">How it works</a></li>
+          <li><a class="text-paper" href="#community">Community</a></li>
+          <li><a class="text-paper" href="#privacy">Privacy</a></li>
+          <li><a class="text-paper" routerLink="/console">Open dashboard</a></li>
+          <li class="pt-2">
+            <a
+              class="inline-flex items-center gap-2 text-paper"
+              href="https://github.com/cxdima/hackutd26"
+              target="_blank"
+              rel="noopener"
+              ><svg lucideCode [size]="17" aria-hidden="true"></svg> Source code on GitHub<span
+                class="visually-hidden"
+                >(opens in a new tab)</span
+              ></a
+            >
+          </li>
+          <li>
+            <a
+              class="inline-flex items-center gap-2 text-paper"
+              href="https://devpost.com/software/firstring"
+              target="_blank"
+              rel="noopener"
+              ><svg lucideExternalLink [size]="17" aria-hidden="true"></svg> FirstRing on
+              Devpost<span class="visually-hidden">(opens in a new tab)</span></a
+            >
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </footer>
+</div>

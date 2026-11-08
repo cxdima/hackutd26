@@ -1,0 +1,16 @@
+{
+  "kind": "synthetic_stream_timing_diagnostic",
+  "production_gate": false,
+  "phone_calls": 0,
+  "timeout_ms": 15000,
+  "first_delta_ms": 393,
+  "first_tool_delta_ms": 441,
+  "tool_argument_chars": 373,
+  "finish_reason": "tool_calls",
+  "usage": {
+    "prompt_tokens": 5400,
+    "total_tokens": 5537,
+    "completion_tokens": 137
+  },
+  "total_ms": 4438
+}

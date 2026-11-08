@@ -255,8 +255,14 @@ fn connect_twiml_for_model(
     let locale = escape(&profile.locale);
     let transcription_model = model.as_str();
     let speech_timeout = crate::config::relay_speech_timeout_ms();
+    // Recognition hints: the household's own name first, so "Sarah" is not heard as "sir".
+    let hints = escape(&format!(
+        "{},{},FirstRing,appointment,verification code,Social Security",
+        profile.display_name,
+        profile.display_name.to_lowercase()
+    ));
     format!(
-        "<Response><Connect action=\"{}\" method=\"POST\"><ConversationRelay url=\"{}\"{greeting} interruptible=\"any\" reportInputDuringAgentSpeech=\"any\" ignoreBackchannel=\"true\" dtmfDetection=\"true\" partialPrompts=\"true\" speechTimeout=\"{speech_timeout}\" language=\"{locale}\" transcriptionProvider=\"{TRANSCRIPTION_PROVIDER}\" speechModel=\"{transcription_model}\" ttsProvider=\"{provider}\" voice=\"{voice}\"><Parameter name=\"session_token\" value=\"{}\"/></ConversationRelay></Connect></Response>",
+        "<Response><Connect action=\"{}\" method=\"POST\"><ConversationRelay url=\"{}\"{greeting} interruptible=\"any\" reportInputDuringAgentSpeech=\"any\" ignoreBackchannel=\"true\" dtmfDetection=\"true\" partialPrompts=\"true\" speechTimeout=\"{speech_timeout}\" language=\"{locale}\" hints=\"{hints}\" transcriptionProvider=\"{TRANSCRIPTION_PROVIDER}\" speechModel=\"{transcription_model}\" ttsProvider=\"{provider}\" voice=\"{voice}\"><Parameter name=\"session_token\" value=\"{}\"/></ConversationRelay></Connect></Response>",
         escape(after.as_str()),
         escape(ws.as_str()),
         escape(session_token)

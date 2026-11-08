@@ -1,0 +1,27 @@
+{
+  "observed_at_utc": "2026-11-08T14:21:55.203541+00:00",
+  "exact_resource_matches_bound_identity": true,
+  "resource_count": 1,
+  "resource_status": "RUNNING",
+  "type": "gpu_1x_h100_pcie",
+  "provider": "lambda-labs",
+  "hourly_quote_usd": 3.948,
+  "remaining_posted_credit_usd": 51.12,
+  "posted_usage_total_usd": 8.89,
+  "auto_recharge_enabled": false,
+  "hard_cleanup_at_utc": "2026-11-08T19:30:00+00:00",
+  "estimated_current_run_compute_accrued_usd": 3.8176,
+  "estimated_current_run_full_compute_plus_cleanup_usd": 26.0861,
+  "authorized_run_max_usd": 27,
+  "authorized_total_usd": 60,
+  "prior_posted_spend_usd": 8.88,
+  "projected_remaining_after_full_quote_and_cleanup_usd": 25.0339,
+  "billing_caveat": "Current resource has only14seconds/$0.01 posted despite being allocated for nearly58minutes. Reportedunitprice1.97 is not assumed to override3.948 catalogue quote. Quote-based accrued/full-run estimates remain conservative planning figures, not final billed usage.",
+  "current_resource_posted_usage": [
+    {
+      "cost_usd": "0.01",
+      "reported_unit_price": "1.97",
+      "reported_seconds": 14
+    }
+  ]
+}

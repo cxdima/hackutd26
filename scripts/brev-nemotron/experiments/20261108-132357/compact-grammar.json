@@ -1,0 +1,154 @@
+{
+  "recorded_at_utc": "2026-11-08T14:12:58.793701+00:00",
+  "change": "Bound generated formatting whitespace atoms to zero through two characters; native extraction unchanged",
+  "plugin_sha256": "bbbaa7f5f9495f9ba338aeb86ef0d444a1fd760d04ebe9f5c810e473e9dd4389",
+  "vllm": "0.27.1",
+  "xgrammar": "0.2.3",
+  "cpu_tests": {
+    "passed": 6,
+    "red_regression_observed": true,
+    "includes_actual_assessment_schema": true,
+    "preserves_quoted_spaces_unicode_negation": true,
+    "preserves_native_extraction": true
+  },
+  "previous_container": {
+    "state": "exited",
+    "started_at": "2026-11-08T13:37:03.576381538Z",
+    "parser": "qwen3_coder",
+    "image": "vllm/vllm-openai@sha256:0a51ea5b4ae2dc5d81890e5173f54203d2a3ae0cfffe51b8fd2afd4391bfd967"
+  },
+  "current_container": {
+    "state": "running",
+    "started_at": "2026-11-08T14:08:59.775985933Z",
+    "parser": "firstring_qwen3_compact",
+    "image": "vllm/vllm-openai@sha256:0a51ea5b4ae2dc5d81890e5173f54203d2a3ae0cfffe51b8fd2afd4391bfd967"
+  },
+  "health_status": null,
+  "native_model_gate": {
+    "source": "fixtures/results/2026-11-08-production-compact-warm-attempt19.json",
+    "source_sha256": "3a3e9e6b3fe37995e30e353173a4dd91a1d53706cd49bd9366b4b35000ff85fa",
+    "recorded_at": "2026-11-08T14:19:37.189913Z",
+    "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "execution": "real_inference_with_inert_runtime_actor",
+    "request_timeout_ms": 3500,
+    "max_output_tokens": 512,
+    "phone_calls": 0,
+    "cases": [
+      {
+        "id": "attempt19-turn1",
+        "passed": true,
+        "pass_scope": "native_control_flow_and_risk_flag_only",
+        "complete_turn_ms": 2975,
+        "terminal_tool": "ask_caller",
+        "blocked": false,
+        "saved_message_present": false,
+        "requests": [
+          {
+            "tool": "record_assessment",
+            "observation": {
+              "backend": "brev_hosted",
+              "completed_at": "2026-11-08T14:19:33.042144+00:00",
+              "completion_tokens": 210,
+              "content_chars": 0,
+              "elapsed_ms": 1499,
+              "error": null,
+              "finish_reason": "stop",
+              "outcome": "success",
+              "reasoning_chars": null,
+              "reasoning_tokens": null,
+              "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+              "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+              "started_at": "2026-11-08T14:19:31.543104+00:00"
+            }
+          },
+          {
+            "tool": "ask_caller",
+            "observation": {
+              "backend": "brev_hosted",
+              "completed_at": "2026-11-08T14:19:34.517065+00:00",
+              "completion_tokens": 118,
+              "content_chars": 0,
+              "elapsed_ms": 1472,
+              "error": null,
+              "finish_reason": "stop",
+              "outcome": "success",
+              "reasoning_chars": null,
+              "reasoning_tokens": null,
+              "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+              "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+              "started_at": "2026-11-08T14:19:33.044161+00:00"
+            }
+          }
+        ]
+      },
+      {
+        "id": "attempt19-turn2",
+        "passed": true,
+        "pass_scope": "native_control_flow_and_risk_flag_only",
+        "complete_turn_ms": 2668,
+        "terminal_tool": "take_message",
+        "blocked": true,
+        "saved_message_present": true,
+        "requests": [
+          {
+            "tool": "record_assessment",
+            "observation": {
+              "backend": "brev_hosted",
+              "completed_at": "2026-11-08T14:19:35.925333+00:00",
+              "completion_tokens": 221,
+              "content_chars": 0,
+              "elapsed_ms": 1403,
+              "error": null,
+              "finish_reason": "stop",
+              "outcome": "success",
+              "reasoning_chars": null,
+              "reasoning_tokens": null,
+              "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+              "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+              "started_at": "2026-11-08T14:19:34.521491+00:00"
+            }
+          },
+          {
+            "tool": "take_message",
+            "observation": {
+              "backend": "brev_hosted",
+              "completed_at": "2026-11-08T14:19:37.187814+00:00",
+              "completion_tokens": 113,
+              "content_chars": 0,
+              "elapsed_ms": 1260,
+              "error": null,
+              "finish_reason": "tool_calls",
+              "outcome": "success",
+              "reasoning_chars": null,
+              "reasoning_tokens": null,
+              "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+              "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+              "started_at": "2026-11-08T14:19:35.927472+00:00"
+            }
+          }
+        ]
+      }
+    ],
+    "limitations": [
+      "First cold assessment timed out at3504ms; this receipt proves warmed execution.",
+      "The first follow-up redundantly asks who despite caller identity being supplied. Semantic quality review and broader matrix remain separate.",
+      "A synthetic native tool cycle is not a phone interaction."
+    ]
+  },
+  "cleanup_deadline_utc": "2026-11-08T19:30:00Z",
+  "runtime_api_key_unchanged": true,
+  "inference_requests_by_deployment_agent": 0,
+  "new_allocations": 0,
+  "resource_readiness_after_restart": {
+    "recorded_at_utc": "2026-11-08T14:17:47.321714+00:00",
+    "health_http": 200,
+    "authenticated_models_http": 200,
+    "unauthorized_models_http": 401,
+    "model_ids": [
+      "nvidia/nemotron-3.5-lightning-30b-a3b"
+    ],
+    "native_protocol_passed": false,
+    "cleanup_deadline_utc": "2026-11-08T19:30:00Z"
+  },
+  "runtime_ready_at_utc": "2026-11-08T14:18:30.593018+00:00"
+}

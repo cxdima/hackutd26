@@ -102,6 +102,7 @@ pub async fn detail(State(app): State<App>, Path(key): Path<String>) -> Response
         Ok(Some(item)) => {
             let mut view = item["reputation"].clone();
             view["audit"] = item["audit"].clone();
+            view["reports"] = item["reports"].clone();
             reply(StatusCode::OK, view)
         }
         Ok(None) => reply(

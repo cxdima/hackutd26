@@ -23,3 +23,7 @@ pub mod reputation;
 pub mod model_availability;
 
 pub mod reputation_http;
+
+pub mod call_recording;
+
+pub mod voice_clone;
