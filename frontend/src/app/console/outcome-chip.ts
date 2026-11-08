@@ -5,6 +5,7 @@ import {
   LucideCircleMinus,
   LucideEye,
   LucidePhoneCall,
+  LucidePhoneForwarded,
   LucideShieldAlert,
 } from '@lucide/angular';
 import { OUTCOME_CHIP, OUTCOME_LABEL, type Outcome } from '../core/calls';
@@ -18,6 +19,7 @@ import { OUTCOME_CHIP, OUTCOME_LABEL, type Outcome } from '../core/calls';
     LucideEye,
     LucideCircleDashed,
     LucidePhoneCall,
+    LucidePhoneForwarded,
     LucideCircleMinus,
   ],
   template: `
@@ -25,6 +27,9 @@ import { OUTCOME_CHIP, OUTCOME_LABEL, type Outcome } from '../core/calls';
       @switch (outcome()) {
         @case ('blocked') {
           <svg lucideShieldAlert [size]="16" aria-hidden="true"></svg>
+        }
+        @case ('connected') {
+          <svg lucidePhoneForwarded [size]="16" aria-hidden="true"></svg>
         }
         @case ('message_saved') {
           <svg lucideCheck [size]="16" aria-hidden="true"></svg>

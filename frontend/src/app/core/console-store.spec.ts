@@ -64,4 +64,68 @@ describe('ConsoleStore', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(store.calls().length).toBeGreaterThan(0);
   });
+
+  it('plays a fictional rehearsal call in the demo view without any network request', () => {
+    vi.useFakeTimers();
+    store.enterDemo();
+    const before = store.calls().length;
+    expect(store.playStaged('branch')).toBe(true);
+    vi.advanceTimersByTime(5000);
+    const live = store.calls().find((c) => c.id.startsWith('staged-branch'));
+    expect(live?.outcome).toBe('in_progress');
+    store.finishStaged();
+    const done = store.calls().find((c) => c.id.startsWith('staged-branch'))!;
+    expect(store.calls().length).toBe(before + 1);
+    expect(done.outcome).toBe('blocked');
+    expect(done.events.every((e) => e.data_origin === 'demo_fixture')).toBe(true);
+    // Skipped receipts are re-timed to the moment of skipping, never left in the future.
+    expect(Math.max(...done.events.map((e) => Date.parse(e.occurred_at)))).toBeLessThanOrEqual(
+      Date.now() + 1000,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('refuses rehearsal playback on a live server', async () => {
+    const { state } = buildDemo();
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/state'
+        ? Promise.resolve(json({ ...state, execution_mode: 'live', sessions: [] }))
+        : Promise.resolve(new Response(new ReadableStream(), { status: 200 })),
+    );
+    await store.connect('token');
+    expect(store.playStaged('connected')).toBe(false);
+  });
+
+  it('marks the view stale when the stream drops, then resumes after the last receipt without duplicates', async () => {
+    vi.useFakeTimers();
+    const { state } = buildDemo();
+    const live = { ...state, execution_mode: 'live', sessions: [] };
+    const sse = (ids: number[]) =>
+      new Response(
+        ids
+          .map(
+            (id) =>
+              `id: ${id}\ndata: ${JSON.stringify({ id: `e${id}`, sequence: id, session_id: null, leg_role: 'system', occurred_at: '2026-11-08T14:00:00Z', received_at: '2026-11-08T14:00:00Z', policy_epoch: 0, execution_mode: 'live', data_origin: 'synthetic', type: 'tactic.created', payload: {} })}\n\n`,
+          )
+          .join(''),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+      );
+    const streams = [sse([1, 2]), sse([2, 3])];
+    const lastEventIds: string[] = [];
+    fetchMock.mockImplementation((url: string, init: RequestInit) => {
+      if (url === '/api/state') return Promise.resolve(json(live));
+      lastEventIds.push((init.headers as Record<string, string>)['Last-Event-ID']);
+      return Promise.resolve(
+        streams.shift() ?? new Response(new ReadableStream(), { status: 200 }),
+      );
+    });
+    await store.connect('token');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(store.connection()).toBe('paused');
+    await vi.advanceTimersByTimeAsync(2500);
+    expect(lastEventIds.slice(0, 2)).toEqual(['0', '2']);
+    expect(store.events().map((e) => e.sequence)).toEqual([1, 2, 3]);
+    vi.useRealTimers();
+  });
 });

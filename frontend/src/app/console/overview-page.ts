@@ -12,6 +12,7 @@ import { ConsoleStore } from '../core/console-store';
 import { formatDateTime, formatDay, relativeAge } from '../core/format';
 import { humanize, PRETEXT_LABEL, TACTIC_LABEL } from '../core/language';
 import { CallRow } from './call-row';
+import { personAction, presentFocus } from '../core/live';
 import { OutcomeChip } from './outcome-chip';
 
 interface Service {
@@ -59,7 +60,7 @@ interface Service {
               <svg lucideCircleAlert [size]="22" class="mt-0.5 shrink-0" aria-hidden="true"></svg>
             }
           }
-          <p class="text-[1.0625rem]">
+          <p class="max-w-[62ch] text-[1.0625rem]">
             <strong>{{ service().title }}</strong> {{ service().detail }}
           </p>
         </div>
@@ -88,20 +89,40 @@ interface Service {
               >
                 {{ call.headline }}
               </p>
-              @if (call.outcome === 'blocked') {
-                <p class="mt-3 max-w-[60ch] text-[1.0625rem] text-ink-3">
-                  If you’re not sure whether the call was real, contact the organization using a
-                  number you already know. Caller ID is not proof.
-                </p>
-              }
-              <a
-                [routerLink]="['/console/calls', call.id]"
-                queryParamsHandling="preserve"
-                class="btn btn-ink mt-6"
-              >
-                See what FirstRing heard and why
-                <svg lucideArrowRight [size]="18" aria-hidden="true"></svg>
-              </a>
+              @let glance = featuredGlance()!;
+              <dl class="mt-5 grid max-w-[60rem] gap-x-8 border-t border-paper-3 sm:grid-cols-3">
+                <div class="border-b border-paper-3 py-3 sm:border-b-0">
+                  <dt class="text-[0.95rem] font-bold text-muted">The caller asked</dt>
+                  <dd class="mt-0.5 text-[1.0625rem] font-semibold">{{ call.request }}</dd>
+                </div>
+                <div class="border-b border-paper-3 py-3 sm:border-b-0">
+                  <dt class="text-[0.95rem] font-bold text-muted">FirstRing</dt>
+                  <dd class="mt-0.5 text-[1.0625rem] font-semibold">{{ glance.did }}</dd>
+                </div>
+                <div class="py-3">
+                  <dt class="text-[0.95rem] font-bold text-muted">Do you need to do anything?</dt>
+                  <dd class="mt-0.5 text-[1.0625rem] font-semibold">{{ glance.action }}</dd>
+                </div>
+              </dl>
+              <div class="mt-6 flex flex-wrap gap-3">
+                <a
+                  [routerLink]="['/console/calls', call.id]"
+                  queryParamsHandling="preserve"
+                  class="btn btn-ink"
+                >
+                  See what FirstRing heard and why
+                  <svg lucideArrowRight [size]="18" aria-hidden="true"></svg>
+                </a>
+                @if (call.outcome === 'in_progress') {
+                  <a
+                    routerLink="/console/present"
+                    queryParamsHandling="preserve"
+                    class="btn btn-secondary"
+                  >
+                    Show it on the presentation screen
+                  </a>
+                }
+              </div>
             </div>
           </section>
         }
@@ -280,6 +301,17 @@ export class OverviewPage {
       calls.find((c) => c.outcome === 'needs_review' && recent(c)) ??
       calls[0]
     );
+  });
+  readonly featuredGlance = computed(() => {
+    const call = this.featured();
+    if (!call) return undefined;
+    const focus = presentFocus(call);
+    const action = personAction(call).text;
+    return {
+      did:
+        call.outcome === 'in_progress' ? (focus.step?.label ?? 'Answering') : focus.outcome.label,
+      action,
+    };
   });
   readonly featuredLabel = computed(() => {
     const call = this.featured();

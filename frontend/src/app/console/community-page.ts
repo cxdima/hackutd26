@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { LucideChevronDown, LucideClock3, LucideShieldAlert, LucideUnplug } from '@lucide/angular';
+import { buildCommunityStories } from '../core/community-story';
 import { ConsoleStore } from '../core/console-store';
 import { formatDateTime, relativeAge, relativeUntil } from '../core/format';
 import {
@@ -10,10 +11,11 @@ import {
   TACTIC_LABEL,
 } from '../core/language';
 import type { Tactic } from '../core/schemas';
+import { CommunityStoryView } from './present/community-story';
 
 @Component({
   selector: 'app-community-page',
-  imports: [LucideShieldAlert, LucideClock3, LucideChevronDown, LucideUnplug],
+  imports: [LucideShieldAlert, LucideClock3, LucideChevronDown, LucideUnplug, CommunityStoryView],
   template: `
     @let state = store.state()!;
     <div class="grid gap-10 lg:grid-cols-12">
@@ -28,10 +30,33 @@ import type { Tactic } from '../core/schemas';
           pretext and the pressure, then expires.
         </p>
 
-        <section class="mt-10" aria-labelledby="active-heading">
-          <h2 id="active-heading" class="border-b-2 border-ink pb-3 text-[1.5rem] font-extrabold">
-            Active shared warnings
-          </h2>
+        @if (story(); as s) {
+          <section class="mt-10" aria-labelledby="story-heading">
+            <div
+              class="flex flex-wrap items-center justify-between gap-3 border-b-2 border-ink pb-3"
+            >
+              <h2 id="story-heading" class="text-[1.5rem] font-extrabold">How a warning travels</h2>
+              @if (store.isDemo()) {
+                <span class="bug bug-example">Example data</span>
+              }
+            </div>
+            <div class="mt-6">
+              <app-community-story [story]="s" [timezone]="state.profile?.timezone" />
+            </div>
+          </section>
+        }
+
+        <section class="mt-12" aria-labelledby="active-heading">
+          <div class="border-b-2 border-ink pb-3">
+            <h2 id="active-heading" class="text-[1.5rem] font-extrabold">
+              Same tactic, different number
+            </h2>
+            <p class="mt-1 max-w-[64ch] text-[1.0625rem] text-ink-3">
+              Active shared warnings. A later call matches one by what it asks for, so a new number
+              does not hide a repeated trick. A match never says two calls came from the same
+              person.
+            </p>
+          </div>
           <ul class="mt-5 space-y-5">
             @for (tactic of tactics(); track tactic.id) {
               <li class="overflow-hidden rounded-[var(--radius-card)] border-2 border-paper-3">
@@ -77,7 +102,9 @@ import type { Tactic } from '../core/schemas';
                     </dd>
                   </div>
                 </dl>
-                <div class="border-t border-paper-3 px-5 py-4 text-[1rem] text-ink-3">
+                <div
+                  class="border-t border-paper-3 px-5 py-4 text-[1rem] text-ink-3 [&_p]:max-w-[68ch]"
+                >
                   <p><strong class="text-ink">Why it was flagged:</strong> {{ why(tactic) }}</p>
                   <p class="mt-1 flex items-center gap-2">
                     <svg lucideClock3 [size]="16" aria-hidden="true"></svg> Expires
@@ -104,23 +131,41 @@ import type { Tactic } from '../core/schemas';
 
         <section class="mt-12" aria-labelledby="reputation-heading">
           <div class="flex flex-wrap items-center justify-between gap-3 border-b-2 border-ink pb-3">
-            <h2 id="reputation-heading" class="text-[1.5rem] font-extrabold">Reported numbers</h2>
-            <span class="bug bug-example"
-              ><svg lucideUnplug [size]="15" aria-hidden="true"></svg> Not connected</span
-            >
+            <h2 id="reputation-heading" class="text-[1.5rem] font-extrabold">
+              Reported-number history
+            </h2>
+            @if (reputationConnected()) {
+              <span class="bug bug-live">Connected</span>
+            } @else if (store.isDemo()) {
+              <span class="bug bug-example">Example data on demo calls</span>
+            } @else {
+              <span class="bug bug-example"
+                ><svg lucideUnplug [size]="15" aria-hidden="true"></svg> Not connected</span
+              >
+            }
           </div>
           <p class="mt-4 max-w-[64ch] text-[1.0625rem] text-ink-3">
-            The server does not keep reported-number reputation yet, so this dashboard shows none.
-            Number warnings, duplicate checks, corrections and expiry need the backend endpoints
-            described in
-            <code class="rounded bg-paper-2 px-1.5 py-0.5 text-[0.95rem]"
-              >frontend/docs/reputation-contract.md</code
-            >.
+            A separate idea from tactic warnings: history about one number, counted by independent
+            households, with recency, expiry and corrections. No history means “No reports yet”,
+            never “safe”, and a number can be spoofed or reassigned.
           </p>
-          <p class="mt-3 max-w-[64ch] text-[1.0625rem] text-ink-3">
-            Reporting a mistake isn’t available yet either: a report would have nowhere to be saved.
-            Until then, shared tactic warnings expire on their own.
-          </p>
+          @if (reputationConnected()) {
+            <p class="mt-3 max-w-[64ch] text-[1.0625rem] text-ink-3">
+              The server provides it. Each call page shows that number’s history next to the call.
+            </p>
+          } @else if (store.isDemo()) {
+            <p class="mt-3 max-w-[64ch] text-[1.0625rem] text-ink-3">
+              Demo calls show fictional, demonstration-only reports on their call pages.
+            </p>
+          } @else {
+            <p class="mt-3 max-w-[64ch] text-[1.0625rem] text-ink-3">
+              This server does not provide it yet, so no number history is shown and nothing is
+              computed in the browser. The proposed contract is in
+              <code class="rounded bg-paper-2 px-1.5 py-0.5 text-[0.95rem]"
+                >frontend/docs/reputation-contract.md</code
+              >. Shared tactic warnings above still work and expire on their own.
+            </p>
+          }
           <button
             type="button"
             class="btn btn-quiet mt-5"
@@ -169,7 +214,10 @@ import type { Tactic } from '../core/schemas';
         </section>
       </div>
 
-      <aside class="space-y-6 lg:col-span-4" aria-label="Participating households">
+      <aside
+        class="space-y-6 lg:sticky lg:top-24 lg:col-span-4 lg:self-start"
+        aria-label="Participating households"
+      >
         <section
           class="rounded-[var(--radius-card)] bg-paper-2 p-5 sm:p-6"
           aria-labelledby="households-heading"
@@ -250,6 +298,12 @@ export class CommunityPage {
       text: 'Participating FirstRing services decline its requests sooner. Carriers are not involved.',
     },
   ];
+  readonly story = computed(
+    () => buildCommunityStories(this.store.state(), this.store.events(), this.store.calls())[0],
+  );
+  readonly reputationConnected = computed(() =>
+    ['configured', 'verified'].includes(this.store.capability('reputation')?.status ?? ''),
+  );
   readonly tactics = computed(() =>
     [...(this.store.state()?.tactics ?? [])].sort((a, b) => b.version - a.version),
   );
@@ -270,6 +324,8 @@ export class CommunityPage {
     return humanize(value, table);
   }
   why(tactic: Tactic) {
+    if (tactic.provenance === 'designated_synthetic_test')
+      return `Created by a designated synthetic test to exercise sharing, not by a real call. It describes a caller asking the person to “${humanize(tactic.requested_action, ACTION_LABEL).toLowerCase()}”.`;
     return `On a call, someone asked the person to “${humanize(tactic.requested_action, ACTION_LABEL).toLowerCase()}”, which FirstRing never does for a caller. The request was reduced to these categories before sharing; no words, names or numbers were kept.`;
   }
   expiry(at: string) {

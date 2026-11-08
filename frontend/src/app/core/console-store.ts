@@ -1,9 +1,18 @@
 import { computed, Injectable, OnDestroy, signal } from '@angular/core';
 import { buildCallRecords, type CallRecord } from './calls';
 import { buildDemo } from './demo-data';
+import { applyToState, stagedScript, type StagedKind, type StagedScript } from './demo-staged';
 import { consumeEvents } from './event-stream';
 import { mergeEvents } from './evidence';
 import {
+  demoReputation,
+  REPUTATION_UNAVAILABLE,
+  reputationSchema,
+  type ReputationResult,
+} from './reputation';
+import { z } from 'zod';
+import {
+  eventSchema,
   fixtureStatusSchema,
   profileSchema,
   stateSchema,
@@ -46,6 +55,14 @@ export class ConsoleStore implements OnDestroy {
   private lastSequence = 0;
   private generation = 0;
   private clock?: ReturnType<typeof setInterval>;
+  private stagedTimers: ReturnType<typeof setTimeout>[] = [];
+  private stagedRun = 0;
+  private stagedQueue?: {
+    script: StagedScript;
+    profile: Parameters<typeof applyToState>[3];
+    generation: number;
+    next: number;
+  };
 
   readonly source = signal<Source>('none');
   readonly state = signal<ConsoleState | null>(null);
@@ -71,6 +88,13 @@ export class ConsoleStore implements OnDestroy {
     return state ? buildCallRecords(state, this.events(), this.now()) : [];
   });
   readonly isDemo = computed(() => this.source() === 'demo');
+  /** The fictional rehearsal call currently playing (DEMO view only). */
+  readonly staged = signal<{ kind: StagedKind; sessionId: string } | null>(null);
+  readonly stagedPlayed = signal<StagedKind[]>([]);
+  /** A server capability, or undefined when the server does not report it. */
+  capability(id: string) {
+    return this.state()?.capabilities.find((c) => c.id === id);
+  }
 
   ngOnDestroy(): void {
     this.stop();
@@ -113,6 +137,7 @@ export class ConsoleStore implements OnDestroy {
 
   enterDemo(): void {
     this.stop();
+    this.stagedPlayed.set([]);
     this.generation++;
     this.token = '';
     const demo = buildDemo();
@@ -129,6 +154,7 @@ export class ConsoleStore implements OnDestroy {
   lock(): void {
     this.generation++;
     this.stop();
+    this.stagedPlayed.set([]);
     this.token = '';
     this.source.set('none');
     this.state.set(null);
@@ -141,6 +167,7 @@ export class ConsoleStore implements OnDestroy {
   }
 
   private stop() {
+    this.stopStaged();
     this.controller?.abort();
     this.controller = undefined;
     clearTimeout(this.reconnectTimer);
@@ -228,6 +255,157 @@ export class ConsoleStore implements OnDestroy {
       this.stale.set(true);
       this.reconnectTimer = setTimeout(() => void this.stream(signal, generation), 2000);
     }
+  }
+
+  /**
+   * Plays a fictional rehearsal call into the DEMO view, receipt by receipt, on
+   * the same timing a real call would have. Never available on a live server.
+   */
+  playStaged(kind: StagedKind): boolean {
+    const state = this.state();
+    if (this.source() !== 'demo' || !state) return false;
+    this.stopStaged();
+    const household = kind === 'maya' ? 'maya' : 'sarah';
+    const base = state.sessions.find((s) => s.household_id === household)?.profile ?? state.profile;
+    if (!base) return false;
+    const profile = {
+      ...base,
+      household_id: household as 'sarah' | 'maya',
+      display_name: household === 'maya' ? 'Maya' : base.display_name,
+    };
+    const startSequence = Math.max(0, ...this.events().map((e) => e.sequence));
+    const script = stagedScript(kind, profile, Date.now(), startSequence, ++this.stagedRun);
+    this.staged.set({ kind, sessionId: script.sessionId });
+    this.stagedPlayed.update((list) => (list.includes(kind) ? list : [...list, kind]));
+    const generation = this.generation;
+    this.stagedQueue = { script, profile, generation, next: 0 };
+    script.frames.forEach((frame, index) => {
+      this.stagedTimers.push(
+        setTimeout(() => {
+          this.applyStagedUpTo(index);
+          if (index === script.frames.length - 1) this.staged.set(null);
+        }, frame.delay),
+      );
+    });
+    this.now.set(Date.now());
+    return true;
+  }
+
+  /** Applies every remaining rehearsal receipt now, re-timed to the moment of skipping. */
+  finishStaged(): void {
+    for (const timer of this.stagedTimers) clearTimeout(timer);
+    this.stagedTimers = [];
+    const queue = this.stagedQueue;
+    if (queue) this.applyStagedUpTo(queue.script.frames.length - 1, Date.now());
+    this.stagedQueue = undefined;
+    this.staged.set(null);
+    this.now.set(Date.now());
+  }
+
+  private stopStaged() {
+    for (const timer of this.stagedTimers) clearTimeout(timer);
+    this.stagedTimers = [];
+    this.stagedQueue = undefined;
+    this.staged.set(null);
+  }
+
+  private applyStagedUpTo(last: number, retimeFrom?: number) {
+    const queue = this.stagedQueue;
+    if (!queue) return;
+    const { script, profile, generation } = queue;
+    if (generation !== this.generation || this.source() !== 'demo') return;
+    for (; queue.next <= last; queue.next++) {
+      let frame = script.frames[queue.next];
+      if (retimeFrom !== undefined) {
+        const at = new Date(retimeFrom + queue.next).toISOString();
+        frame = { ...frame, event: { ...frame.event, occurred_at: at, received_at: at } };
+      }
+      const state = this.state();
+      if (!state) return;
+      this.state.set(applyToState(state, script, frame, profile));
+      this.events.update((events) => mergeEvents(events, [frame.event]));
+      this.lastReceiptAt.set(frame.event.received_at);
+    }
+  }
+
+  /**
+   * Reported-number history for one call. Requested only when the server
+   * advertises a reputation capability; the demo uses labeled fictional data.
+   */
+  async loadReputation(sessionId: string, signal?: AbortSignal): Promise<ReputationResult> {
+    if (this.source() === 'demo') {
+      const data = demoReputation(sessionId.replace(/-\d+$/, ''));
+      return data
+        ? { kind: 'ok', data, fixture: true }
+        : { kind: 'unavailable', reason: REPUTATION_UNAVAILABLE };
+    }
+    const capability = this.capability('reputation');
+    if (!capability || !['configured', 'verified'].includes(capability.status))
+      return { kind: 'unavailable', reason: REPUTATION_UNAVAILABLE };
+    try {
+      const response = await fetch(`/api/session/${encodeURIComponent(sessionId)}/reputation`, {
+        headers: { Authorization: `Bearer ${this.token}` },
+        cache: 'no-store',
+        signal: timeout(10000, signal),
+      });
+      if (response.status === 404)
+        return { kind: 'unavailable', reason: 'No reported-number history for this call.' };
+      if (response.status === 503)
+        return {
+          kind: 'unavailable',
+          reason: 'Number reputation is not configured on the server.',
+        };
+      if (!response.ok) return { kind: 'error', message: responseError(response.status) };
+      const parsed = reputationSchema.safeParse(await response.json());
+      if (!parsed.success)
+        return {
+          kind: 'error',
+          message: 'The reputation format changed; nothing is shown rather than a guess.',
+        };
+      return { kind: 'ok', data: parsed.data, fixture: false };
+    } catch {
+      return { kind: 'error', message: responseError(0) };
+    }
+  }
+
+  /**
+   * Fills one call's receipts from the per-session endpoint (read-only, bounded
+   * pages) so a call page does not wait for the full history replay. The live
+   * stream stays authoritative; duplicates merge by receipt id. Older servers
+   * without the endpoint are ignored quietly.
+   */
+  async backfillSession(sessionId: string, signal?: AbortSignal): Promise<number> {
+    if (this.source() !== 'live' || !this.token) return 0;
+    const page = z.object({
+      events: z.array(eventSchema),
+      next_after: z.number(),
+      has_more: z.boolean(),
+    });
+    let after = 0;
+    let added = 0;
+    for (let i = 0; i < 20; i++) {
+      let response: Response;
+      try {
+        response = await fetch(
+          `/api/session/${encodeURIComponent(sessionId)}/events?after=${after}&limit=500`,
+          {
+            headers: { Authorization: `Bearer ${this.token}` },
+            cache: 'no-store',
+            signal: timeout(10000, signal),
+          },
+        );
+      } catch {
+        return added;
+      }
+      if (!response.ok || !response.headers.get('content-type')?.includes('json')) return added;
+      const parsed = page.safeParse(await response.json().catch(() => null));
+      if (!parsed.success || signal?.aborted || this.source() !== 'live') return added;
+      added += parsed.data.events.length;
+      this.events.update((events) => mergeEvents(events, parsed.data.events));
+      if (!parsed.data.has_more || parsed.data.next_after <= after) return added;
+      after = parsed.data.next_after;
+    }
+    return added;
   }
 
   /** POSTs an operator control. Never available in demo; success means "request sent", not "done". */

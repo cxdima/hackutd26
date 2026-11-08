@@ -10,6 +10,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env['CI'],
   retries: 0,
+  // First loads of lazily compiled dev-server chunks can be slow under parallel load.
+  expect: { timeout: 10000 },
+  timeout: 60000,
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'test-results/html' }]],
   outputDir: 'test-results/artifacts',
   use: {

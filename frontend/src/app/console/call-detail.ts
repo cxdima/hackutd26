@@ -21,14 +21,21 @@ import {
 import { formatDateTime, formatDuration, formatMs, zoneLabel } from '../core/format';
 import { describeObservation, humanize, PRETEXT_LABEL, ACTION_LABEL } from '../core/language';
 import type { Leg } from '../core/schemas';
+import { handoffView, personAction } from '../core/live';
 import { DecisionSpine } from './decision-spine';
+import { HandoffTimeline } from './handoff-timeline';
+import { ModelEvidence } from './model-evidence';
 import { OutcomeChip } from './outcome-chip';
+import { ReputationPanel } from './reputation-panel';
 
 @Component({
   selector: 'app-call-detail',
   imports: [
     OutcomeChip,
     DecisionSpine,
+    HandoffTimeline,
+    ModelEvidence,
+    ReputationPanel,
     LucideCheck,
     LucideCircle,
     LucideLockKeyhole,
@@ -75,7 +82,7 @@ import { OutcomeChip } from './outcome-chip';
       </header>
 
       <section
-        class="grid gap-px overflow-hidden border-b border-paper-3 sm:grid-cols-2"
+        class="grid gap-px overflow-hidden border-b border-paper-3 sm:grid-cols-2 2xl:grid-cols-3"
         aria-label="At a glance"
       >
         <div class="py-5 sm:pr-6">
@@ -115,6 +122,19 @@ import { OutcomeChip } from './outcome-chip';
             </div>
           }
         </div>
+        <div
+          class="border-t border-paper-3 py-5 sm:col-span-2 2xl:col-span-1 2xl:border-l 2xl:border-t-0 2xl:pl-6"
+        >
+          <h2 class="text-[0.9375rem] font-extrabold uppercase tracking-[0.08em] text-muted">
+            Do you need to do anything?
+          </h2>
+          <p
+            class="mt-1.5 max-w-[60ch] text-[1.1875rem] font-semibold leading-snug"
+            [class.text-magenta-ink]="action().needed && c.outcome === 'in_progress'"
+          >
+            {{ action().text }}
+          </p>
+        </div>
       </section>
 
       @if (matches().length) {
@@ -137,13 +157,13 @@ import { OutcomeChip } from './outcome-chip';
 
       <section class="mt-10" aria-labelledby="transcript-heading">
         <h2 id="transcript-heading" class="text-[1.5rem] font-extrabold">Transcript</h2>
-        <p class="mt-1 text-[1rem] text-muted">
+        <p class="mt-1 max-w-[64ch] text-[1rem] text-muted">
           Closed-caption style. Lines marked “evidence” were quoted by the model to justify its
           assessment.
         </p>
         <ol class="caption-band on-ink mt-4 space-y-3 p-5 sm:p-6">
           @for (turn of s.turns; track turn.id) {
-            <li class="text-[1.125rem] leading-snug">
+            <li class="max-w-[62ch] text-[1.125rem] leading-snug">
               <span class="caption-speaker mr-2" [class.!text-lime]="turn.speaker !== 'caller'"
                 >&gt;&gt; {{ turn.speaker === 'caller' ? 'Caller' : 'FirstRing' }}</span
               >
@@ -176,21 +196,34 @@ import { OutcomeChip } from './outcome-chip';
         <div class="mt-4"><app-decision-spine [call]="c" /></div>
       </section>
 
-      @if (s.offer || s.legs.length) {
-        <section class="mt-12" aria-labelledby="phones-heading">
-          <h2 id="phones-heading" class="text-[1.5rem] font-extrabold">Phone actions</h2>
+      @if (handoff()) {
+        <section class="mt-12" aria-labelledby="handoff-heading">
+          <h2 id="handoff-heading" class="text-[1.5rem] font-extrabold">Private permission</h2>
+          <p class="mt-1 max-w-[65ch] text-[1rem] text-muted">
+            FirstRing asks {{ c.name }} on their own phone before connecting anyone. Each step below
+            appears only when its receipt arrives.
+          </p>
           @if (s.offer; as offer) {
-            <div class="mt-4 rounded-xl border-2 border-paper-3 p-5">
-              <p class="text-[1.0625rem] font-bold">Private offer · {{ offer.status }}</p>
-              <p class="mt-1 text-[1.0625rem]">{{ offer.summary }}</p>
+            <div class="mt-4 rounded-xl bg-paper-2 p-4">
+              <p class="text-[0.95rem] font-bold text-muted">
+                Private summary for {{ c.name }} · offer {{ offer.status }}
+              </p>
+              <p class="mt-1 text-[1.0625rem] font-semibold">{{ offer.summary }}</p>
               <p class="mt-1 text-[0.95rem] text-muted">
                 Policy epoch {{ offer.policy_epoch }} · expires {{ time(offer.expires_at) }}. A
                 withdrawn offer cannot be revived by an old acceptance.
               </p>
             </div>
           }
+          <app-handoff-timeline [call]="c" />
+        </section>
+      }
+
+      @if (otherLegs().length) {
+        <section class="mt-12" aria-labelledby="phones-heading">
+          <h2 id="phones-heading" class="text-[1.5rem] font-extrabold">Other phone actions</h2>
           <div class="mt-4 grid gap-4 sm:grid-cols-2">
-            @for (leg of s.legs; track leg.action_id) {
+            @for (leg of otherLegs(); track leg.action_id) {
               <article
                 class="rounded-xl border-2 p-5"
                 [class]="leg.acknowledged ? 'border-lime' : 'border-paper-3'"
@@ -201,7 +234,7 @@ import { OutcomeChip } from './outcome-chip';
                   } @else {
                     <svg lucidePhone [size]="18" aria-hidden="true"></svg>
                   }
-                  {{ leg.role === 'sarah' ? c.name : legName(leg.role) }}
+                  {{ leg.kind === 'probe' ? 'Phone B test call' : legName(leg.role) }}
                 </h3>
                 <p class="mt-1 text-[1.0625rem] font-semibold">{{ legStatus(leg) }}</p>
                 <ol
@@ -239,12 +272,18 @@ import { OutcomeChip } from './outcome-chip';
         </section>
       }
 
+      <div class="mt-12"><app-reputation-panel [sessionId]="c.id" /></div>
+
       <details class="mt-12 rounded-[var(--radius-card)] border-2 border-paper-3">
         <summary
           class="flex min-h-14 cursor-pointer items-center justify-between gap-4 px-5 text-[1.125rem] font-extrabold"
         >
           Technical details
         </summary>
+        <section class="px-5 pb-8" aria-labelledby="nvidia-heading">
+          <h3 id="nvidia-heading" class="text-[1.125rem] font-extrabold">NVIDIA decision model</h3>
+          <div class="mt-2"><app-model-evidence [call]="c" /></div>
+        </section>
         <div class="grid gap-8 px-5 pb-6 lg:grid-cols-2">
           <dl class="grid grid-cols-[auto_1fr] gap-x-5 gap-y-2 text-[1rem]">
             <dt class="font-bold text-muted">Model requests</dt>
@@ -348,6 +387,14 @@ export class CallDetail {
   readonly shortId = shortId;
 
   readonly understanding = computed(() => this.call().session.understanding?.understanding);
+  readonly action = computed(() => personAction(this.call()));
+  readonly handoff = computed(() => handoffView(this.call()));
+  /** Handoff legs are shown in the permission timeline; the rest (tests, family) here. */
+  readonly otherLegs = computed(() =>
+    this.call().session.legs.filter(
+      (leg) => leg.kind !== 'handoff' && leg.action_id !== this.call().session.offer?.leg_id,
+    ),
+  );
   readonly when = computed(() =>
     formatDateTime(this.call().startedAt ?? this.call().lastActivityAt, this.call().timezone),
   );
@@ -392,6 +439,8 @@ export class CallDetail {
     switch (c.outcome) {
       case 'blocked':
         return 'Declined the protected request and ended the call politely. Nothing private was shared.';
+      case 'connected':
+        return `Asked ${c.name} privately, played a summary, and connected the call only after ${c.name} pressed 1.`;
       case 'message_saved':
         return 'Took a message and ended the call politely.';
       case 'needs_review':

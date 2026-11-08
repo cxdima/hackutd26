@@ -60,12 +60,15 @@ test.describe('demo dashboard', () => {
     await expect(page.getByText('Remove links and phone numbers from the greeting.')).toBeVisible();
   });
 
-  test('community shows shared warnings and labels number reputation as not connected', async ({
+  test('community separates tactic warnings from labeled example number history', async ({
     page,
   }) => {
     await page.goto('/console/community?view=demo');
     await expect(page.getByRole('heading', { name: 'Asking for a sign-in code' })).toBeVisible();
-    await expect(page.getByText('Not connected')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Same tactic, different number' }),
+    ).toBeVisible();
+    await expect(page.getByText('Example data on demo calls')).toBeVisible();
     await page.getByRole('button', { name: /Show the example progression/ }).click();
     await expect(page.getByText('Example · fictional number (555) 010-2234')).toBeVisible();
   });

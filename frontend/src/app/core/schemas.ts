@@ -7,7 +7,8 @@ import { z } from 'zod';
  */
 export const executionModeSchema = z.enum(['live', 'replay']);
 export type ExecutionMode = z.infer<typeof executionModeSchema>;
-export const modelBackendSchema = z.enum(['nvidia_hosted', 'brev_hosted']);
+/** Known backends get friendly labels; an unknown future backend stays a readable string. */
+export const modelBackendSchema = z.string();
 
 export const householdIdSchema = z.enum(['sarah', 'maya']);
 export type HouseholdId = z.infer<typeof householdIdSchema>;
@@ -29,7 +30,7 @@ export type Profile = z.infer<typeof profileSchema>;
 export const legSchema = z.object({
   action_id: z.string(),
   kind: z.string().optional(),
-  role: z.enum(['sarah', 'family', 'clinic']),
+  role: z.string(),
   status: z.string(),
   acknowledged: z.boolean(),
 });
@@ -102,6 +103,17 @@ const acceptedUnderstandingSchema = z.object({
   }),
 });
 
+/** A private handoff offer. Its summary is private to the household and never shown in shared views. */
+export const offerSchema = z.object({
+  id: z.string(),
+  summary: z.string(),
+  status: z.string(),
+  policy_epoch: z.number(),
+  expires_at: z.string(),
+  leg_id: z.string().optional(),
+});
+export type Offer = z.infer<typeof offerSchema>;
+
 export const sessionSchema = z.object({
   id: z.string(),
   household_id: z.string(),
@@ -130,15 +142,10 @@ export const sessionSchema = z.object({
     .nullable()
     .optional(),
   turns: z.array(z.object({ id: z.string(), text: z.string(), speaker: z.string() })),
-  offer: z
-    .object({
-      id: z.string(),
-      summary: z.string(),
-      status: z.string(),
-      policy_epoch: z.number(),
-      expires_at: z.string(),
-    })
-    .nullable(),
+  offer: offerSchema.nullable(),
+  offer_history: z.array(offerSchema).optional(),
+  bridge_committed: z.boolean().optional(),
+  end_requested: z.boolean().optional(),
   legs: z.array(legSchema),
   execution_mode: executionModeSchema,
   data_origin: z.string(),
@@ -164,6 +171,7 @@ export const tacticSchema = z.object({
   recommended_action: z.string().optional(),
   provenance: z.string().optional(),
   ttl_hours: z.number().optional(),
+  schema_version: z.number().optional(),
 });
 export type Tactic = z.infer<typeof tacticSchema>;
 
@@ -182,6 +190,17 @@ export const stateSchema = z.object({
       configured: z.boolean(),
       protocol_verified: z.boolean(),
       detail: z.string(),
+      /** Live availability check (backend in progress): additive and optional. */
+      current: z
+        .object({
+          available: z.boolean(),
+          reason: z.string().nullable().optional(),
+          checked_at: z.string().nullable().optional(),
+          available_until: z.string().nullable().optional(),
+          endpoint_reachable: z.boolean().optional(),
+          protocol_current: z.boolean().optional(),
+        })
+        .optional(),
     })
     .optional(),
   speech: z
@@ -195,6 +214,9 @@ export const stateSchema = z.object({
       closing_voice: z.string(),
       transcription_provider: z.string().nullable(),
       transcription_model: z.string().nullable(),
+      speech_timeout_ms: z.number().nullable().optional(),
+      emergency_fallback_provider: z.string().nullable().optional(),
+      emergency_fallback_voice: z.string().nullable().optional(),
     })
     .optional(),
   evidence: z
@@ -214,13 +236,8 @@ export const stateSchema = z.object({
       reason: z.string(),
     })
     .optional(),
-  capabilities: z.array(
-    z.object({
-      id: z.string(),
-      status: z.enum(['pending', 'configured', 'verified', 'disabled']),
-      detail: z.string(),
-    }),
-  ),
+  /** Status stays an open string: a new server status must not break the console. */
+  capabilities: z.array(z.object({ id: z.string(), status: z.string(), detail: z.string() })),
   sessions: z.array(sessionSchema),
   community: z.array(
     z.object({

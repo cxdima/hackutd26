@@ -67,6 +67,40 @@ for (const [name, width, height] of [
     await settle(p);
     await p.screenshot({ path: join(out, `console-locked-${name}.png`), fullPage: true });
   }
+  // Presentation view: fictional rehearsal calls (labeled DEMO on screen).
+  await p.goto(`${base}/console/present?view=demo`);
+  await settle(p);
+  await p.screenshot({ path: join(out, `present-waiting-${name}.png`) });
+  const play = async (label) => {
+    // On phones the rehearsal buttons sit inside "Presenter controls".
+    const controls = p.locator('details:has(summary:text("Presenter controls"))');
+    if ((await controls.isVisible()) && !(await controls.evaluate((d) => d.open)))
+      await controls.locator('summary').click();
+    await p.getByRole('button', { name: label }).click();
+    await p.getByRole('button', { name: 'Skip to end' }).click();
+    await p.waitForTimeout(400);
+  };
+  await play('The request changes');
+  await p.screenshot({ path: join(out, `present-branch-${name}.png`), fullPage: true });
+  if (name === 'desktop') {
+    await play('Ordinary call, connected');
+    await p.screenshot({ path: join(out, `present-connected-${name}.png`) });
+    await play('Maya was ready');
+    await p.getByRole('button', { name: 'Community', exact: true }).click();
+    await p.waitForTimeout(400);
+    await p.screenshot({ path: join(out, `present-community-${name}.png`), fullPage: true });
+    await p.getByRole('button', { name: 'Call', exact: true }).click();
+    await p.getByRole('button', { name: 'Evidence' }).click();
+    await p.waitForTimeout(400);
+    await p.screenshot({ path: join(out, `present-evidence-${name}.png`) });
+    await p.keyboard.press('Escape');
+    await p.goto(`${base}/console/settings?view=demo`);
+    await settle(p);
+    await p.getByRole('button', { name: 'See how enrollment would work (example)' }).click();
+    await p.getByLabel('Use my own voice').check();
+    await p.getByRole('region', { name: 'Private permission calls' }).scrollIntoViewIfNeeded();
+    await p.screenshot({ path: join(out, `console-setup-${name}.png`) });
+  }
   if (errors.length) console.log(name, 'errors:', errors.slice(0, 5));
   await context.close();
 }

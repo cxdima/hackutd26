@@ -1,107 +1,151 @@
-# Frontend handoff: Angular landing page and dashboard (Nov 8, 2026)
+# Frontend handoff: judge-facing pass (Nov 8, 2026)
 
-**Branch:** `frontend/angular-console`, created from `0632568`, in a separate worktree (`../hackutd26-frontend`). It touches only `frontend/`, `infra/terraform/`, docs and design records. No Rust, telephony, model, Brev, credential or call-allowance files were changed, and the running phone process was never restarted.
+**Branch:** `frontend/angular-console` in the worktree `../hackutd26-frontend`, with `origin/main` (44ecc40) merged in.
 
-**Stack decision:** the user asked for Angular + Tailwind instead of React. The new app lives in `frontend/`. The React console in `web/` is left untouched, because `main` has uncommitted Codex edits there. Retire it after integration.
+**Commit:** `__COMMIT__` (see `git log`). Review: https://github.com/cxdima/hackutd26/compare/main...frontend/angular-console
 
-## Run
+This pass touches only:
+- `frontend/`
+- docs and design records: `docs/frontend*`, `DESIGN.md`, `.impeccable/`
+
+It did not modify Rust, telephony, model serving, Brev, credentials or call allowances, and it did not restart the running server. The backend terminal's uncommitted work in the main checkout was read, never edited.
+
+## Preview
 
 ```sh
-cd frontend && npm ci && npm start   # http://127.0.0.1:4310, /api proxied to http://127.0.0.1:8080
+cd frontend && npm ci && npm start     # http://127.0.0.1:4310 (proxies /api to :8080)
 ```
 
-- `/`: landing page.
-- `/console`: operator token form. The token is held in memory only.
-- `/console?view=demo`: labeled fictional demo.
-
-## Integration with the Rust server (backend owner)
-
-1. **Serve the new build.** `npm run build` outputs `frontend/dist/firstring-web/browser/`. `server/src/http.rs` currently serves `web/dist` through `ServeDir::new("web/dist").append_index_html_on_directories(true)`.
-2. **Add an SPA fallback.** Deep links such as `/console/calls/<id>` must return `index.html`, for example `ServeDir::new(...).fallback(ServeFile::new(".../index.html"))`. Without it, reloading a dashboard URL returns 404. The React console had no client routes, so it never needed this.
-3. No API changes are required. The app uses the existing endpoints:
-   - `GET /api/state`
-   - `GET /api/events` (fetch-based SSE with `Last-Event-ID`)
-   - `GET/PUT /api/profile/:household`
-   - `POST /api/demo/{household,probe,end-call,reset,replay}`
-   - `GET /api/demo/audio-fixture[/recording]`
-4. Verified against the running server (read-only GETs, token never printed). `/api/state`, `/api/profile/sarah` and `/api/demo/audio-fixture` all validate against the new Zod schemas. Through the dev proxy the console showed **LIVE** with 31 real sessions classified as 17 messages saved, 6 suspicious requests blocked and 8 incomplete. One real blocked call rendered its full decision trace, receipts #2272–#2397. The browser sent no write requests. Those screenshots contain real test-call content and were not committed.
-
-### Recommended (optional) backend improvements
-
-- `GET /api/session/:id/events`: each connect currently replays the whole event history (about 4,000 receipts) to build per-call traces. A per-session endpoint would make call detail load faster.
-- `started_at` / `ended_at` on the session snapshot. Times are currently derived from `call.inbound.received` and `call.ended` receipts.
-- A per-session recording endpoint, if recordings are ever stored. The dashboard currently says "No audio recording is available for this call". Only the latest automated test caller recording can be loaded, on request, from Operator detail.
-- Number reputation and corrections: see `frontend/docs/reputation-contract.md`. They are labeled "Not connected" or "Concept" everywhere.
-
-## Completed
-
-**Landing (`/`):**
-- Navigation, with a mobile menu below 1024px.
-- Hero with the Ringo loop, signal arcs and a screened-call lower third.
-- Why it matters.
-- How it works, with a staged call (GSAP, replay and "show all steps").
-- An interactive two-call example.
-- A ring transition from personal to community (scroll-linked, no pinning).
-- Community: same tactic with different numbers, the water loop, spam vs fraud vs unwanted call, the labeled reputation concept and a fairness drawer covering duplicates, corrections, expiry and spoofing.
-- The mission statement, privacy and voice section, and a 6-question FAQ.
-- Final action, and a footer with the technology credit.
-
-**Dashboard (`/console`):**
-- **Overview:** truthful service state, most important call, recent rundown, counts (explicitly not a protection score), community update, and who answers the next call.
-- **Calls:** search, outcome and household filters, and a sticky list. Each call shows a bulletin, what the caller wanted, what FirstRing did, the private saved message, a closed-caption transcript with evidence marks, and the decision spine (every receipt by caller turn, with raw JSON). Technical details cover model time, tokens, proposals vs executed, versions and epochs. Phone legs and offers show their receipts. Operator actions (End session with confirmation, Phone B with the original gating) are live-only.
-- **Community:** active shared warnings from `state.tactics`, explaining why each was flagged and when it expires. It shows each household's applied version and recent community receipts. Number reputation is labeled "Not connected", with an optional labeled example.
-- **Settings:** the profile editor (name, greeting, voice preset, timezone) with loading, saving, saved-version, error and undo states and client validation (no links or phone numbers), and the selector for who answers the next call. It notes that voice cloning is off and voice previews are unavailable.
-- **Operator detail drawer:** connection, model backend, speech configuration, recorded evidence, provider readiness ("configured is not tested"), Phone B status, replay and reset controls (reset needs confirmation), the read-only automated caller status with an on-request recording, and the filterable raw receipt stream.
-- **States:** locked, connecting, LIVE, REPLAY, DEMO, signal lost (paused banner, last snapshot kept), rejected token, unreachable server, empty calls, and a call missing from the snapshot.
-
-**Motion:**
-- GSAP: hero entrance (decorative layers only; text is readable from the first paint), layer depth, the ring transition and the staged call.
-- One visible pause control covers the hero loop and the ring pulse. The community video has its own control.
-- Video pauses off-screen.
-- Reduced motion shows complete static alternatives.
-
-## Generated assets (Higgsfield)
-
-There were 10 jobs in a 12-job budget. The balance went from 270 to 240.5 credits (29.5 spent). One `kling3_0` "pro" request was refused before submission because it needs the "plus" plan; it was retried as "std". The full manifest (job IDs, prompts, models, settings, dimensions, verification notes) is in `frontend/asset-sources/higgsfield/manifest.json`.
-
-| Asset | Shipping files |
+| URL | What |
 |---|---|
-| Ringo reference (concept B, chosen from 3) | `public/media/ringo-reference-640.webp` |
-| Hero still (desktop) + square crop (mobile) | `ringo-hero-{1280,1920,2688}.{avif,webp}`, `ringo-hero-square-{720,1200}.{avif,webp}` |
-| Hero loop, 5 s, seamless (start = end frame) | `ringo-hero-loop{,-square}.{mp4,webm}`, `ringo-hero-loop-poster.jpg` |
-| Poses: greeting, listening, rest (transparent) | `ringo-{greeting,listening,rest}-{480,960}.webp` |
-| Community still + 5 s ripple loop | `community-rings-*.{avif,webp}`, `community-loop.{mp4,webm}`, `community-loop-poster.jpg` |
+| `/` | Landing page. New "What works today" section separates working-now from next. |
+| `/console` | Dashboard. The operator token is held in memory only. |
+| `/console/present` | **Presentation view** to project during the judge call. |
+| `/console/present?view=demo` | Presentation with three labeled fictional rehearsal calls. Nothing leaves the browser. |
+| `/console/settings` | Profile, private permission call readiness, optional voice (example only). |
 
-## Live vs demo-only
+## What is connected to real backend data
 
-- **Live (real API):** state, sessions, transcripts, the decision trace from real receipts, the profile editor, next-call household, tactic capsules and household application receipts, and operator controls.
-- **Demo-only:** `/console?view=demo` (five authored fictional calls, labeled DEMO, never sent to a server) and the landing page's written examples.
-- **Concept-only:** number reputation, corrections, and the "stronger screening" progression.
+Verified read-only against the running server at 07:47 CT through the dev proxy:
+- token read from `.env`, never printed;
+- all non-GET requests blocked;
+- no page errors;
+- screenshots kept out of Git.
 
-## Verification (Nov 8, 03:32 Central)
+| Capability | Status |
+|---|---|
+| State, sessions, transcripts, decision trace, profile, tactics, household versions | **Live.** The contract updates in this pass are open capability statuses, offer `leg_id`/`offer_history`, `bridge_committed`, speech timeout and fallback fields, and tactic `schema_version`. |
+| Presentation view (caption, current step, outcome, stage rundown, branch, evidence drawer) | **Live**, from receipts. It showed "Connected. Waiting for a call." The server is in `transport: probe` and its model is not configured right now, and the readiness list says exactly that. |
+| Failed tool results | `agent.tool.result ok:false` (15 on the server) are shown as "Not done … Rust rejected this proposal", with the rule's reason. They never become a saved message or follow-up. |
+| NVIDIA evidence | Configured backend, live availability (`model_backend.current`, read when the server sends it), requests made, median and last latency, proposals, Rust allowed/held, and what was carried out. The credit "Decision model: NVIDIA Nemotron" appears only after a successful model receipt. In DEMO it reads "Demo data: no model was called", and proposals show "Authored receipt". |
+| Community story ("Sarah spotted it. Maya was ready.") | **Live**, from `tactic.created`, `community.applied` and `tactic.matched`. On the real data, "spotted on a call" is **not available**, because both capsules came from a designated synthetic test. "Saved" and "Maya was ready" are done; "later call matched" is not yet. |
+| Private permission (handoff) timeline | **Wired to the real receipts** (`docs`: `frontend/docs/phone-handoff.md`). No handoff has happened on the server yet, so it has only been exercised with fixtures. |
+| Per-session receipts `GET /api/session/{id}/events` | Wired. A call page backfills from it, and the live stream stays authoritative. The running binary predates it and returns 404, which is ignored quietly. |
+| Reported-number history | Wired to the backend's in-progress contract (`/api/session/{id}/reputation`, the `reputation` capability). Until the server reports the capability, the console says "Not connected" and sends no request. |
 
-- `npm run format:check`, `npm run lint` (angular-eslint incl. template a11y) and `npm run typecheck` (strict + strictTemplates): pass.
-- `npm test`: 20 Vitest tests pass. They cover the SSE parser, contract and demo validity, outcome classification, the decision trace, receipt dedupe and leg receipts, tactic matching, timezone formatting, and the store (memory-only token, incompatible contract, demo never posts).
-- `npm run test:browser`: 24 Playwright tests pass, at 1440 desktop plus 390 mobile-tagged. They cover:
-  - first-viewport actions;
-  - the interactive example;
-  - the concept, privacy and FAQ truthfulness;
-  - reduced motion and the pause control;
-  - the skip link, mobile menu and Escape;
-  - no horizontal scroll at 390, 768 and 1440;
-  - the demo labeling, filters, search, decision trace and raw receipt;
-  - the operator drawer's focus and Escape handling;
-  - demo settings limits and validation;
-  - mocked live flows: rejected token, unreachable server, LIVE with a bearer token and empty storage, signal lost, profile save success and rejection, and confirmed end-session payload.
-- `npm run build`: initial bundle 305 KB (80 KB transferred).
-- Impeccable: `detect` returned 0 findings after fixes, against the rendered landing and console at 1280 and 390. The finish reviewer's first disposition was **fix** (8 items). The verdict pass resolved 7. Item 5 (sticky list overflow cue) was partial, and two tablet issues were raised (header wrap at 768, a faint hero image box and compression specks). All three were fixed afterwards and verified by screenshot, but not re-reviewed: the two-round review budget was used.
-- Screenshots are in `docs/frontend/screenshots/`. A 37-second walkthrough with motion is in `docs/frontend/walkthrough-demo.webm`.
+## Simulated or awaiting backend support
+
+- **Fictional rehearsal calls** (DEMO view only): "Ordinary call, connected", "The request changes" (offer withdrawn, late keypad rejected, warning shared) and "Maya was ready" (tactic matched from a different number). They use the real receipt shapes and render through the same code, labeled "Fictional rehearsal".
+- **Reputation in demo:** fictional, demo-scope history on demo calls, labeled "Example · fictional reports".
+- **Voice enrollment:** the server reports `voice_clone: disabled`. The flow (choose, consent, record or upload, processing and checks, preview disabled, apply, turn off and delete) runs as a labeled in-browser example. Contract: `frontend/docs/voice-enrollment-contract.md`.
+- **Whether permission calls are armed:** not reported by `/api/state`. A one-line `handoff` capability is proposed in `frontend/docs/phone-handoff.md`; the console picks it up automatically.
+
+## Production integration (exact steps)
+
+The backend terminal is already implementing serving in **uncommitted** `server/src/console_http.rs`, wired in `http.rs`. I reviewed it read-only against the requirements:
+- `/`, `/console` and `/console/{*path}` return the Angular `index.html`, so deep links survive a refresh.
+- Static assets come from `frontend/dist/firstring-web/browser`.
+- `/api`, `/voice`, `/health` and bare `/media` paths that don't exist return JSON 404s, never the page.
+- Existing voice, webhook and WebSocket routes are unchanged.
+- The React console stays at `/legacy-console/`.
+- It falls back to `web/dist` if the Angular build is missing.
+
+I had independently built and tested an equivalent patch: 3 new route tests, and the full Rust suite passed in my worktree. I dropped it to avoid conflicting with that work.
+
+1. The backend terminal commits its `console_http.rs` work (owner: backend).
+2. Merge this branch into `main` (no conflicts with 44ecc40; frontend paths only).
+3. `cd frontend && npm ci && npm run build`. This writes `frontend/dist/firstring-web/browser/`, which is gitignored and built on the serving machine.
+4. Restart the Rust server from the repository root when the backend owner chooses. `frontend_service()` picks the Angular build at startup.
+5. Check:
+   - `GET /` and `GET /console/calls/<id>` return HTML;
+   - `GET /api/missing` returns a JSON 404;
+   - `/legacy-console/` still serves the React console;
+   - the presentation connects with the operator token.
+
+## 90-second presentation sequence
+
+1. **0:00. Projector on `/console/present`** (connected, LIVE bug). The waiting cover shows the number and an optional tel: QR. Say: "Before you answer, FirstRing checks."
+2. **0:10. The judge calls.** Their words appear as the caption. The lower third reads "Checking the request", then "Asking a follow-up" with FirstRing's question.
+3. **0:35. The judge switches** to "read me the code we just texted". The branch strip shows "First: an ordinary request → Then the request changed". The outcome turns to **Suspicious request blocked**.
+   - If permission calls are armed and a phone is enrolled, the ordinary opening can instead ring the presenter's phone: private summary, press 1, **Connected**. A late "1" after a change is rejected on screen.
+4. **0:55. Open Evidence:** NVIDIA Nemotron requests and latency, what the model proposed, which Rust rule held it, and what was carried out. Close with Escape.
+5. **1:10. Switch to Community:** the shared warning. On live data the source stage honestly reads "not available" (test-created capsules). For the full "Sarah spotted it. Maya was ready." story, use the DEMO rehearsal, which is labeled fictional.
+6. **1:25. Close** on the mission line.
+
+**Fallback:** if the readiness list shows the phone line or model is unavailable, run `/console/present?view=demo` → "The request changes". It is labeled fictional rehearsal throughout.
+
+## Essential remaining user actions
+
+- **For the live phone demo, the backend must be put in conversation mode.** Right now `transport: probe` (callers hear a keypad test) and the model is not configured. That is the backend terminal's job, using your existing Brev/hosted authorization.
+- **For the "my phone rings, I press 1" demonstration:** enrolling your own phone as Sarah's endpoint and enabling `HANDOFF_CALLS_ENABLED` and outbound calling require your explicit authorization to the backend terminal. AGENTS.md currently keeps outbound flags false. Nothing in the console can or will arm it.
+- Merge, build and restart as above.
+
+## Verification (this pass)
+
+- `npm run format:check`, `npm run lint` and `npm run typecheck` (strict templates): pass.
+- `npm test`: **54** Vitest tests pass. New coverage:
+  - failed or rejected tool results never become success;
+  - SSE reconnect with `Last-Event-ID` and duplicate receipts;
+  - stale stream;
+  - demo rehearsal never touches the network, and is refused on a live server;
+  - missing capabilities (reputation is never requested without one; NVIDIA credit only after inference);
+  - call selection (history never takes over; live calls followed; pinned stays; a call that finished before reset stays off);
+  - handoff transitions (provider accepted is not ringing; connected only on bridge; revoked and stale);
+  - community stages;
+  - QR encodes only `tel:`;
+  - voice sample checks.
+- `npm run test:browser`: **41** Playwright tests pass (desktop 1440, plus mobile-tagged at 390). New:
+  - rehearsal flow with zero `/api` and zero write requests;
+  - evidence drawer focus and Escape;
+  - community completion;
+  - reset;
+  - reduced motion;
+  - phone width;
+  - mocked live: waiting vs service unavailable, history kept off screen, number and QR, following a new call;
+  - setup pages place no call and voice runs only as an example;
+  - rejected proposal shown as "Not done";
+  - reputation Connected vs Not connected.
+- `npm run build`: initial bundle 318 KB raw, 80 KB transferred. The presentation view is a lazy chunk.
+- **Impeccable:**
+  - detector: 0 findings on the presentation and Settings pages.
+  - Remaining notes, judged not defects:
+    - "cramped padding" on vertically centred min-height pills;
+    - a long Community column next to a now-sticky aside;
+    - the landing display heading's deliberate 1.18 leading;
+    - two roughly 86-character lines in call detail.
+  - Finish review (one round, presentation surface): disposition **fix**, 10 items, all applied (see the end of this file). Confirmed by a re-capture at 1440 and 390; no second review round.
+- Visual review at 390, 768 and 1440 (`docs/frontend/screenshots/`, fixture data only). Labeled 63-second walkthrough: `docs/frontend/walkthrough.webm` (landing, mocked-server dashboard, presentation rehearsal, community, setup).
 
 ## Known limitations
 
-- The finish reviewer judged reduced-motion captures. Motion was checked by tests (the video plays and pauses) and by the walkthrough, not by the reviewer.
-- On connect, the full event history streams in. The trace fills in within a few seconds on the current database.
-- The demo uses times relative to "now", so its dates change between visits.
-- No audio examples ship. No approved FirstRing voice sample exists to play, so the page doesn't imitate one with browser speech.
-- `AGENTS.md` previously said React for a new frontend. Its stack bullet now records the user's Angular decision.
-- Design-system drift found by the Impeccable documenter. These were fixed: a second status bug on the call page (now a plain "Source" field), "Example" tags using the `bug-demo` class, and an unused display token (the hero now uses `text-display`). Still open: several console title sizes are inline values rather than tokens, there is one hard-coded field-hover border colour, and the SVG ring colours are hex values. `DESIGN.md` and `.impeccable/design.json` record the shipped system.
+- The live handoff path has never run on the server. Its UI is proven against fixtures that mirror the Rust receipts.
+- After "Skip to end", a rehearsal's stage times collapse to the moment of skipping (they are retimed, never left in the future).
+- The presentation's "Follow newest" counts a call as live while its receipts are under 2 minutes old.
+- Reputation list, report and correction actions are not exposed in the console yet (household-facing permissions undecided).
+- `.impeccable/design.json` was not regenerated this pass. `DESIGN.md` documents the new components.
+
+## Impeccable finish review (presentation view) and what changed
+
+The reviewer judged the shipped captures against the surface brief (`.impeccable/surfaces/frontend-src-app-console-present-present-page-ts.md`). All ten fixes were applied:
+
+1. **DEMO honesty:** the footer credit and the drawer no longer imply a model ran on authored receipts.
+2. **Revoked handoff:** the permission list shows "Permission withdrawn" and "Pressed 1 after permission was withdrawn: rejected" in magenta with words, not lime checks.
+3. **Lower-third tally:** turns magenta-ink and reads "FirstRing · request blocked" or "permission withdrawn" when that is the outcome.
+4. **Earlier request:** shown as "Before:", struck through, with a neutral marker instead of a lime check.
+5. **No eyebrow labels:** the outcome is its own `h2`; labels are sentence case at 1.0625rem or larger; no main-stage text is below 0.95rem.
+6. **Station bug:** 1.0625rem on the projected screen; the duplicate DEMO bug in the rehearsal strip was removed.
+7. **Fit on a projector:** long captions step down in size, the rundown shows the newest five stages, and times drop the seconds.
+8. **Phone layout:** presenter controls (Showing, rehearsal buttons, Reset, Exit) collapse into one "Presenter controls" disclosure at 390.
+9. **Phone rundown:** the stage list stacks vertically, with times aligned right.
+10. **Community scene:** the receipt list sits beside the rings at desktop width, so the proof stays above the fold.
+

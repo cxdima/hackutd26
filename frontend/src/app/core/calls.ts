@@ -16,11 +16,18 @@ import {
  */
 
 export type Outcome =
-  'in_progress' | 'blocked' | 'message_saved' | 'needs_review' | 'no_message' | 'incomplete';
+  | 'in_progress'
+  | 'blocked'
+  | 'connected'
+  | 'message_saved'
+  | 'needs_review'
+  | 'no_message'
+  | 'incomplete';
 
 export const OUTCOME_LABEL: Record<Outcome, string> = {
   in_progress: 'On the line now',
   blocked: 'Suspicious request blocked',
+  connected: 'Connected after permission',
   message_saved: 'Message saved',
   needs_review: 'Needs review',
   no_message: 'Ended, no message',
@@ -30,6 +37,7 @@ export const OUTCOME_LABEL: Record<Outcome, string> = {
 export const OUTCOME_CHIP: Record<Outcome, string> = {
   in_progress: 'chip-live',
   blocked: 'chip-blocked',
+  connected: 'chip-saved',
   message_saved: 'chip-saved',
   needs_review: 'chip-review',
   no_message: 'chip-none',
@@ -56,6 +64,8 @@ export interface CallRecord {
   protectedRequest?: Observation;
   failure?: string;
   hasEndReceipt: boolean;
+  /** Still connected: no end receipt and a recent receipt, whatever the outcome so far. */
+  active: boolean;
 }
 
 function eventsBySession(events: readonly CallEvent[]): Map<string, CallEvent[]> {
@@ -144,9 +154,13 @@ export function buildCallRecord(
   const understanding = session.understanding?.understanding;
   const callerTurns = session.turns.filter((t) => t.speaker === 'caller').length;
 
+  // Connected only on the bridge receipt: an offer, ringing or keypad choice is not a connection.
+  const bridged = events.some((e) => e.type === 'bridge.connected');
+
   let outcome: Outcome;
   if (blocked) outcome = 'blocked';
   else if (!ended && !quiet) outcome = 'in_progress';
+  else if (bridged) outcome = 'connected';
   else if (session.message) outcome = 'message_saved';
   else if (session.ambiguous || understanding?.readiness === 'needs_information')
     outcome = 'needs_review';
@@ -162,6 +176,9 @@ export function buildCallRecord(
   switch (outcome) {
     case 'blocked':
       headline = `Asked for ${OBJECT_LABEL[protectedRequest?.requested_object ?? 'unknown']}. FirstRing declined${session.message ? ' and saved a note for you' : ''}.`;
+      break;
+    case 'connected':
+      headline = `${name} heard a private summary, pressed 1 and was connected to the caller.`;
       break;
     case 'message_saved':
       headline = session.message?.summary ?? 'Message saved.';
@@ -211,6 +228,7 @@ export function buildCallRecord(
     protectedRequest,
     failure,
     hasEndReceipt: !!end,
+    active: !ended && !quiet,
   };
 }
 
@@ -550,12 +568,17 @@ export function stepFor(event: CallEvent, who: string): TraceStep | undefined {
       const name = str(p['name']) ?? 'unknown';
       const ok = p['ok'] === true;
       const result = (p['result'] ?? {}) as Record<string, unknown>;
+      // ok:false is a rejected proposal: nothing from it was carried out, whatever else the payload says.
       return make(
         'executed',
-        ok ? `Done: ${toolLabel(name)}.` : `Rust reported a failure: ${toolLabel(name)}.`,
+        ok
+          ? `Done: ${toolLabel(name)}.`
+          : `Not done: ${toolLabel(name)}. Rust rejected this proposal.`,
         ok ? (result['blocked'] === true ? 'protect' : 'ok') : 'fail',
         {
-          detail: ok ? describeResult(name, result) : str(p['error']),
+          detail: ok
+            ? describeResult(name, result)
+            : 'Nothing from this proposal was carried out. The reason is in the rule check that follows.',
         },
       );
     }
@@ -667,6 +690,35 @@ export function stepFor(event: CallEvent, who: string): TraceStep | undefined {
       return make('ended', 'Call ended.', 'neutral');
     case 'tactic.created':
       return make('community', 'A minimized tactic capsule was shared.', 'neutral');
+    case 'reputation.lookup':
+      return make(
+        'community',
+        'Checked reported-number history (screening context only).',
+        'neutral',
+        {
+          detail: 'History about the presented number. It never verifies who is calling.',
+          facts: [
+            { label: 'Level', value: str(p['level'])?.replaceAll('_', ' ') ?? '—' },
+            {
+              label: 'Verified independent households',
+              value: String(num(p['verified_independent_households']) ?? 0),
+            },
+          ],
+        },
+      );
+    case 'reputation.reported':
+      return make('community', 'This call’s number was reported to shared history.', 'neutral', {
+        detail: 'Reported after a durable protective message. Counted once per household.',
+        facts: [{ label: 'Level', value: str(p['level'])?.replaceAll('_', ' ') ?? '—' }],
+      });
+    case 'reputation.level_changed':
+      return make('community', 'Reported-number level changed.', 'neutral', {
+        detail: `${str(p['from']) ?? '—'} → ${str(p['to']) ?? '—'}${str(p['reason']) ? ` (${str(p['reason'])})` : ''}`,
+      });
+    case 'reputation.correction':
+      return make('community', 'A correction to number history was recorded.', 'neutral', {
+        detail: `State: ${str(p['state']) ?? '—'}`,
+      });
     default:
       return make('raw', event.type, 'neutral');
   }

@@ -3,6 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { LucideCheck, LucideLoader, LucideRotateCw } from '@lucide/angular';
 import { ConsoleStore } from '../core/console-store';
 import type { Profile } from '../core/schemas';
+import { HandoffSetup } from './setup/handoff-setup';
+import { VoiceEnrollment } from './setup/voice-enrollment';
 
 type Status = 'idle' | 'loading' | 'saving' | 'saved' | 'error';
 
@@ -27,7 +29,7 @@ const LINK_OR_NUMBER = /(https?:\/\/|www\.|\b\d{3}[\s.-]?\d{3}[\s.-]?\d{4}\b)/i;
  */
 @Component({
   selector: 'app-settings-page',
-  imports: [FormsModule, LucideCheck, LucideLoader, LucideRotateCw],
+  imports: [FormsModule, LucideCheck, LucideLoader, LucideRotateCw, HandoffSetup, VoiceEnrollment],
   template: `
     @let state = store.state()!;
     <div class="grid gap-10 lg:grid-cols-12">
@@ -230,7 +232,7 @@ const LINK_OR_NUMBER = /(https?:\/\/|www\.|\b\d{3}[\s.-]?\d{3}[\s.-]?\d{4}\b)/i;
             @for (h of state.community; track h.household_id) {
               <button
                 type="button"
-                class="min-h-12 rounded-full border-2 px-5 text-[1.0625rem] font-bold disabled:opacity-60"
+                class="min-h-12 rounded-full border-2 px-5 text-[1.0625rem] font-bold disabled:cursor-not-allowed"
                 [class]="
                   state.selected_household === h.household_id
                     ? 'border-ink bg-lime text-ink'
@@ -269,6 +271,10 @@ const LINK_OR_NUMBER = /(https?:\/\/|www\.|\b\d{3}[\s.-]?\d{3}[\s.-]?\d{4}\b)/i;
           </dl>
         </section>
       </aside>
+    </div>
+    <div class="mt-14 space-y-8">
+      <app-handoff-setup />
+      <app-voice-enrollment />
     </div>
   `,
 })

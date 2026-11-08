@@ -1,69 +1,72 @@
-# Reported-number reputation: proposed backend contract
+# Reported-number history: contract between console and server
 
-Status: **not implemented.** The landing page and the dashboard show reputation only as a labeled concept. This document describes what the Rust server would need so the Community page can show real data. It does not authorize building it.
+Status (Nov 8, 07:45 CT): **in development on the backend.** The backend terminal's uncommitted work in the main checkout adds the following:
 
-## Principles
+- `server/src/reputation.rs` and `server/src/reputation_http.rs`.
+- A `reputation` capability in `/api/state`.
+- The routes below.
 
-- **Match tactics, not people.** A number warning never claims who placed a call. Caller ID can be spoofed or reassigned.
-- **Independent evidence.** Corroboration counts distinct participating households, not reports.
-- **Minimized data.** No names, transcripts, recordings or quotes. The number is stored as a keyed hash (HMAC with a server secret) plus the last two digits, for display.
-- **Expiry by default.** Every level decays unless renewed by new, independent reports.
-- **Correctable.** A correction request freezes escalation, and an accepted correction removes the warning everywhere.
-- **Scope.** Effects stay inside participating FirstRing services. There are no carrier actions and no shutdown claims.
+The Angular console is already wired to that contract. It shows the server's data only when `/api/state` reports `{"id":"reputation","status":"configured"}`. Until then it says "Not connected" and makes no reputation requests. The running server (`.tools/firstring-campaign-transport-only`) predates this work, so live calls show "Not connected" today.
 
-## Data
+## Principles (unchanged, and kept by the backend implementation)
 
-```text
-number_reputation
-  number_key        TEXT PRIMARY KEY   -- HMAC-SHA256(server_secret, E.164)
-  display_suffix    TEXT               -- e.g. "34"
-  level             TEXT               -- none | reported | corroborated | warning | screened
-  household_count   INTEGER            -- distinct reporting households (dedupe key below)
-  tactic_ids        TEXT[]             -- capsule ids that support the reports
-  first_reported_at TIMESTAMP
-  last_reported_at  TIMESTAMP
-  expires_at        TIMESTAMP          -- recomputed on every accepted report
-  correction        TEXT               -- none | requested | upheld | removed
-  version           INTEGER            -- monotonic, for idempotent clients
+- **History about a number, not a person.** Caller ID can be spoofed or reassigned. Every response carries `identity_verified: false`.
+- **No history means "No reports yet", never "safe".** The console never words it as safety.
+- **The browser computes nothing.** The band, label, explanation and optional score come from the server. The console displays them and never derives a percentage.
+- **Independence is honest.** Demo-scope reports come from simulated household profiles, so `verified_independent_households` is 0. The console shows both numbers.
+- **Correctable and expiring.** A correction request freezes escalation. Levels expire without new reports.
+- **Inside FirstRing only.** No carrier actions and no claim that a number can be shut down.
 
-number_report
-  report_id         TEXT PRIMARY KEY
-  number_key        TEXT
-  household_id      TEXT
-  session_id        TEXT               -- the blocked call that produced it
-  tactic_id         TEXT NULL
-  created_at        TIMESTAMP
-  UNIQUE(number_key, household_id)     -- one household counts once
-  UNIQUE(session_id)                   -- one call reports once
+## Routes (all behind the operator bearer token)
+
+| Method | Path | Used by the console |
+|---|---|---|
+| `GET` | `/api/session/{id}/reputation` | **Yes.** Call page and presentation evidence drawer, only when the capability is configured. |
+| `GET` | `/api/reputation?limit=…` | Not yet. Reserved for a list on the Community page. |
+| `GET` | `/api/reputation/{number_key}` | Not yet. |
+| `POST` | `/api/reputation/reports` `{session_id}` | No. Reports come from the server's own protective flow. |
+| `POST` | `/api/reputation/{number_key}/corrections` `{reason, expected_version}` | Not yet. Needs a decision on who may request corrections from the console. |
+| `POST` | `/api/reputation/{number_key}/corrections/resolve` | No. Operator-only, out of scope for the household view. |
+
+## `GET /api/session/{id}/reputation` response (validated by `reputationSchema` in `src/app/core/reputation.ts`)
+
+```json
+{
+  "version": 2,
+  "scope": "demo",
+  "number_label": "Presented number ending 34",
+  "band": "no_reports | reported | corroborated | warning",
+  "band_label": "Demo reported; simulated profiles, no verified independence",
+  "explanation": "Server-written sentence shown verbatim.",
+  "score": null,
+  "independent_households": 0,
+  "verified_independent_households": 0,
+  "demo_household_count": 1,
+  "reports": 1,
+  "first_reported_at": "RFC 3339 or null",
+  "last_reported_at": "RFC 3339 or null",
+  "expires_at": "RFC 3339 or null",
+  "correction": { "state": "none | requested | upheld | removed" },
+  "related_tactic_ids": [],
+  "identity_verified": false
+}
 ```
 
-Suggested thresholds (tunable): one household → `reported` (private to that household); two independent households within 7 days → `corroborated`; three or more → `warning`. `screened` (stronger screening) requires `warning` plus a matching shared tactic capsule. Levels expire after 14 days without new independent reports. A correction in `requested` state holds the level where it is.
+Additive fields are tolerated. A missing `explanation` or any other required field makes the console show "The reputation format changed; nothing is shown rather than a guess." It never falls back to a computed value.
 
-## API (bearer-authenticated, same as `/api/*`)
+How the console handles each status:
+- `404` means no history for this call.
+- `503` means reputation is not configured on the server.
+- Anything else is shown as an error.
 
-| Method | Path | Body / result |
-|---|---|---|
-| `GET` | `/api/reputation?limit=50` | `{ items: [{ number_key, display_suffix, level, household_count, expires_at, correction, version, tactic_ids }] }` |
-| `GET` | `/api/reputation/:number_key` | One item plus `reports: [{ household_id, created_at, tactic_id }]` (household-scoped for non-operators) |
-| `POST` | `/api/reputation/reports` | `{ session_id }` → `202 { report_id, level, version }`. The server derives the number from the session, so a client never sends raw numbers. `409` if it is a duplicate. |
-| `POST` | `/api/reputation/:number_key/corrections` | `{ reason: "mistaken" \| "spoofed" \| "legitimate_business", note?: string ≤ 280 }` → `202 { correction: "requested", version }` |
-| `POST` | `/api/reputation/:number_key/corrections/resolve` | operator only, `{ outcome: "upheld" \| "removed" }` |
+## Receipts on the event stream
 
-Events for the existing SSE stream (same envelope as other receipts):
+These are rendered in the decision trace as plain-language steps:
+- `reputation.lookup` (screening context only)
+- `reputation.reported`
+- `reputation.level_changed`
+- `reputation.correction`
 
-- `reputation.reported` `{ number_key, level, version, household_count }`
-- `reputation.level_changed` `{ number_key, from, to, version, reason: "corroborated" | "expired" | "corrected" }`
-- `reputation.correction` `{ number_key, state, version }`
+## Demo and rehearsal data
 
-Duplicate and out-of-order events must not regress `version`. This is the same rule the console already applies to phone receipts.
-
-## Frontend wiring once available
-
-1. Add Zod schemas next to `src/app/core/schemas.ts` and a loader in `ConsoleStore`.
-2. Replace the "Not connected" panel in `src/app/console/community-page.ts` with the list, and add a "Report a mistake" form posting to `/corrections`.
-3. In a call's detail, show the number's level only as "reported number", never as an identity.
-4. Keep the landing page's concept section labeled until real data exists in production.
-
-## If built on AWS instead
-
-The Terraform scaffold in `infra/terraform` can host this as API Gateway + Lambda + DynamoDB, with the Rust server calling it server-side. The browser contract above stays the same, with the Rust server proxying it so tokens never reach the browser.
+`demoReputation()` supplies fictional, demo-scope history for demo calls only, labeled "Example · fictional reports". Fictional numbers are shown only as "Fictional number ending 07/41". No real or judge number is ever reported or displayed as reported.

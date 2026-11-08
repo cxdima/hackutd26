@@ -151,10 +151,21 @@
     cursor: pointer;
     border: 2px solid transparent;
   }
+  /* Disabled stays readable for older eyes: a flat, quiet fill with full-contrast muted text. */
   .btn:disabled,
   .btn[aria-disabled='true'] {
     cursor: not-allowed;
-    opacity: 0.55;
+    background: var(--color-paper-3);
+    color: var(--color-muted);
+    border-color: var(--color-paper-3);
+    box-shadow: none;
+    transform: none;
+  }
+  .on-ink .btn:disabled,
+  .on-ink .btn[aria-disabled='true'] {
+    background: transparent;
+    color: var(--color-muted-on-ink);
+    border-color: rgb(184 191 182 / 0.35);
   }
   .btn-primary {
     background: var(--color-lime);
@@ -289,6 +300,92 @@
   .chip-live {
     background: var(--color-ink);
     color: var(--color-lime);
+  }
+
+  /* Presentation stages: a broadcast rundown. Word + dot shape; colour is never the only signal. */
+  .stage-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    border-radius: 0.5rem;
+    padding: 0.35rem 0.75rem 0.35rem 0.6rem;
+    font-weight: 750;
+    font-size: 1rem;
+    line-height: 1.25;
+    color: var(--color-paper);
+    background: var(--color-ink-3);
+  }
+  .stage-dot {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 999px;
+    border: 2px solid currentColor;
+    flex-shrink: 0;
+  }
+  .stage-chip[data-tone='ok'] .stage-dot,
+  .stage-chip[data-tone='active'] .stage-dot {
+    background: var(--color-lime);
+    border-color: var(--color-lime);
+  }
+  .stage-chip[data-tone='protect'] {
+    color: var(--color-magenta-on-ink);
+  }
+  .stage-chip[data-tone='protect'] .stage-dot {
+    background: var(--color-magenta-on-ink);
+    border-color: var(--color-magenta-on-ink);
+    border-radius: 0.15rem;
+  }
+  .stage-chip[data-tone='warn'] .stage-dot,
+  .stage-chip[data-tone='fail'] .stage-dot {
+    background: transparent;
+    border-color: #f4c46b;
+    border-radius: 0.15rem;
+    transform: rotate(45deg);
+  }
+  .stage-chip.stage-now {
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+  .stage-chip.stage-now[data-tone='protect'] {
+    background: var(--color-magenta-wash);
+    color: var(--color-magenta-ink);
+  }
+  .stage-chip.stage-now[data-tone='ok'] {
+    background: var(--color-lime);
+    color: var(--color-ink);
+  }
+  .stage-chip.stage-now[data-tone='ok'] .stage-dot {
+    background: var(--color-ink);
+    border-color: var(--color-ink);
+  }
+
+  /* Waiting-for-a-call beacon: one slow ring. Reduced motion removes the class. */
+  .waiting-ping {
+    animation: waiting-ping 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  }
+  @keyframes waiting-ping {
+    from {
+      transform: scale(1);
+      opacity: 0.7;
+    }
+    to {
+      transform: scale(3);
+      opacity: 0;
+    }
+  }
+  /* The station bug on the projected screen must read from a few feet away. */
+  .present-bug .bug {
+    font-size: 1.0625rem;
+    padding: 0.45rem 0.9rem 0.45rem 0.7rem;
+  }
+  .evidence-drawer::backdrop {
+    background: rgb(23 28 24 / 0.55);
+  }
+  .evidence-drawer[open] {
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .field-label {

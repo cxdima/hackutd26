@@ -16,7 +16,9 @@ import {
   LucideArrowRight,
   LucideAudioLines,
   LucideBan,
+  LucideCheck,
   LucideChevronDown,
+  LucideCircleDashed,
   LucideEarOff,
   LucideFingerprint,
   LucideMessageSquareText,
@@ -45,6 +47,8 @@ import { SiteHeader } from './site-header';
     LucideShieldAlert,
     LucideShieldCheck,
     LucideChevronDown,
+    LucideCheck,
+    LucideCircleDashed,
     LucideAudioLines,
     LucideFingerprint,
     LucideMessageSquareText,
@@ -72,6 +76,33 @@ export class LandingPage {
     poster: 'media/community-loop-poster.jpg',
   };
   readonly exampleNumbers = ['(555) 010-2234', '(555) 014-7781', '(555) 019-3305'];
+  /** Only what has receipts today; everything else is listed under "Next". */
+  readonly today = [
+    'Answers calls on a real phone number and asks what the call is about, tested with automated test callers.',
+    'Judges the request with NVIDIA Nemotron. FirstRing’s own rules decide what is allowed, not the model.',
+    'Refuses requests for codes, unusual payments or device access, and saves a private note.',
+    'Takes ordinary messages and shows each call’s transcript, decisions and receipts in the dashboard.',
+    'Shares minimized, expiring tactic warnings between two fictional households.',
+  ];
+  readonly next = [
+    {
+      title: 'Ringing your own phone first',
+      text: 'A private summary, then press 1 to connect. Built into the server; not yet shown on a real handset.',
+    },
+    {
+      title: 'Reported-number history',
+      text: 'Independent reports, expiry and corrections for a number. In development.',
+    },
+    {
+      title: 'An assistant voice that sounds like you',
+      text: 'Optional, with explicit consent and an off switch. Designed, not available.',
+    },
+    {
+      title: 'More households',
+      text: 'Today’s community is two fictional households.',
+    },
+  ];
+
   readonly faqs = [
     {
       q: 'Who is FirstRing for?',

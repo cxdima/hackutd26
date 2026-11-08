@@ -320,6 +320,37 @@ One link per call: a 8.5rem time column (bold time, muted age and duration), the
 ### Decision Spine
 A vertical rail of numbered stations per caller turn: slate station name and tabular time in a right-aligned left column (inline on mobile), a 2.25rem circular icon node coloured by tone (ok lime, protect magenta, warn amber, fail charcoal, proposed dashed ink-3), then title, caption-band quote for heard lines, a key/value list and the raw receipt link.
 
+### Presentation Studio (`/console/present`)
+The only charcoal-ground surface in the console. It is the projected broadcast of one call, chrome-less, with its own top strip:
+- **Top strip:** wordmark, a Call/Community scene switch, the "Showing" select (Follow newest call / pinned call), the station bug, Evidence, Reset display and Exit.
+- **Caption:** `>> CALLER` slate, then the caller's words at `clamp(1.875rem, 1.1rem + 2.9vw, 4.25rem)`, weight 800, measure 28ch. Partial speech shows at 80% opacity with "…".
+- **Branch strip:** two ruled rows. A lime disc marks the earlier ordinary request; a magenta-on-ink square marks "Then the request changed."
+- **Lower third:** paper band with a tally strip. Lime for active and done, magenta-ink for protect, amber-wash for warn. "FirstRing · now", the step at `clamp(1.5rem, 1.1rem + 1.5vw, 2.5rem)`, and FirstRing's last reply as a `>> FIRSTRING` caption.
+- **Outcome graphic:** a 1.25rem-radius block. Fill by outcome:
+  - lime fill with ink text for things that happened (connected, message saved);
+  - magenta-wash with magenta-ink for blocked or withdrawn;
+  - amber-wash for permission pending;
+  - a dashed outline while no outcome exists.
+  It always carries an icon and words.
+- **Waiting cover:** "Call FirstRing", the inbound number in lime at display scale, the readiness rows (check, or dashed circle with amber), an optional tel: QR on white, and Ringo's rest pose. One slow lime beacon, removed under reduced motion.
+- **Service unavailable:** a separate cover with the SIGNAL LOST bug. It is never shown as waiting.
+
+### Stage Chip
+A rundown of evidence-backed stages: 0.5rem corners, 1rem/750 type, a 0.7rem shape dot plus words and tabular time.
+- Dot shapes: circle for neutral and active; square for protect, in magenta-on-ink text; rotated amber diamond for warn and fail.
+- On ink the chips are ink-3. The newest ("now") chip inverts to paper, lime for ok, or magenta-wash for protect.
+- Only the last seven show, behind "+N earlier".
+
+### Community Story
+Two household rings (lime, 20px stroke) and a capsule-shaped shared warning (magenta-ink outline, magenta triangle). Concentric arcs sit behind each ring.
+- A connector is drawn solid lime only when its stage has a receipt; it is dotted otherwise.
+- A magenta ring segment marks "spotted" on the source ring and "matched" on the receiving ring.
+- Below it, a ruled list of five stages, each marked receipt observed, not yet, or not available.
+- GSAP draws a connector, or pulses the ring once, only when a stage newly completes.
+
+### Disabled Buttons
+Disabled controls keep full-contrast text: a paper-3 fill with muted text (on ink: transparent with muted-on-ink text). They no longer fade with opacity.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -331,6 +362,7 @@ A vertical rail of numbered stations per caller turn: slate station name and tab
 - **Do** keep primary actions flat lime pills with charcoal text.
 - **Do** render progressions and comparisons as ruled rows and rundown lines.
 - **Do** keep overlays and floating graphics opaque, using the Lift or Soft shadow only.
+- **Do** derive every presentation stage, outcome and community stage from a receipt; show missing ones as "not yet" or "not available", never as done.
 
 ### Don't:
 - **Don't** put eyebrows or kickers above headings; carry hierarchy with scale.

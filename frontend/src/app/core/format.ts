@@ -112,3 +112,13 @@ export function relativeUntil(value: string | undefined, now: number): string {
   if (hours < 48) return `in ${hours} h`;
   return `in ${Math.round(hours / 24)} days`;
 }
+
+/** "+12145550134" → "+1 (214) 555-0134". Anything else is returned unchanged. */
+export function formatPhone(e164: string): string {
+  const us = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(e164);
+  return us ? `+1 (${us[1]}) ${us[2]}-${us[3]}` : e164;
+}
+
+export function isE164(value: string | undefined | null): value is string {
+  return !!value && /^\+[1-9]\d{6,14}$/.test(value);
+}

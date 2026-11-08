@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { LucideArrowLeft, LucideSearch } from '@lucide/angular';
@@ -169,6 +169,7 @@ export class CallsPage {
     const order: Outcome[] = [
       'in_progress',
       'blocked',
+      'connected',
       'message_saved',
       'needs_review',
       'no_message',
@@ -204,6 +205,17 @@ export class CallsPage {
     });
   });
   readonly selected = computed(() => this.store.calls().find((call) => call.id === this.id()));
+
+  constructor() {
+    // Opening a live call fetches its own receipts directly; the stream remains the source of truth.
+    effect((onCleanup) => {
+      const id = this.id();
+      if (!id || this.store.source() !== 'live') return;
+      const controller = new AbortController();
+      onCleanup(() => controller.abort());
+      untracked(() => void this.store.backfillSession(id, controller.signal));
+    });
+  }
 
   reset() {
     this.query.set('');

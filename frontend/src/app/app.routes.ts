@@ -31,6 +31,11 @@ export const routes: Routes = [
         loadComponent: () => import('./console/community-page').then((m) => m.CommunityPage),
       },
       {
+        path: 'present',
+        title: 'Presentation · FirstRing',
+        loadComponent: () => import('./console/present/present-page').then((m) => m.PresentPage),
+      },
+      {
         path: 'settings',
         title: 'Settings · FirstRing',
         loadComponent: () => import('./console/settings-page').then((m) => m.SettingsPage),
