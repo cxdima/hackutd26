@@ -34,6 +34,38 @@ struct Case {
     expected_blocked: bool,
     semantic_review: String,
 }
+/// Record that this deployment just completed real native tool cycles, so the
+/// console's current-availability check reflects a fresh, passing conversation
+/// against exactly the endpoint and model the live server is configured with.
+async fn record_current_model_proof(
+    probe_url: &str,
+    probe_backend: firstring::config::ModelBackend,
+    model: &Nemotron,
+    receipt: &str,
+) -> Result<()> {
+    let live = Config::from_env()?;
+    let deployment = std::env::var("NEMOTRON_DEPLOYMENT_ID").unwrap_or_default();
+    ensure!(
+        !deployment.is_empty(),
+        "NEMOTRON_DEPLOYMENT_ID is required to record a current-model proof"
+    );
+    ensure!(
+        live.model_url == probe_url
+            && live.model_backend == probe_backend
+            && live.model == model.requested_model(),
+        "The probe did not exercise the live server's configured model endpoint"
+    );
+    let store = firstring::store::Store::open(&live.database_url).await?;
+    let proof = json!({"deployment_id":deployment,"backend":live.model_backend,"model":live.model,"endpoint_sha256":firstring::config::endpoint_fingerprint(&live.model_url),"status":"passed","native_cycle":true,"recorded_at":chrono::Utc::now(),"receipt":receipt});
+    store
+        .set_metadata("verification.current_model", &proof.to_string())
+        .await?;
+    println!(
+        "{}",
+        json!({"recorded":"verification.current_model","deployment_id":proof["deployment_id"],"receipt":receipt})
+    );
+    Ok(())
+}
 fn hash(value: &Value) -> String {
     format!("{:x}", Sha256::digest(serde_json::to_vec(value).unwrap()))
 }
@@ -68,6 +100,8 @@ async fn main() -> Result<()> {
         !conversation || (max == 512 && timeout == 3500),
         "Conversation mode uses production limits: 512 tokens, 3500ms request and 6000ms per turn"
     );
+    let probe_url = settings.url.clone();
+    let probe_backend = settings.backend;
     let model = Nemotron::new(settings.key, settings.url, settings.model)
         .with_backend(settings.backend)
         .with_max_output_tokens(max)?
@@ -99,6 +133,9 @@ async fn main() -> Result<()> {
             reports.len() == 2 && reports.iter().all(|r| r["passed"] == true),
             "Consecutive conversation failed; inspect preserved receipt"
         );
+        if std::env::var("RECORD_CURRENT_MODEL_PROOF").as_deref() == Ok("1") {
+            record_current_model_proof(&probe_url, probe_backend, &model, &args[1]).await?;
+        }
         return Ok(());
     }
     let mut reports = Vec::new();

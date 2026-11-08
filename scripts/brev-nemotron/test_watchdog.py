@@ -330,7 +330,7 @@ class ExpiryTests(unittest.TestCase):
                 for validator in [watchdog.expiry, lambda x: remote_guard.cleanup_due(x, 1000, False)]:
                     with self.subTest(field=field, invalid=invalid), self.assertRaises(ValueError):
                         validator(r)
-        for version in [None, True, False, 0, 1, 3, "2", 2.0]:
+        for version in [None, True, False, 0, 1, 4, "2", "3", 2.0, 3.0]:
             for validator in [watchdog.expiry, lambda x: remote_guard.cleanup_due(x, 1000, False)]:
                 with self.subTest(version=version), self.assertRaises(ValueError):
                     # A legacy-compatible short duration must not hide a missing
@@ -355,6 +355,35 @@ class ExpiryTests(unittest.TestCase):
             changed = dict(original, ready=True); changed[field] += 1
             self.assertEqual(watchdog.safe_deadline(original, changed), 2800)
         self.assertEqual(watchdog.safe_deadline(original, dict(original, ready=True)), 19000)
+
+    def test_v3_presentation_day_allows_ten_hours_with_v2_spend_bounds(self):
+        # Explicit operator authorization to keep inference up through the
+        # presentations: a longer window, never a larger spend envelope.
+        r = dict(self.budget_v2_receipt(), budget_policy_version=3,
+                 deadline=37000, max_spend_usd=32, ready=True)
+        self.assertEqual(watchdog.expiry(r), 37000)
+        self.assertFalse(remote_guard.cleanup_due(r, 36999, True))
+        self.assertTrue(remote_guard.cleanup_due(r, 37000, True))
+        r["ready"] = False
+        self.assertEqual(watchdog.expiry(r), 2800)
+        for changes in [dict(deadline=37001), dict(max_spend_usd=31.99),
+                        dict(balance_usd=31.99), dict(prior_spend_usd=28.01),
+                        dict(total_budget_usd=61), dict(cleanup_allowance_usd=1),
+                        dict(warmup_deadline=2801), dict(campaign_authorized=True)]:
+            for validator in [watchdog.expiry, lambda x: remote_guard.cleanup_due(x, 1000, True)]:
+                with self.subTest(changes=changes), self.assertRaises(ValueError):
+                    validator(dict(r, ready=True, **changes))
+
+    def test_v2_keeps_its_eight_hour_limit_after_v3_exists(self):
+        r = dict(self.budget_v2_receipt(), deadline=29801, max_spend_usd=32, ready=True)
+        for validator in [watchdog.expiry, lambda x: remote_guard.cleanup_due(x, 1000, True)]:
+            with self.assertRaises(ValueError):
+                validator(r)
+
+    def test_running_receipt_cannot_switch_policy_version(self):
+        original = dict(self.budget_v2_receipt(), deadline=29800, max_spend_usd=32, ready=True)
+        extended = dict(original, budget_policy_version=3, deadline=37000)
+        self.assertEqual(watchdog.safe_deadline(original, extended), 29800)
 
 
 if __name__ == "__main__":

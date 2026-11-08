@@ -4,11 +4,11 @@ The new H100 has completed fresh native assessment → Rust result → action cy
 
 Current fixed development matrix:9contexts, no held-out edits. Latest broad candidate8/9 native/action/risk-flag passes; independent semantic review also flags redundant pickup/human questions and unqualified relationship wording. Scope guidance corrected a benign warning false positive. A focused policy regression now permits a categorical quoted/negated report with no present requested object to proceed, while an unexplained requested code still holds consent. Capability-aware native schemas omit unavailable dial actions; the actor remains the authorization boundary.
 
-Backend adds durable scoped reputation with category/taxonomy IDs, expiry/correction/audit, real model-context lookup receipts, startup activation, current-deployment readiness, and a one-use private-handoff arm. Old inbound retries cannot capture a new arm. Physical recipient remains unenrolled; no Sarah/family call was placed. Automated ledger remains19/26used,7remaining. Claude's Angular commit900bc22 is integrated unchanged, including presentation and profile settings; separate worktree preserved. Actual preview API/browser rendering passed without calls. Fresh Angular typecheck/lint/build,54unit and41browser tests pass. Current Rust checks:367passed,2explicit ignores; fmt/Clippy/build pass.
+Backend adds durable scoped reputation with category/taxonomy IDs, expiry/correction/audit, real model-context lookup receipts, startup activation, current-deployment readiness, and a one-use private-handoff arm. Old inbound retries cannot capture a new arm. Physical recipient remains unenrolled; no Sarah/family call was placed. Automated ledger remains19/26used,7remaining. The Angular commit900bc22 is integrated unchanged, including presentation and profile settings; separate worktree preserved. Actual preview API/browser rendering passed without calls. Fresh Angular typecheck/lint/build,54unit and41browser tests pass. Current Rust checks:367passed,2explicit ignores; fmt/Clippy/build pass.
 
 New Brev run `firstring-nemotron-20261108-132357`: Lambda H100 PCIe80GB, $3.948/hour including fixed1TiB. Both exact-resource cleanup guards target **19:30UTC /13:30Central**. The$27run cap includes$2cleanup allowance; conservative full-run estimate$26.09, projectedcreditafterbound~$25.03. At14:21UTC billing postedonly$0.01forcurrentresource ($8.89totalusage), reportedbalance$51.12, so settlement clearly lags. No topups/recharge or secondGPU. Hosted fallback current-schema request returned403; it is not a verified substitute. No training/LoRA work.
 
-See [contracts](backend-integration.md), pinned runtime/cost receipts under `scripts/brev-nemotron/experiments/20261108-132357`, and `fixtures/results/2026-11-08-production-*.json`. Phone8080 remains transport-only while the candidate's remaining timing failure is investigated; preview8081 is inert/provider-disabled.
+See pinned runtime/cost receipts under `scripts/brev-nemotron/experiments/20261108-132357`, and `fixtures/results/2026-11-08-production-*.json`. Phone8080 remains transport-only while the candidate's remaining timing failure is investigated; preview8081 is inert/provider-disabled.
 
 # Progress
 
@@ -24,7 +24,7 @@ See [contracts](backend-integration.md), pinned runtime/cost receipts under `scr
 
 **Current availability:** app/console/tunnel remain up in explicitly labeled **live transport probe**, with inference unconfigured afterGPUcleanup. Hostedfallback remains unhealthy. Best phone-verified binary `.tools/firstring-campaign-flux-600` and latest experimental `.tools/firstring-campaign-native-repair` are preserved with hashes; no GPUweights backup is claimed. Restore a budget-checked GPU and pass exactlivecontext diagnostics before promising a fresh AI demonstration.
 
-**Verification/checkpoints:** latest324Rusttests passed,2documentedignores; fmt, workspaceClippy andbuild pass.53frontendtests,lint/typecheck/build andfocusedbrowsercheck pass.116847e pushed; final repair/evidence/cleanup checkpoint follows. See [campaign handoff](campaign-handoff-2026-11-08.md) and [phone evidence](evidence/automated-caller-campaign-2026-11-08.json).
+**Verification/checkpoints:** latest324Rusttests passed,2documentedignores; fmt, workspaceClippy andbuild pass.53frontendtests,lint/typecheck/build andfocusedbrowsercheck pass.116847e pushed; final repair/evidence/cleanup checkpoint follows. See [phone evidence](evidence/automated-caller-campaign-2026-11-08.json).
 
 ## Historical checkpoints
 

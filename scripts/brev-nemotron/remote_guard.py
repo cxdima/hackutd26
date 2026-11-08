@@ -25,8 +25,11 @@ def budget_v2_limit(config):
            ["campaign_authorized", "campaign_started_at", "campaign_work_deadline"]):
         raise ValueError("Cannot combine campaign and rehearsal budget policies")
     duration = config["deadline"] - config["created_at"]
-    if not math.isfinite(duration) or not 0 < duration <= 8 * 3600:
-        raise ValueError("Rehearsal exceeds eight hours")
+    # v2: eight-hour rehearsal. v3: presentation day, explicitly authorized by
+    # the operator to stay up through judging; same spend bounds, ten hours.
+    hours = 10 if config.get("budget_policy_version") == 3 else 8
+    if not math.isfinite(duration) or not 0 < duration <= hours * 3600:
+        raise ValueError("Rehearsal exceeds its authorized window")
     if not 0 <= config["prior_spend_usd"] < config["total_budget_usd"] <= 60:
         raise ValueError("Rehearsal exceeds total authorization")
     if config["cleanup_allowance_usd"] != 2:
@@ -54,9 +57,9 @@ def cleanup_due(config, now, ready):
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
             raise ValueError("Invalid deadline field")
     if "budget_policy_version" in config and (
-            type(config["budget_policy_version"]) is not int or config["budget_policy_version"] != 2):
+            type(config["budget_policy_version"]) is not int or config["budget_policy_version"] not in (2, 3)):
         raise ValueError("Unsupported explicit budget policy version")
-    if config.get("budget_policy_version") == 2:
+    if config.get("budget_policy_version") in (2, 3):
         limit = budget_v2_limit(config)
         cost = config["hourly_usd"] * (config["deadline"] - config["created_at"]) / 3600 + 2
         if config["hourly_usd"] <= 0 or cost > limit:

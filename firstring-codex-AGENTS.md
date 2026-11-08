@@ -4,7 +4,7 @@ FirstRing is a Rust application for a live HackUTD 2026 voice demonstration. Fol
 
 ## Specification and sources
 
-Read `docs/FirstRing_Master_Guide.md`, or the root `FirstRing_Master_Guide.md` if the docs copy is absent. The master guide replaces the older Perplexity/Claude blueprint as the product and implementation specification. `FirstRing_Codex_Start.md` replaces the earlier initialization-only, transport-only and kickoff prompts.
+Read `docs/FirstRing_Master_Guide.md`, or the root `FirstRing_Master_Guide.md` if the docs copy is absent. The master guide replaces the older blueprint as the product and implementation specification. `FirstRing_Codex_Start.md` replaces the earlier initialization-only, transport-only and kickoff prompts.
 
 Current primary provider documentation determines API syntax and account capabilities. Correct a documented mismatch narrowly and record the reason. Third-party skills are advisory. Preserve unrelated repository instructions when merging this file into an existing `AGENTS.md`.
 

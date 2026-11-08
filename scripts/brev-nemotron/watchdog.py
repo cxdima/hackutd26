@@ -34,8 +34,11 @@ def budget_v2_limit(receipt):
            ["campaign_authorized", "campaign_started_at", "campaign_work_deadline"]):
         raise ValueError("Cannot combine campaign and rehearsal budget policies")
     duration = receipt["deadline"] - receipt["created_at"]
-    if not math.isfinite(duration) or not 0 < duration <= 8 * 3600:
-        raise ValueError("Rehearsal exceeds eight hours")
+    # v2: eight-hour rehearsal. v3: presentation day, explicitly authorized by
+    # the operator to stay up through judging; same spend bounds, ten hours.
+    hours = 10 if receipt.get("budget_policy_version") == 3 else 8
+    if not math.isfinite(duration) or not 0 < duration <= hours * 3600:
+        raise ValueError("Rehearsal exceeds its authorized window")
     if not 0 <= receipt["prior_spend_usd"] < receipt["total_budget_usd"] <= 60:
         raise ValueError("Rehearsal exceeds total authorization")
     if receipt["cleanup_allowance_usd"] != 2:
@@ -66,10 +69,10 @@ def expiry(receipt):
     if not isinstance(receipt.get("ready", False), bool):
         raise ValueError("Invalid readiness state")
     if "budget_policy_version" in receipt and (
-            type(receipt["budget_policy_version"]) is not int or receipt["budget_policy_version"] != 2):
+            type(receipt["budget_policy_version"]) is not int or receipt["budget_policy_version"] not in (2, 3)):
         raise ValueError("Unsupported explicit budget policy version")
     duration = receipt["deadline"] - receipt["created_at"]
-    if receipt.get("budget_policy_version") == 2:
+    if receipt.get("budget_policy_version") in (2, 3):
         limit = budget_v2_limit(receipt)
     elif receipt.get("campaign_authorized") is True:
         for field in ["campaign_started_at", "campaign_work_deadline", "prior_spend_usd", "total_budget_usd"]:

@@ -6,13 +6,13 @@ FirstRing is a Rust application for a live HackUTD 2026 voice demonstration. Fol
 
 The campaign at `44ecc40` is complete. The current user request supersedes its expired timer and A-only stopping point: restore a new bounded Nemotron deployment, reproduce attempt 19 through the actual runtime contract, enable an explicitly armed physical-phone handoff when the recipient is enrolled and ready, and implement durable scoped reputation with real lookup receipts. Preserve the existing 26-call total ledger and unused Sarah probe. Family calling remains disabled. No new training/NeMo/LoRA project in this pass.
 
-Claude owns `frontend/`, assets and visual design in the separate `frontend/angular-console` worktree; backend agents own Rust, additive contracts, SQLite and deployment. Do not overwrite Claude's uncommitted work. Angular production artifacts belong at `frontend/dist/firstring-web/browser/`; retain the prior console until integration is verified.
+The Angular console in `frontend/` owns assets and visual design; the Rust backend owns additive contracts, SQLite and deployment. All work lives on `main`; do not overwrite uncommitted work. Angular production artifacts belong at `frontend/dist/firstring-web/browser/`; retain the prior console until integration is verified.
 
 Use a new Brev resource identity and versioned budget policy within the original $60 lifetime authorization. Never repurpose a deleted instance pointer or expired campaign identity. Historical model receipts must not make an offline backend appear available. A private handoff requires explicit short-lived operator arming; page loads, refreshes and reconnects never initiate calls.
 
 ## Specification and sources
 
-Read `docs/FirstRing_Master_Guide.md`, or the root `FirstRing_Master_Guide.md` if the docs copy is absent. The master guide replaces the older Perplexity/Claude blueprint as the product and implementation specification. `FirstRing_Codex_Start.md` replaces the earlier initialization-only, transport-only and kickoff prompts.
+Read `docs/FirstRing_Master_Guide.md`, or the root `FirstRing_Master_Guide.md` if the docs copy is absent. The master guide replaces the older blueprint as the product and implementation specification. `FirstRing_Codex_Start.md` replaces the earlier initialization-only, transport-only and kickoff prompts.
 
 Current primary provider documentation determines API syntax and account capabilities. Correct a documented mismatch narrowly and record the reason. Third-party skills are advisory. Preserve unrelated repository instructions when merging this file into an existing `AGENTS.md`.
 
@@ -31,7 +31,7 @@ Current primary provider documentation determines API syntax and account capabil
 - A feasible official Nemotron LoRA pilot is now authorized within that same total budget, after a valid native-tool baseline. Verify exact-model training memory/precision, adapter export and serving compatibility first; inference fit alone is insufficient. Use reviewed synthetic trajectories with scenario-family splits and untouched frozen held-out data. Record actual optimizer steps and artifacts; prompt changes/inference are not weight training. Reuse useful allocated compute, export results, and stop/delete by the budget deadline.
 - Use the master guide's current Nemotron model/tool contract, subject to a real access probe. The NVIDIA speech skill does not configure LLM tool calling.
 - Do not build a SIP/RTP server, raw-audio pipeline, distributed workflow system, vector database or second model for the core. No post-bridge AI monitoring claim.
-- Frontend: the user-selected Angular/Tailwind app in `frontend/` is owned by Claude. Integrate its committed work without redesign; retain React/Vite `web/` at `/legacy-console` until verified. Readable live actions and real evidence matter more than decoration.
+- Frontend: the user-selected Angular/Tailwind app in `frontend/` is the primary console. Integrate its committed work without redesign; retain React/Vite `web/` at `/legacy-console` until verified. Readable live actions and real evidence matter more than decoration.
 
 ## State and execution invariants
 
