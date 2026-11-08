@@ -1,0 +1,45 @@
+{
+  "assessment_only": true,
+  "backend": "nvidia_hosted",
+  "backend_evidence": "Configured adapter selection; this label alone does not prove GPU execution",
+  "data_origin": "synthetic",
+  "error": "Nemotron completion was truncated or incomplete",
+  "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+  "max_output_tokens": 512,
+  "native_result_roundtrips": 0,
+  "native_tool_choice": "named_assessment_then_readiness_gated_next_step",
+  "observed_assessments": [],
+  "observed_followups": [],
+  "phone_tested": false,
+  "prefix_provenance": null,
+  "recorded_at": "2026-11-08T08:07:48.336354+00:00",
+  "relevance_check": "prewritten lexical anchors; human review still required",
+  "request_observations": [
+    {
+      "backend": "nvidia_hosted",
+      "completion_tokens": 512,
+      "content_chars": 939,
+      "elapsed_ms": 5631,
+      "error": "Nemotron completion was truncated or incomplete",
+      "finish_reason": "length",
+      "native_argument_diagnostic": {
+        "function_name": null,
+        "native_tool_count": 0,
+        "scope": "fixed_synthetic_probe_only"
+      },
+      "outcome": "schema",
+      "reasoning_chars": null,
+      "reasoning_tokens": 0,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    }
+  ],
+  "request_timeout_ms": 10000,
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "requests_submitted": 1,
+  "retained_arguments_scope": "Synthetic native assessment arguments only; no assistant content or hidden reasoning",
+  "reused_prefix": false,
+  "reused_prefix_source": null,
+  "selected_context_index": 0,
+  "status": "model_probe_failed"
+}

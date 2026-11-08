@@ -1,0 +1,94 @@
+{
+  "observed_at_utc": "2026-11-08T08:40:34.689895+00:00",
+  "mode": "read_only_reconciliation",
+  "account": {
+    "resources_http_status": 200,
+    "active_resource_count": 1,
+    "exact_resource_http_status": 200,
+    "exact_identity_matches": true,
+    "status": "RUNNING",
+    "health": "HEALTHY",
+    "remaining_credit_usd": 53.17,
+    "auto_recharge_enabled": false,
+    "usage_http_status": 202
+  },
+  "quote": {
+    "hourly_usd": 3.0,
+    "fixed_disk_gib": 850,
+    "stoppable": false,
+    "fixed_storage_basis": "Original account-eligible quote; no new profile selected"
+  },
+  "reported_usage_rows": [
+    {
+      "type": "compute",
+      "cost": "2.60",
+      "reported_instance_price": "1.50",
+      "reported_seconds": 6224
+    },
+    {
+      "type": "compute",
+      "cost": "4.23",
+      "reported_instance_price": "1.50",
+      "reported_seconds": 10160
+    }
+  ],
+  "billing_limitation": "Reported unit price/time differ from quote/wall time; no discounted price or exact unposted accrual is inferred.",
+  "projection": {
+    "current_full_lifetime_at_quote_usd": 7.9558,
+    "prior_observed_usd": 2.6,
+    "cleanup_buffer_usd": 2,
+    "estimated_total_usd": 12.5558,
+    "total_limit_usd": 60,
+    "reported_remaining_covers_full_current_lifetime_again_plus_buffer": true
+  },
+  "local_guard": {
+    "deadline": 1794130790,
+    "work_deadline": 1794128990,
+    "ready": true,
+    "watchdog_targets_current_private_receipt": true,
+    "processes_alive": {
+      "watchdog_pid": true,
+      "caffeinate_pid": true,
+      "ssh_forward_pid": true,
+      "gpu_sampler_pid": true,
+      "connection_supervisor_pid": true
+    }
+  },
+  "remote": {
+    "observed_at_utc": "2026-11-08T08:40:35.398378+00:00",
+    "deadline": 1794130790,
+    "campaign_work_deadline": 1794128990,
+    "ready": true,
+    "guard_script_sha256": "16f5f8903c8c73d5a6500a68feda21cf8866ca54ac7c675f132f1daa8aa46ee1",
+    "config_permissions": "0o600",
+    "timer_active": true,
+    "timer_properties": {
+      "NextElapseUSecMonotonic": "1h 38min 23.996386s",
+      "LastTriggerUSec": "Sun 2026-11-08 08:40:32 UTC",
+      "ActiveState": "active",
+      "SubState": "waiting"
+    },
+    "container_running": true,
+    "gpu_metrics": "NVIDIA H100 PCIe, 81559, 74585, 0",
+    "health_http_status": 200,
+    "models_http_status": 200,
+    "served_model_ids": [
+      "nvidia/nemotron-3.5-lightning-30b-a3b"
+    ],
+    "last15m_logs": {
+      "lines": 80,
+      "http200_chat_completions": 14,
+      "error_lines": 0,
+      "warning_lines": 0,
+      "last_line_timestamp": null,
+      "interpretation": "HTTP200 counts do not establish native-tool or behavioral correctness."
+    },
+    "local_guard_script_matches_remote": true
+  },
+  "expected_deadline": 1794130790,
+  "expected_work_deadline": 1794128990,
+  "gpu_inference_requests": 0,
+  "phone_calls": 0,
+  "resource_mutations": 0,
+  "limitation": "Installed timers and health are not deletion proof; exact-resource404 and billing reconciliation remain required. Prior historical cleanup overrun remains unresolved."
+}

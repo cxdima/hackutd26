@@ -410,6 +410,69 @@ impl Session {
             !credential_terms(summary),
             "Remove authentication details from the message summary"
         );
+        // A bounded fidelity check, not temporal interpretation: adding an
+        // AM/PM qualifier requires positive caller wording in cited evidence.
+        // Preserve an unqualified time rather than guessing its day period.
+        fn meridiems(text: &str, day_periods: bool) -> u8 {
+            let lower = text
+                .to_lowercase()
+                .replace("a.m.", "am")
+                .replace("p.m.", "pm")
+                .replace([',', ';', '.', '!', '?'], " | ");
+            let words: Vec<_> = lower
+                .split(|c: char| !c.is_ascii_alphanumeric() && c != ':' && c != '|')
+                .filter(|s| !s.is_empty())
+                .collect();
+            let clock = |word: &str| {
+                word.chars().any(|c| c.is_ascii_digit())
+                    || [
+                        "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+                        "ten", "eleven", "twelve", "fifteen", "thirty", "forty", "fifty",
+                    ]
+                    .contains(&word)
+            };
+            let mut mask = 0;
+            let mut clause_start = 0;
+            for (index, word) in words.iter().enumerate() {
+                if *word == "|" {
+                    clause_start = index + 1;
+                    continue;
+                }
+                if day_periods
+                    && words[index.saturating_sub(3).max(clause_start)..index]
+                        .iter()
+                        .any(|w| ["not", "never", "no"].contains(w))
+                {
+                    continue;
+                }
+                for (suffix, bit) in [("am", 1), ("pm", 2)] {
+                    if word.strip_suffix(suffix).is_some_and(|prefix| {
+                        if prefix.is_empty() {
+                            index > 0 && clock(words[index - 1])
+                        } else {
+                            clock(prefix)
+                        }
+                    }) {
+                        mask |= bit;
+                    }
+                }
+                if day_periods {
+                    mask |= match *word {
+                        "morning" => 1,
+                        "afternoon" | "evening" | "tonight" => 2,
+                        _ => 0,
+                    };
+                }
+            }
+            mask
+        }
+        let supported_periods = evidence.iter().fold(0, |mask, reference| {
+            mask | meridiems(&reference.quote, true)
+        });
+        anyhow::ensure!(
+            meridiems(summary, false) & !supported_periods == 0,
+            "AM/PM in the message needs explicit caller evidence; preserve the unqualified time"
+        );
         // Retain numeric facts such as times, dates, quantities and prices.
         // Contact-shaped literals remain unnecessary: actions resolve only
         // enrolled contacts. A bare long number can be ambiguous, so phone-like

@@ -383,15 +383,15 @@ async fn fixture_audio(
 }
 async fn speech_audio(State(app): State<App>, Path(capability): Path<String>) -> Response {
     if let Some(cache) = &app.speech
-        && let Ok(Some(bytes)) = cache.media(&capability).await
+        && let Ok(Some(media)) = cache.media_response(&capability).await
     {
         return (
             [
-                (header::CONTENT_TYPE, "audio/mpeg"),
+                (header::CONTENT_TYPE, media.mime_type),
                 (header::CACHE_CONTROL, "private, no-store"),
                 (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
             ],
-            bytes,
+            media.bytes,
         )
             .into_response();
     }

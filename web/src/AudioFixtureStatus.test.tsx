@@ -48,6 +48,14 @@ it.each([
   ["exact_appointment_george", "Appointment with exact time"],
   ["maya_appointment_george", "Maya appointment"],
   ["appointment_correction_george", "Appointment time correction"],
+  [
+    "model_failure_recovery_george",
+    "Deliberately injected model failure → recovery",
+  ],
+  [
+    "identity_human_decline_george",
+    "Assistant identity → human request → message declined",
+  ],
 ])(
   "shows %s through read-only status without grading it",
   async (scenario, label) => {

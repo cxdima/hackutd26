@@ -32,7 +32,8 @@ fn speech_configuration_for_model(
         "voice_label":if is_relay {match profile.voice_id.as_str() { crate::profile::JESSICA => "Jessica v4", crate::profile::GEORGE => "George v4", _ => "Janet (legacy ID) v4"}} else {"Joanna Neural"},
         "closing_provider":"ElevenLabs", "closing_voice":profile.voice_id, "emergency_fallback_provider":"Amazon Polly", "emergency_fallback_voice":"Joanna-Neural",
         "transcription_provider":if is_relay {Some(TRANSCRIPTION_PROVIDER)} else {None},
-        "transcription_model":if is_relay {Some(model.as_str())} else {None}})
+        "transcription_model":if is_relay {Some(model.as_str())} else {None},
+        "speech_timeout_ms":if is_relay {Some(crate::config::relay_speech_timeout_ms())} else {None}})
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -253,8 +254,9 @@ fn connect_twiml_for_model(
     let provider = escape(&profile.tts_provider);
     let locale = escape(&profile.locale);
     let transcription_model = model.as_str();
+    let speech_timeout = crate::config::relay_speech_timeout_ms();
     format!(
-        "<Response><Connect action=\"{}\" method=\"POST\"><ConversationRelay url=\"{}\"{greeting} interruptible=\"any\" reportInputDuringAgentSpeech=\"any\" ignoreBackchannel=\"true\" dtmfDetection=\"true\" partialPrompts=\"true\" speechTimeout=\"1000\" language=\"{locale}\" transcriptionProvider=\"{TRANSCRIPTION_PROVIDER}\" speechModel=\"{transcription_model}\" ttsProvider=\"{provider}\" voice=\"{voice}\"><Parameter name=\"session_token\" value=\"{}\"/></ConversationRelay></Connect></Response>",
+        "<Response><Connect action=\"{}\" method=\"POST\"><ConversationRelay url=\"{}\"{greeting} interruptible=\"any\" reportInputDuringAgentSpeech=\"any\" ignoreBackchannel=\"true\" dtmfDetection=\"true\" partialPrompts=\"true\" speechTimeout=\"{speech_timeout}\" language=\"{locale}\" transcriptionProvider=\"{TRANSCRIPTION_PROVIDER}\" speechModel=\"{transcription_model}\" ttsProvider=\"{provider}\" voice=\"{voice}\"><Parameter name=\"session_token\" value=\"{}\"/></ConversationRelay></Connect></Response>",
         escape(after.as_str()),
         escape(ws.as_str()),
         escape(session_token)

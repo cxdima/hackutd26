@@ -465,11 +465,11 @@ pub fn schemas() -> Value {
         ],
         json!({
             "version":{"type":"integer","enum":[1]},
-            "claimed_identity":{"type":["string","null"],"maxLength":120,"description":"A literal caller identity/relationship claim, or null; never verified identity."},
-            "purpose":string(180), "requested_action":string(180),
+            "claimed_identity":{"type":["string","null"],"maxLength":120,"description":"Copy one continuous exact substring of caller words, preserving punctuation. A name alone is enough; never concatenate a name and affiliation from separate phrases. Use null if absent. This is an unverified claim."},
+            "purpose":string(180), "requested_action":{"type":"string","maxLength":180,"description":"Who should do what for whom. Preserve the caller's roles: I/me/my refer to the caller, not the household person. Do not reverse the requested actor and recipient."},
             "supplied_facts":{"type":"array","maxItems":MAX_SUPPLIED_FACTS,"description":"Optional literal caller evidence, each quoted once. Never paraphrase. Use [] for sensitive content.","items":object(&["turn_id","quote"],json!({"turn_id":string(96),"quote":string(180)}))},
-            "missing_information":{"type":"array","maxItems":3,"items":string(160),"description":"Essential unanswered details for the actual caller purpose; do not invent mandatory intake."},
-            "readiness":{"type":"string","enum":["needs_information","ready","caller_declined","no_message"],"description":"needs_information for an unresolved request for assistance or incomplete opening: ask the one fact that makes the next step useful. ready for a complete notice/update with useful details or fully understood risky action; never mark a request ready merely because its words can be saved. Unknown code purpose needs_information; established account-access extraction ready for protective handling, never seek its value."}
+            "missing_information":{"type":"array","maxItems":3,"items":string(160),"description":"Essential unanswered details for the actual caller purpose. Must be [] for ready or no_message; a caller declining a message does not owe more information. Do not invent mandatory intake."},
+            "readiness":{"type":"string","enum":["needs_information","ready","caller_declined","no_message"],"description":"needs_information for an unresolved request for assistance or incomplete opening. ready for a complete notice/update, a clear correction replacing an earlier supplied detail, or a fully understood risky action. Reuse the earlier purpose when the caller corrects one value; do not ask them to repeat or confirm that value. Unspecified AM/PM alone does not make a supplied time incomplete. Never mark an unresolved assistance request ready merely because its words can be saved. A request to arrange a ride, delivery, visit or collection is still an opening when its practical when/where detail is absent; ask for the most useful missing detail. A complete update or explicit callback message does not need extra intake. Unknown code purpose needs_information; established account-access extraction ready for protection, never seek its value."}
         }),
     );
     json!([
@@ -483,10 +483,10 @@ pub fn schemas() -> Value {
         ),
         function(
             "ask_caller",
-            "Ask one short contextual clarification. Never request credentials, authentication digits or secrets; never reveal private household information.",
+            "Ask one short contextual clarification. If asked whether you are the household person or who is answering, first briefly say you are their automated assistant, then ask the relevant question. Never request credentials, authentication digits or secrets; never reveal private household information.",
             object(
                 &["question", "purpose", "evidence_refs"],
-                json!({"question":string(240),"purpose":enumeration(&["clarify_request","clarify_code_type","clarify_identity"]),"evidence_refs":evidence})
+                json!({"question":{"type":"string","maxLength":240,"description":"The actual brief spoken reply to the current caller. Follow accepted missing information and server guidance. Preserve who does what for whom; reuse known facts instead of asking again. Do not add an identity introduction or request unless the actual current exchange needs one."},"purpose":enumeration(&["clarify_request","clarify_code_type","clarify_identity"]),"evidence_refs":evidence})
             )
         ),
         function(

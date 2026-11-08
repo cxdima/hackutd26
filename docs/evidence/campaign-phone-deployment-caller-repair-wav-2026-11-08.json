@@ -1,0 +1,14 @@
+{
+  "status": "deployed",
+  "recorded_at": "2026-11-08T08:14:31.353622+00:00",
+  "pid": 12746,
+  "command": ".tools/firstring-campaign-caller-repair-wav",
+  "backend": "brev_hosted",
+  "binary_sha256": "6b04618d702ad68040053561172810b783f339fde97059d6ca6f9143742b2f38",
+  "supervisor_pid": 12748,
+  "public_base_url": "https://printers-saints-hay-camcorder.trycloudflare.com",
+  "handoff_calls_enabled": false,
+  "family_calls_enabled": false,
+  "calls_started": 0,
+  "database_backup": "local_only"
+}

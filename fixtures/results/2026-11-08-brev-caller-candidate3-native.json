@@ -1,0 +1,85 @@
+{
+  "assessment_only": false,
+  "backend": "brev_hosted",
+  "backend_evidence": "Configured adapter selection; this label alone does not prove GPU execution",
+  "data_origin": "synthetic",
+  "error": "Probe question failed the prewritten context-anchor check; human relevance review still required",
+  "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+  "max_output_tokens": 512,
+  "native_result_roundtrips": 1,
+  "native_tool_choice": "named_assessment_then_readiness_gated_next_step",
+  "observed_assessments": [
+    {
+      "arguments": {
+        "evidence_refs": [
+          {
+            "quote": "The clinic appointment time has changed, and I need to give her the new time.",
+            "turn_id": "turn-1"
+          }
+        ],
+        "observation": {
+          "direction": "caller_supplies",
+          "requested_object": "routine_information",
+          "speech_act": "statement"
+        },
+        "understanding": {
+          "claimed_identity": null,
+          "missing_information": [
+            "new appointment time"
+          ],
+          "purpose": "update sarah on new clinic appointment time",
+          "readiness": "needs_information",
+          "requested_action": "give sarah the new time",
+          "supplied_facts": [],
+          "version": 1
+        }
+      },
+      "context_index": 0,
+      "name": "record_assessment",
+      "tool_call_id": "chatcmpl-tool-ae8a15bc0cd989f7"
+    }
+  ],
+  "observed_followups": [
+    "I'm FirstRing, Sarah's automated assistant. May I ask who is calling?"
+  ],
+  "phone_tested": false,
+  "prefix_provenance": null,
+  "recorded_at": "2026-11-08T08:43:26.749207+00:00",
+  "relevance_check": "prewritten lexical anchors; human review still required",
+  "request_observations": [
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 174,
+      "content_chars": 0,
+      "elapsed_ms": 934,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 97,
+      "content_chars": 0,
+      "elapsed_ms": 516,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    }
+  ],
+  "request_timeout_ms": 3500,
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "requests_submitted": 2,
+  "retained_arguments_scope": "Synthetic native assessment arguments only; no assistant content or hidden reasoning",
+  "reused_prefix": false,
+  "reused_prefix_source": null,
+  "selected_context_index": null,
+  "status": "model_probe_failed"
+}

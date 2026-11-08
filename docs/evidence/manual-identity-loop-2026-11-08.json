@@ -1,0 +1,1047 @@
+{
+  "recorded_at": "2026-11-08T08:07:20.280943+00:00",
+  "session_id": "4ec19331-fb60-4eb7-8f1d-9f43a10009a4",
+  "data_origin": "human_manual_call",
+  "backend": "brev_hosted",
+  "speech_provider": "ElevenLabs",
+  "voice_id": "cgSgspJ2msm6clMCkdW9-v4",
+  "relay_transcription": "Deepgram flux",
+  "diagnosis": [
+    "Repeated identity claim paraphrases failed literal caller grounding. Four rejected assessments exhausted the tool-step budget on second turn.",
+    "The assistant failed to answer repeated direct identity questions and asked redundant reasons after caller asked for a human; this is a model conversational failure, not ASR loss.",
+    "Later conversation resumed and saved the explicitly requested final message; that does not make the overall conversation successful."
+  ],
+  "privacy": "Name and final hostile message omitted from exported receipt; actual transcripts retained in local authenticated incident store.",
+  "evidence": [
+    {
+      "at": "2026-11-08T08:04:41.979086+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 5,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 196,
+          "content_chars": 0,
+          "elapsed_ms": 952,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 1
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:41.981680+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 5,
+        "name": "record_assessment",
+        "ok": true,
+        "result": {
+          "ambiguous": false,
+          "assessed_version": 1,
+          "blocked": false
+        },
+        "turn_version": 1
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:42.598305+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 5,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 116,
+          "content_chars": 0,
+          "elapsed_ms": 615,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 1
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:42.601551+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 5,
+        "name": "ask_caller",
+        "ok": true,
+        "result": {
+          "audio_requested": true,
+          "stop": true
+        },
+        "turn_version": 1
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:51.424969+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 17,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 253,
+          "content_chars": 0,
+          "elapsed_ms": 1456,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 2
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:51.426565+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 17,
+        "name": "record_assessment",
+        "ok": false,
+        "result": {
+          "check_action_receipts": true,
+          "completed": false
+        },
+        "turn_version": 2
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:51.427113+00:00",
+      "type": "policy.denied",
+      "payload": {
+        "detail": "Identity claim must quote caller words",
+        "tool": "record_assessment"
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:52.662237+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 17,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 253,
+          "content_chars": 0,
+          "elapsed_ms": 1233,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 2
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:52.666848+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 17,
+        "name": "record_assessment",
+        "ok": false,
+        "result": {
+          "check_action_receipts": true,
+          "completed": false
+        },
+        "turn_version": 2
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:52.669005+00:00",
+      "type": "policy.denied",
+      "payload": {
+        "detail": "Identity claim must quote caller words",
+        "tool": "record_assessment"
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:53.893144+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 17,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 254,
+          "content_chars": 0,
+          "elapsed_ms": 1220,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 2
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:53.898881+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 17,
+        "name": "record_assessment",
+        "ok": false,
+        "result": {
+          "check_action_receipts": true,
+          "completed": false
+        },
+        "turn_version": 2
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:53.900946+00:00",
+      "type": "policy.denied",
+      "payload": {
+        "detail": "Identity claim must quote caller words",
+        "tool": "record_assessment"
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:55.125172+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 17,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 253,
+          "content_chars": 0,
+          "elapsed_ms": 1220,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 2
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:55.131713+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 17,
+        "name": "record_assessment",
+        "ok": false,
+        "result": {
+          "check_action_receipts": true,
+          "completed": false
+        },
+        "turn_version": 2
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:55.133192+00:00",
+      "type": "policy.denied",
+      "payload": {
+        "detail": "Identity claim must quote caller words",
+        "tool": "record_assessment"
+      }
+    },
+    {
+      "at": "2026-11-08T08:04:55.136886+00:00",
+      "type": "dependency.failed",
+      "payload": {
+        "detail": "Turn tool-step budget exhausted",
+        "provider": "nemotron"
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:06.626733+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 23,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 187,
+          "content_chars": 0,
+          "elapsed_ms": 1105,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 3
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:06.635063+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 23,
+        "name": "record_assessment",
+        "ok": true,
+        "result": {
+          "ambiguous": true,
+          "assessed_version": 3,
+          "blocked": false
+        },
+        "turn_version": 3
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:07.250607+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 23,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 106,
+          "content_chars": 0,
+          "elapsed_ms": 611,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 3
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:07.258790+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 23,
+        "name": "ask_caller",
+        "ok": true,
+        "result": {
+          "audio_requested": true,
+          "stop": true
+        },
+        "turn_version": 3
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:13.459957+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 31,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 243,
+          "content_chars": 0,
+          "elapsed_ms": 1153,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 4
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:13.467314+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 31,
+        "name": "record_assessment",
+        "ok": false,
+        "result": {
+          "check_action_receipts": true,
+          "completed": false
+        },
+        "turn_version": 4
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:13.469108+00:00",
+      "type": "policy.denied",
+      "payload": {
+        "detail": "Identity claim must quote caller words",
+        "tool": "record_assessment"
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:14.639207+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 31,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 243,
+          "content_chars": 0,
+          "elapsed_ms": 1166,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 4
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:14.645986+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 31,
+        "name": "record_assessment",
+        "ok": false,
+        "result": {
+          "check_action_receipts": true,
+          "completed": false
+        },
+        "turn_version": 4
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:14.647900+00:00",
+      "type": "policy.denied",
+      "payload": {
+        "detail": "Identity claim must quote caller words",
+        "tool": "record_assessment"
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:15.726239+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 31,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 237,
+          "content_chars": 0,
+          "elapsed_ms": 1075,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 4
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:15.735904+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 31,
+        "name": "record_assessment",
+        "ok": true,
+        "result": {
+          "ambiguous": false,
+          "assessed_version": 4,
+          "blocked": false
+        },
+        "turn_version": 4
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:16.367547+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 31,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 109,
+          "content_chars": 0,
+          "elapsed_ms": 627,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 4
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:16.375498+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 31,
+        "name": "ask_caller",
+        "ok": true,
+        "result": {
+          "audio_requested": true,
+          "stop": true
+        },
+        "turn_version": 4
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:27.479965+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 45,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 274,
+          "content_chars": 0,
+          "elapsed_ms": 1429,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 5
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:27.487171+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 45,
+        "name": "record_assessment",
+        "ok": false,
+        "result": {
+          "check_action_receipts": true,
+          "completed": false
+        },
+        "turn_version": 5
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:27.489767+00:00",
+      "type": "policy.denied",
+      "payload": {
+        "detail": "Identity claim must quote caller words",
+        "tool": "record_assessment"
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:28.721032+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 45,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 275,
+          "content_chars": 0,
+          "elapsed_ms": 1228,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 5
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:28.727854+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 45,
+        "name": "record_assessment",
+        "ok": false,
+        "result": {
+          "check_action_receipts": true,
+          "completed": false
+        },
+        "turn_version": 5
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:28.729033+00:00",
+      "type": "policy.denied",
+      "payload": {
+        "detail": "Identity claim must quote caller words",
+        "tool": "record_assessment"
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:29.930606+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 45,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 268,
+          "content_chars": 0,
+          "elapsed_ms": 1198,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 5
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:29.939493+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 45,
+        "name": "record_assessment",
+        "ok": true,
+        "result": {
+          "ambiguous": false,
+          "assessed_version": 5,
+          "blocked": false
+        },
+        "turn_version": 5
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:30.658636+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 45,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 123,
+          "content_chars": 0,
+          "elapsed_ms": 715,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 5
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:30.666254+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 45,
+        "name": "ask_caller",
+        "ok": true,
+        "result": {
+          "audio_requested": true,
+          "stop": true
+        },
+        "turn_version": 5
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:41.900821+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 59,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 197,
+          "content_chars": 0,
+          "elapsed_ms": 1130,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 6
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:41.903959+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 59,
+        "name": "record_assessment",
+        "ok": true,
+        "result": {
+          "ambiguous": true,
+          "assessed_version": 6,
+          "blocked": false
+        },
+        "turn_version": 6
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:42.624560+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 59,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 122,
+          "content_chars": 0,
+          "elapsed_ms": 719,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 6
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:42.627847+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 59,
+        "name": "ask_caller",
+        "ok": true,
+        "result": {
+          "audio_requested": true,
+          "stop": true
+        },
+        "turn_version": 6
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:53.279282+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 75,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 199,
+          "content_chars": 0,
+          "elapsed_ms": 1032,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 7
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:53.285155+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 75,
+        "name": "record_assessment",
+        "ok": true,
+        "result": {
+          "ambiguous": true,
+          "assessed_version": 7,
+          "blocked": false
+        },
+        "turn_version": 7
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:53.943252+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 75,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 115,
+          "content_chars": 0,
+          "elapsed_ms": 654,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 7
+      }
+    },
+    {
+      "at": "2026-11-08T08:05:53.949886+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 75,
+        "name": "ask_caller",
+        "ok": true,
+        "result": {
+          "audio_requested": true,
+          "stop": true
+        },
+        "turn_version": 7
+      }
+    },
+    {
+      "at": "2026-11-08T08:06:03.641504+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 88,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 258,
+          "content_chars": 0,
+          "elapsed_ms": 1270,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 8
+      }
+    },
+    {
+      "at": "2026-11-08T08:06:03.647184+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 88,
+        "name": "record_assessment",
+        "ok": true,
+        "result": {
+          "ambiguous": false,
+          "assessed_version": 8,
+          "blocked": false
+        },
+        "turn_version": 8
+      }
+    },
+    {
+      "at": "2026-11-08T08:06:04.310586+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 88,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 118,
+          "content_chars": 0,
+          "elapsed_ms": 658,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 8
+      }
+    },
+    {
+      "at": "2026-11-08T08:06:04.319921+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 88,
+        "name": "ask_caller",
+        "ok": true,
+        "result": {
+          "audio_requested": true,
+          "stop": true
+        },
+        "turn_version": 8
+      }
+    },
+    {
+      "at": "2026-11-08T08:06:11.740361+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 94,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 245,
+          "content_chars": 0,
+          "elapsed_ms": 1213,
+          "error": null,
+          "finish_reason": "stop",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 9
+      }
+    },
+    {
+      "at": "2026-11-08T08:06:11.748169+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 94,
+        "name": "record_assessment",
+        "ok": true,
+        "result": {
+          "ambiguous": false,
+          "assessed_version": 9,
+          "blocked": false
+        },
+        "turn_version": 9
+      }
+    },
+    {
+      "at": "2026-11-08T08:06:12.392246+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 94,
+        "heard": false,
+        "observation": {
+          "backend": "brev_hosted",
+          "completion_tokens": 111,
+          "content_chars": 0,
+          "elapsed_ms": 641,
+          "error": null,
+          "finish_reason": "tool_calls",
+          "outcome": "success",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "turn_version": 9
+      }
+    },
+    {
+      "at": "2026-11-08T08:06:12.395173+00:00",
+      "type": "message.recorded",
+      "payload": {
+        "evidence_turn_ids": [
+          "94b90933-6993-410f-8028-5b3255fce5ec"
+        ],
+        "recorded_at": "2026-11-08T08:06:12.394174+00:00",
+        "turn_version": 9
+      }
+    },
+    {
+      "at": "2026-11-08T08:06:12.396801+00:00",
+      "type": "agent.tool.result",
+      "payload": {
+        "generation_id": 94,
+        "name": "take_message",
+        "ok": true,
+        "result": {
+          "closing": true,
+          "message_recorded": true,
+          "stop": true
+        },
+        "turn_version": 9
+      }
+    },
+    {
+      "at": "2026-11-08T08:06:19.404097+00:00",
+      "type": "call.ended",
+      "payload": {}
+    }
+  ],
+  "model_http_ms_by_turn": {
+    "1": [
+      952,
+      615
+    ],
+    "2": [
+      1456,
+      1233,
+      1220,
+      1220
+    ],
+    "3": [
+      1105,
+      611
+    ],
+    "4": [
+      1153,
+      1166,
+      1075,
+      627
+    ],
+    "5": [
+      1429,
+      1228,
+      1198,
+      715
+    ],
+    "6": [
+      1130,
+      719
+    ],
+    "7": [
+      1032,
+      654
+    ],
+    "8": [
+      1270,
+      658
+    ],
+    "9": [
+      1213,
+      641
+    ]
+  },
+  "model_timing_scope": "HTTP completion only; no audible onset or ASR delay measurement exists for this unrecorded manual call."
+}

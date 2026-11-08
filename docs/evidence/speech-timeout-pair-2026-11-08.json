@@ -1,0 +1,20 @@
+{
+  "recorded_at": "2026-11-08T08:47:21.560899+00:00",
+  "attempts": [
+    16,
+    17
+  ],
+  "changed_variable": "RELAY_SPEECH_TIMEOUT_MS 1000 to600; same app binary, Flux, Jessica, cached MP3, George source clip and distinct origin route.",
+  "recording_caller_end_to_reply_ms": [
+    4873,
+    4553
+  ],
+  "model_http_sequence_ms": [
+    1722,
+    1760
+  ],
+  "binary_sha256": "bedde93f429cc5372ad605d595987cba746fb215492c4200d3778b657949e795",
+  "both_message_and_terminal_pass": true,
+  "human_listening_review": false,
+  "limitation": "Single pair does not estimate general speedup or noisy/interruption robustness. Same closing Relay\u2192Gather transfer still adds roughly1.1s."
+}

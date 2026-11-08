@@ -16,6 +16,34 @@ const CACHE_TTL: u64 = 86_400;
 const CAPABILITY_TTL: u64 = 300;
 const MAX_AUDIO: usize = 512 * 1024;
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum AudioFormat {
+    #[default]
+    Mp3,
+    Wav,
+}
+impl AudioFormat {
+    fn parse(value: Option<&str>) -> Result<Self> {
+        match value.unwrap_or("mp3") {
+            "mp3" => Ok(Self::Mp3),
+            "wav" => Ok(Self::Wav),
+            _ => Err(anyhow!("CLOSING_AUDIO_FORMAT must be mp3 or wav")),
+        }
+    }
+    fn mime_type(self) -> &'static str {
+        match self {
+            Self::Mp3 => "audio/mpeg",
+            Self::Wav => "audio/wav",
+        }
+    }
+}
+
+pub struct SpeechMedia {
+    pub bytes: Vec<u8>,
+    pub mime_type: &'static str,
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum StaticPhrase {
@@ -76,12 +104,20 @@ pub struct PreparedAudio {
     pub profile: VoiceProfile,
     pub sha256: String,
     pub cache_hit: bool,
+    audio_format: AudioFormat,
+    requested_audio_format: AudioFormat,
+    duration_ms: Option<u64>,
+    source_sha256: String,
+    format_fallback: Option<&'static str>,
 }
 impl PreparedAudio {
     pub fn evidence(&self) -> Value {
         json!({"provider":self.profile.provider,"model_id":self.profile.model_id,
             "voice_id":self.profile.voice_id,"phrase":self.phrase,"sha256":self.sha256,
             "cache_hit":self.cache_hit,"expires_at":self.expires_at,
+            "audio_format":self.audio_format,"requested_audio_format":self.requested_audio_format,
+            "mime_type":self.audio_format.mime_type(),"duration_ms":self.duration_ms,
+            "source_sha256":self.source_sha256,"format_fallback":self.format_fallback,
             "generated_audio_available":true,"audible_playback_verified":false})
     }
 }
@@ -99,6 +135,16 @@ struct CacheEntry {
 struct Capability {
     cache_key: String,
     expires_at: u64,
+    #[serde(default)]
+    format: AudioFormat,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WavEntry {
+    source_sha256: String,
+    sha256: String,
+    duration_ms: u64,
 }
 
 pub struct SpeechCache {
@@ -108,6 +154,7 @@ pub struct SpeechCache {
     client: reqwest::Client,
     lock: Mutex<()>,
     endpoint: String,
+    format: AudioFormat,
 }
 impl SpeechCache {
     #[cfg(test)]
@@ -140,6 +187,7 @@ impl SpeechCache {
                 .build()?,
             lock: Mutex::new(()),
             endpoint: API.into(),
+            format: AudioFormat::parse(std::env::var("CLOSING_AUDIO_FORMAT").ok().as_deref())?,
         })
     }
 
@@ -167,6 +215,10 @@ impl SpeechCache {
         let entry = if let Some((entry, _)) = existing {
             entry
         } else {
+            ensure!(
+                self.format != AudioFormat::Wav,
+                "WAV experiment requires an existing MP3 source"
+            );
             let key = self
                 .key
                 .as_ref()
@@ -213,6 +265,25 @@ impl SpeechCache {
             }
             self.store_audio(phrase, relay_voice, &bytes, at).await?
         };
+        // Offline derivatives only: never convert or regenerate speech in a call.
+        // A missing/invalid variant keeps the already-validated same-voice MP3.
+        let wav = if self.format == AudioFormat::Wav {
+            self.read_wav(&cache_key, &entry.sha256)
+                .await
+                .unwrap_or(None)
+        } else {
+            None
+        };
+        let (format, sha256, duration_ms, format_fallback) = if let Some((wav, _)) = wav {
+            (AudioFormat::Wav, wav.sha256, Some(wav.duration_ms), None)
+        } else {
+            (
+                AudioFormat::Mp3,
+                entry.sha256.clone(),
+                None,
+                (self.format == AudioFormat::Wav).then_some("wav_unavailable_using_cached_mp3"),
+            )
+        };
         let capability = format!(
             "{}{}",
             uuid::Uuid::new_v4().simple(),
@@ -224,6 +295,7 @@ impl SpeechCache {
         let cap = Capability {
             cache_key,
             expires_at,
+            format,
         };
         write_private(
             &self
@@ -233,9 +305,14 @@ impl SpeechCache {
             &serde_json::to_vec(&cap)?,
         )
         .await?;
+        let extension = if format == AudioFormat::Wav {
+            ".wav"
+        } else {
+            ""
+        };
         let url = self
             .origin
-            .join(&format!("/media/speech/{capability}"))?
+            .join(&format!("/media/speech/{capability}{extension}"))?
             .to_string();
         Ok(PreparedAudio {
             url,
@@ -243,8 +320,13 @@ impl SpeechCache {
             phrase,
             text: phrase.text(),
             profile,
-            sha256: entry.sha256,
+            sha256,
             cache_hit,
+            audio_format: format,
+            requested_audio_format: self.format,
+            duration_ms,
+            source_sha256: entry.sha256,
+            format_fallback,
         })
     }
     async fn store_audio(
@@ -308,6 +390,52 @@ impl SpeechCache {
         self.media_at(capability, now()).await
     }
     async fn media_at(&self, capability: &str, at: u64) -> Result<Option<Vec<u8>>> {
+        Ok(self
+            .media_response_at(capability, at)
+            .await?
+            .map(|media| media.bytes))
+    }
+    pub async fn media_response(&self, capability: &str) -> Result<Option<SpeechMedia>> {
+        self.media_response_at(capability, now()).await
+    }
+    async fn read_wav(
+        &self,
+        key: &str,
+        source_sha256: &str,
+    ) -> Result<Option<(WavEntry, Vec<u8>)>> {
+        let Some(metadata) = read_bounded(
+            &self.root.join("audio").join(format!("{key}.wav.json")),
+            4096,
+        )
+        .await?
+        else {
+            return Ok(None);
+        };
+        let Ok(entry) = serde_json::from_slice::<WavEntry>(&metadata) else {
+            return Ok(None);
+        };
+        let Some(bytes) = read_bounded(
+            &self.root.join("audio").join(format!("{key}.wav")),
+            MAX_AUDIO,
+        )
+        .await?
+        else {
+            return Ok(None);
+        };
+        if entry.source_sha256 != source_sha256
+            || hash(&bytes) != entry.sha256
+            || wav_duration_ms(&bytes) != Some(entry.duration_ms)
+        {
+            return Ok(None);
+        }
+        Ok(Some((entry, bytes)))
+    }
+    async fn media_response_at(&self, capability: &str, at: u64) -> Result<Option<SpeechMedia>> {
+        let (capability, format) = if let Some(key) = capability.strip_suffix(".wav") {
+            (key, AudioFormat::Wav)
+        } else {
+            (capability, AudioFormat::Mp3)
+        };
         if !hex_key(capability) {
             return Ok(None);
         }
@@ -325,13 +453,27 @@ impl SpeechCache {
         let Ok(cap) = serde_json::from_slice::<Capability>(&bytes) else {
             return Ok(None);
         };
-        if at >= cap.expires_at || cap.expires_at > at.saturating_add(CAPABILITY_TTL) {
+        if at >= cap.expires_at
+            || cap.expires_at > at.saturating_add(CAPABILITY_TTL)
+            || cap.format != format
+        {
             return Ok(None);
         }
-        Ok(self
-            .read_audio(&cap.cache_key, at)
-            .await?
-            .map(|(_, audio)| audio))
+        let Some((source, audio)) = self.read_audio(&cap.cache_key, at).await? else {
+            return Ok(None);
+        };
+        let bytes = if format == AudioFormat::Wav {
+            let Some((_, wav)) = self.read_wav(&cap.cache_key, &source.sha256).await? else {
+                return Ok(None);
+            };
+            wav
+        } else {
+            audio
+        };
+        Ok(Some(SpeechMedia {
+            bytes,
+            mime_type: format.mime_type(),
+        }))
     }
 }
 
@@ -349,6 +491,58 @@ fn hex_key(value: &str) -> bool {
 fn valid_mp3(bytes: &[u8]) -> bool {
     (32..=MAX_AUDIO).contains(&bytes.len())
         && (bytes.starts_with(b"ID3") || (bytes[0] == 0xff && bytes[1] & 0xe0 == 0xe0))
+}
+/// Strict RIFF PCM16, mono 8kHz. Metadata chunks are allowed, malformed/duplicate
+/// chunks and compressed WAV variants are not. No duration is guessed from MP3.
+fn wav_duration_ms(bytes: &[u8]) -> Option<u64> {
+    if !(44..=MAX_AUDIO).contains(&bytes.len())
+        || &bytes[..4] != b"RIFF"
+        || &bytes[8..12] != b"WAVE"
+    {
+        return None;
+    }
+    let u32_at = |at: usize| -> Option<u32> {
+        Some(u32::from_le_bytes(
+            bytes.get(at..at.checked_add(4)?)?.try_into().ok()?,
+        ))
+    };
+    if usize::try_from(u32_at(4)?).ok()?.checked_add(8)? != bytes.len() {
+        return None;
+    }
+    let mut at = 12usize;
+    let mut format = false;
+    let mut data = None;
+    while at < bytes.len() {
+        let tag = bytes.get(at..at.checked_add(4)?)?;
+        let size = usize::try_from(u32_at(at + 4)?).ok()?;
+        let start = at.checked_add(8)?;
+        let end = start.checked_add(size)?;
+        let chunk = bytes.get(start..end)?;
+        if tag == b"fmt " {
+            if format
+                || size != 16
+                || chunk[..2] != 1u16.to_le_bytes()
+                || chunk[2..4] != 1u16.to_le_bytes()
+                || chunk[4..8] != 8000u32.to_le_bytes()
+                || chunk[8..12] != 16000u32.to_le_bytes()
+                || chunk[12..14] != 2u16.to_le_bytes()
+                || chunk[14..16] != 16u16.to_le_bytes()
+            {
+                return None;
+            }
+            format = true;
+        } else if tag == b"data" {
+            if data.is_some() || size == 0 || size % 2 != 0 {
+                return None;
+            }
+            data = Some(size as u64);
+        }
+        at = end.checked_add(size % 2)?;
+    }
+    if !format || at != bytes.len() {
+        return None;
+    }
+    Some(data?.checked_mul(1000)? / 16000)
 }
 fn cache_key(phrase: StaticPhrase, relay_voice: &str) -> Result<String> {
     let profile = voice_profile(relay_voice)?;
@@ -412,6 +606,146 @@ async fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn pcm_wav() -> Vec<u8> {
+        let data = vec![0u8; 16000];
+        let mut bytes = b"RIFF".to_vec();
+        bytes.extend_from_slice(&(36u32 + data.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(b"WAVEfmt ");
+        bytes.extend_from_slice(&16u32.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&8000u32.to_le_bytes());
+        bytes.extend_from_slice(&16000u32.to_le_bytes());
+        bytes.extend_from_slice(&2u16.to_le_bytes());
+        bytes.extend_from_slice(&16u16.to_le_bytes());
+        bytes.extend_from_slice(b"data");
+        bytes.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        bytes.extend(data);
+        bytes
+    }
+
+    #[test]
+    fn wav_switch_defaults_off_and_pcm_validation_rejects_wrong_or_truncated_audio() {
+        assert_eq!(AudioFormat::parse(None).unwrap(), AudioFormat::Mp3);
+        assert_eq!(AudioFormat::parse(Some("wav")).unwrap(), AudioFormat::Wav);
+        assert!(AudioFormat::parse(Some("arbitrary")).is_err());
+        let bytes = pcm_wav();
+        assert_eq!(wav_duration_ms(&bytes), Some(1000));
+        for (offset, replacement) in [(0, b'X'), (20, 3), (22, 2), (24, 0), (34, 8)] {
+            let mut invalid = bytes.clone();
+            invalid[offset] = replacement;
+            assert!(wav_duration_ms(&invalid).is_none(), "offset {offset}");
+        }
+        assert!(wav_duration_ms(&bytes[..bytes.len() - 1]).is_none());
+        assert!(wav_duration_ms(&vec![0; MAX_AUDIO + 1]).is_none());
+    }
+
+    #[tokio::test]
+    async fn wav_variant_keeps_original_provenance_capability_expiry_and_correct_mime() {
+        let root = directory();
+        let mut cache = SpeechCache::new(root.clone(), "https://first.example", None).unwrap();
+        let phrase = StaticPhrase::NormalSaved;
+        let voice = "cgSgspJ2msm6clMCkdW9-v4";
+        let source = [b"ID3".as_slice(), &[0u8; 40]].concat();
+        cache
+            .store_audio(phrase, voice, &source, 1000)
+            .await
+            .unwrap();
+        let old_mp3 = cache.prepare_at(phrase, voice, 1001).await.unwrap();
+        let key = cache_key(phrase, voice).unwrap();
+        let wav = pcm_wav();
+        write_private(&root.join("audio").join(format!("{key}.wav")), &wav)
+            .await
+            .unwrap();
+        write_private(
+            &root.join("audio").join(format!("{key}.wav.json")),
+            &serde_json::to_vec(
+                &json!({"source_sha256":hash(&source),"sha256":hash(&wav),"duration_ms":1000}),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+        cache.format = AudioFormat::Wav;
+        let prepared = cache.prepare_at(phrase, voice, 1001).await.unwrap();
+        assert!(prepared.url.ends_with(".wav"));
+        assert_eq!(prepared.evidence()["mime_type"], "audio/wav");
+        assert_eq!(prepared.evidence()["duration_ms"], 1000);
+        assert_eq!(prepared.evidence()["source_sha256"], hash(&source));
+        assert_eq!(prepared.evidence()["sha256"], hash(&wav));
+        assert_eq!(prepared.evidence()["audible_playback_verified"], false);
+        let capability = prepared.url.rsplit('/').next().unwrap();
+        let media = cache
+            .media_response_at(capability, 1300)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(media.mime_type, "audio/wav");
+        assert_eq!(media.bytes, wav);
+        assert!(
+            cache
+                .media_response_at(capability, 1301)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            cache
+                .media_response_at(capability.trim_end_matches(".wav"), 1002)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            cache
+                .media_at(old_mp3.url.rsplit('/').next().unwrap(), 1002)
+                .await
+                .unwrap(),
+            Some(source)
+        );
+        tokio::fs::write(
+            root.join("audio").join(format!("{key}.wav")),
+            b"invalid RIFF",
+        )
+        .await
+        .unwrap();
+        assert!(
+            cache
+                .media_response_at(capability, 1002)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let fallback = cache.prepare_at(phrase, voice, 1002).await.unwrap();
+        assert_eq!(fallback.evidence()["audio_format"], "mp3");
+        assert_eq!(
+            fallback.evidence()["format_fallback"],
+            "wav_unavailable_using_cached_mp3"
+        );
+        tokio::fs::remove_dir_all(root).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn wav_mode_without_source_never_attempts_provider_generation() {
+        let root = directory();
+        let mut cache = SpeechCache::new(
+            root.clone(),
+            "https://first.example",
+            Some("never-submit".into()),
+        )
+        .unwrap();
+        cache.format = AudioFormat::Wav;
+        cache.endpoint = "http://127.0.0.1:1/must-not-contact".into();
+        let error = cache
+            .prepare_at(StaticPhrase::NoMessage, "cgSgspJ2msm6clMCkdW9-v4", 1000)
+            .await
+            .err()
+            .unwrap()
+            .to_string();
+        assert_eq!(error, "WAV experiment requires an existing MP3 source");
+        assert!(!root.exists());
+    }
 
     fn directory() -> PathBuf {
         std::env::temp_dir().join(format!("firstring-speech-{}", uuid::Uuid::new_v4()))

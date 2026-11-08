@@ -1,0 +1,55 @@
+{
+  "reviewed_at": "2026-11-08T08:37:26.524290+00:00",
+  "source": "fixtures/results/2026-11-08-caller-experience-candidate1.json",
+  "review_method": "Assistant inspection of actual arguments/results against independently authored frozen rubric; not model self-grading or phone evidence.",
+  "cases": [
+    {
+      "id": "caller-experience-exact-appointment",
+      "behavior_verdict": "pass",
+      "reason": "Complete update saved with relative day/time; no meridiem invention.",
+      "turn_elapsed_ms": 1934
+    },
+    {
+      "id": "caller-experience-two-sentence-identity",
+      "behavior_verdict": "pass",
+      "reason": "Literal Morgan identity accepted; complete repair message saved without repeating identity rejection.",
+      "turn_elapsed_ms": 1410
+    },
+    {
+      "id": "caller-experience-who-answering",
+      "behavior_verdict": "fail",
+      "reason": "Caller asked who is answering; assistant instead demanded caller identity/purpose. Does not fulfill disclosure.",
+      "turn_elapsed_ms": 1281
+    },
+    {
+      "id": "caller-experience-known-purpose-human-request",
+      "behavior_verdict": "fail",
+      "reason": "Known purpose and human preference ignored; assistant asked caller identity rather than honestly offering message.",
+      "turn_elapsed_ms": 1223
+    },
+    {
+      "id": "caller-experience-declines-message",
+      "behavior_verdict": "pass",
+      "reason": "Declined message ended without saving. Automatic classifier still reports clarify for unknown object; this does not undo appropriate action.",
+      "turn_elapsed_ms": 1207
+    },
+    {
+      "id": "caller-experience-corrected-unqualified-time",
+      "behavior_verdict": "pass",
+      "reason": "Correction superseded four with five and preserved unqualified time.",
+      "turn_elapsed_ms": 1389
+    },
+    {
+      "id": "caller-experience-pickup-recipient",
+      "behavior_verdict": "fail",
+      "reason": "Incomplete pickup request incorrectly ready and saved without practical time/place. Summary asserts son instead of explicitly reporting claimed relationship.",
+      "turn_elapsed_ms": 1480
+    }
+  ],
+  "behavior_passes": 4,
+  "total": 7,
+  "native_cycles": 7,
+  "errors": 0,
+  "phones": 0,
+  "expected_answers_modified": false
+}

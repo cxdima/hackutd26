@@ -176,6 +176,8 @@ fn scenario_clips(id: &str) -> anyhow::Result<&'static [usize]> {
         "exact_appointment_george" => &[12],
         "maya_appointment_george" => &[13],
         "appointment_correction_george" => &[12, 14],
+        "model_failure_recovery_george" => &[12, 15],
+        "identity_human_decline_george" => &[16, 17, 18],
         _ => anyhow::bail!("Unknown audio fixture scenario"),
     })
 }
@@ -184,7 +186,11 @@ const FAMILY_CACHE: &str =
     ".tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e";
 const FOCUSED_CACHE: &str =
     ".tools/audio-fixtures/20261108T072946Z-2c1256e0-ea86-45a3-9b04-51bebe3131e5";
-const CLIPS: [(&str, &str, &str); 15] = [
+const RECOVERY_CACHE: &str =
+    ".tools/audio-fixtures/20261108T080537Z-15e7fd16-511b-45fe-99a9-3caca91a2f55";
+const IDENTITY_CACHE: &str =
+    ".tools/audio-fixtures/20261108T081733Z-4916b809-772d-45d9-b535-c158d44a724f";
+const CLIPS: [(&str, &str, &str); 19] = [
     (
         "clinic_opening_caller_brisk",
         "003ee739433076ec124e2b68353c6c93b37163e32c6424073f95b4b52978a58f",
@@ -260,6 +266,26 @@ const CLIPS: [(&str, &str, &str); 15] = [
         "19c1c314257480f7024a1507520d7099a130edaf4536a60534250ada0e8dab6b",
         FOCUSED_CACHE,
     ),
+    (
+        "recovery_finish_caller_george",
+        "52c948b9d81417778673b28d2504f3737a9510de332bc797dbcaa32540c2274e",
+        RECOVERY_CACHE,
+    ),
+    (
+        "identity_question_caller_george",
+        "a11d036becca32237300e8b68bc15818b0ab3dfeeba927f7d71a234c7fdc4001",
+        IDENTITY_CACHE,
+    ),
+    (
+        "identity_human_request_caller_george",
+        "088a84090a30abe53d333dac7ef14072092e34a0663e34104009e9a0dc545e52",
+        IDENTITY_CACHE,
+    ),
+    (
+        "identity_message_declined_caller_george",
+        "b5511845421aa09fc84751a1c0b41f8dad8ed118bfeffe0b32d808b83266aa47",
+        IDENTITY_CACHE,
+    ),
 ];
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -271,8 +297,22 @@ struct ScriptedCorrection {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+struct ModelFailureInjection {
+    source: String,
+    status: String,
+    synthetic: bool,
+    requests_submitted: u8,
+    turn_version: u64,
+    generation_id: u64,
+    reserved_at: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Run {
     pub leg: Leg,
+    // Private routing snapshot. Missing only on historical self-call fixtures.
+    #[serde(default)]
+    originating_e164: Option<String>,
     #[serde(default = "default_scenario")]
     scenario_id: String,
     #[serde(default)]
@@ -284,6 +324,8 @@ pub struct Run {
     started_at: i64,
     #[serde(default)]
     correction: Option<ScriptedCorrection>,
+    #[serde(default)]
+    model_failure_injection: Option<ModelFailureInjection>,
     capability: String,
     next_step: u8,
     replies: BTreeMap<u8, String>,
@@ -423,11 +465,13 @@ impl Run {
                 call_sid: None,
             },
             scenario_id: SCENARIO.into(),
+            originating_e164: None,
             inbound_ended: false,
             loop_detected: false,
             expires_at: chrono::Utc::now().timestamp() + 300,
             started_at: chrono::Utc::now().timestamp(),
             correction: None,
+            model_failure_injection: None,
             capability: format!(
                 "{}{}",
                 uuid::Uuid::new_v4().simple(),
@@ -546,7 +590,7 @@ impl Run {
         Ok(reply)
     }
     fn public(&self) -> Value {
-        json!({"scenario_id":self.scenario_id,"action_id":self.leg.action_id,"execution_mode":"live","data_origin":"synthetic","test_kind":"automated_audio_caller","destination":"owned_firstring_number_only","voice":"George","clip_count":scenario_clips(&self.scenario_id).map_or(0,|clips|clips.len()),"time_limit_seconds":90,"provider_status":self.leg.status,"provider_error_code":self.provider_error_code,"call_sid_bound":self.leg.call_sid.is_some(),"inbound_bound":self.inbound_sid.is_some(),"inbound_ended":self.inbound_ended,"outcome":self.outcome,"next_step":self.next_step,"observations":self.observations,"partial_observations":self.partial_observations,"recording_available":self.recording_sid.is_some(),"recording_duration_seconds":self.recording_duration_seconds,"human_audition":false,"noise_tested":false,"verdict":"ungraded","scripted_correction":self.correction})
+        json!({"scenario_id":self.scenario_id,"action_id":self.leg.action_id,"execution_mode":"live","data_origin":"synthetic","test_kind":"automated_audio_caller","destination":"owned_firstring_number_only","origin_route":if self.originating_e164.is_some(){"distinct_photon_line"}else{"legacy_same_line"},"voice":"George","clip_count":scenario_clips(&self.scenario_id).map_or(0,|clips|clips.len()),"time_limit_seconds":90,"provider_status":self.leg.status,"provider_error_code":self.provider_error_code,"call_sid_bound":self.leg.call_sid.is_some(),"inbound_bound":self.inbound_sid.is_some(),"inbound_ended":self.inbound_ended,"outcome":self.outcome,"next_step":self.next_step,"observations":self.observations,"partial_observations":self.partial_observations,"recording_available":self.recording_sid.is_some(),"recording_duration_seconds":self.recording_duration_seconds,"human_audition":false,"noise_tested":false,"verdict":"ungraded","scripted_correction":self.correction,"model_failure_injection":self.model_failure_injection})
     }
 }
 
@@ -794,7 +838,9 @@ pub async fn view(app: &App) -> anyhow::Result<Value> {
         "family_pickup_risky_george",
         "exact_appointment_george",
         "maya_appointment_george",
-        "appointment_correction_george"
+        "appointment_correction_george",
+        "model_failure_recovery_george",
+        "identity_human_decline_george"
     ]);
     value["noise_supported"] = json!(false);
     value["intentional_interrupt_supported"] = json!(true);
@@ -823,6 +869,85 @@ async fn public_run(store: &Store, run: &Run) -> anyhow::Result<Value> {
     value["authorization_grants"] = authorization["grants"].clone();
     Ok(value)
 }
+pub(crate) const INJECTED_MODEL_FAILURE: &str =
+    "Synthetic fixture-injected model failure; zero provider requests";
+
+pub(crate) async fn reserve_model_failure(
+    store: &Store,
+    mode: ExecutionMode,
+    session: &crate::calls::state::Session,
+) -> anyhow::Result<Option<String>> {
+    if mode != ExecutionMode::Live
+        || session.execution_mode != ExecutionMode::Live
+        || session.turn_version != 1
+        || session.inbound_ended
+        || session.end_requested
+        || session.bridge_committed
+        || session.speech_pending
+        || session.closing_reason.is_some()
+    {
+        return Ok(None);
+    }
+    let Some(run) = load(store).await? else {
+        return Ok(None);
+    };
+    if run.scenario_id != "model_failure_recovery_george"
+        || run.inbound_sid.as_deref() != Some(session.inbound_sid.as_str())
+    {
+        return Ok(None);
+    }
+    // Only an operator-created fixture reservation is eligible. Normal inbound
+    // actors and replay data cannot opt themselves into this test by their words.
+    let row: Option<(String, String, String, String)> =
+        sqlx::query_as("SELECT kind,mode,session_id,idempotency_key FROM actions WHERE id=?")
+            .bind(&run.leg.action_id)
+            .fetch_optional(&store.pool)
+            .await?;
+    let Some((kind, execution, owner, key)) = row else {
+        return Ok(None);
+    };
+    if kind != "fixture_caller"
+        || execution != "live"
+        || owner != "audio-fixture"
+        || !key
+            .strip_prefix("audio-fixture:request:")
+            .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok())
+    {
+        return Ok(None);
+    }
+    change_action(store, &run.leg.action_id, |current| {
+        let now = chrono::Utc::now().timestamp();
+        if current.scenario_id != "model_failure_recovery_george"
+            || current.inbound_sid.as_deref() != Some(session.inbound_sid.as_str())
+            || current.inbound_ended
+            || current.loop_detected
+            || current.leg.status != "in-progress"
+            || current.next_step != 2
+            || current
+                .leg
+                .call_sid
+                .as_deref()
+                .is_none_or(|sid| !twilio::valid_call_sid(sid) || sid == session.inbound_sid)
+            || current.model_failure_injection.is_some()
+            || now >= current.expires_at
+            || now >= current.started_at.saturating_add(90)
+        {
+            return Ok(None);
+        }
+        current.model_failure_injection = Some(ModelFailureInjection {
+            source: "designated_fixture_pre_http_failure".into(),
+            status: "reserved_once".into(),
+            synthetic: true,
+            requests_submitted: 0,
+            turn_version: session.turn_version,
+            generation_id: session.generation_id,
+            reserved_at: chrono::Utc::now().to_rfc3339(),
+        });
+        Ok(Some(current.leg.action_id.clone()))
+    })
+    .await
+}
+
 pub async fn start(app: &App, scenario: &str) -> anyhow::Result<Value> {
     start_request(app, scenario, None).await
 }
@@ -872,11 +997,15 @@ pub async fn start_request(
         }
         return view(app).await;
     }
+    // Idempotent returns above keep old reservations valid even if the startup
+    // origin changes. Only a new reservation requires the distinct designated line.
+    let originating_e164 = app.twilio.fixture_origin()?.to_owned();
     for index in clips {
         clip(*index).await?;
     }
     let mut run = Run::new();
     run.scenario_id = scenario.into();
+    run.originating_e164 = Some(originating_e164);
     let (existing, fresh) = app
         .store
         .reserve("audio-fixture", &key, &run.leg, ExecutionMode::Live)
@@ -904,7 +1033,13 @@ pub async fn start_request(
     let response = public_run(&app.store, &run).await?;
     let app = app.clone();
     tokio::spawn(async move {
-        let outcome = app.twilio.create_fixture(&run.leg).await;
+        let outcome = app
+            .twilio
+            .create_fixture(
+                &run.leg,
+                run.originating_e164.as_deref().unwrap_or_default(),
+            )
+            .await;
         let _ = change_action(&app.store, &run.leg.action_id, |state| {
             match outcome {
                 CreateOutcome::Accepted { sid, status } => {
@@ -1085,7 +1220,7 @@ fn owned_origin(from: &str, number: &str) -> bool {
 /// Signed provider ingress + the pending one-attempt reservation correlates this
 /// local canary. Caller ID alone is not proof of identity outside this test.
 pub async fn bind_inbound(app: &App, sid: &str, from: &str) -> anyhow::Result<u8> {
-    if app.config.mode != ExecutionMode::Live || !owned_origin(from, &app.config.photon_number) {
+    if app.config.mode != ExecutionMode::Live {
         return Ok(0);
     }
     let Some(run) = load(&app.store).await? else {
@@ -1095,7 +1230,15 @@ pub async fn bind_inbound(app: &App, sid: &str, from: &str) -> anyhow::Result<u8
         return Ok(0);
     }
     change_action(&app.store, &run.leg.action_id, |run| {
-        if terminal(&run.leg.status) || chrono::Utc::now().timestamp() >= run.expires_at {
+        if terminal(&run.leg.status)
+            || chrono::Utc::now().timestamp() >= run.expires_at
+            || !owned_origin(
+                from,
+                run.originating_e164
+                    .as_deref()
+                    .unwrap_or(&app.config.photon_number),
+            )
+        {
             return Ok(0);
         }
         run.bind(sid)
@@ -1614,6 +1757,210 @@ mod tests {
         assert!(app.store.events_after(0).await.unwrap().is_empty());
     }
 
+    async fn recovery_fixture(app: &App) -> (Run, crate::calls::state::Session) {
+        let (mut run, mut session) = correction_fixture();
+        run.scenario_id = "model_failure_recovery_george".into();
+        session.closing_reason = None;
+        session.speech_pending = false;
+        session.commit_turn("Sarah has an appointment tomorrow at four.");
+        session.turn_version = 1;
+        let request_key = format!("audio-fixture:request:{}", uuid::Uuid::new_v4());
+        app.store
+            .reserve("audio-fixture", &request_key, &run.leg, ExecutionMode::Live)
+            .await
+            .unwrap();
+        app.store
+            .set_metadata(
+                &run_key(&run.leg.action_id),
+                &serde_json::to_string(&run).unwrap(),
+            )
+            .await
+            .unwrap();
+        app.store
+            .set_metadata(ACTIVE, &run.leg.action_id)
+            .await
+            .unwrap();
+        (run, session)
+    }
+
+    #[tokio::test]
+    async fn model_failure_injection_requires_designated_live_bound_first_turn_and_is_once() {
+        let app = app().await;
+        let (run, mut session) = recovery_fixture(&app).await;
+        assert!(
+            reserve_model_failure(&app.store, ExecutionMode::Replay, &session)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let sid = session.inbound_sid.clone();
+        session.inbound_sid = "CA33333333333333333333333333333333".into();
+        assert!(
+            reserve_model_failure(&app.store, ExecutionMode::Live, &session)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        session.inbound_sid = sid;
+        session.turn_version = 2;
+        assert!(
+            reserve_model_failure(&app.store, ExecutionMode::Live, &session)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        session.turn_version = 1;
+        let (left, right) = tokio::join!(
+            reserve_model_failure(&app.store, ExecutionMode::Live, &session),
+            reserve_model_failure(&app.store, ExecutionMode::Live, &session)
+        );
+        assert_eq!(
+            usize::from(left.unwrap().is_some()) + usize::from(right.unwrap().is_some()),
+            1,
+            "Exactly one durable pre-HTTP failure reservation"
+        );
+        assert!(
+            reserve_model_failure(&app.store, ExecutionMode::Live, &session)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let restored = load_action(&app.store, &run.leg.action_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            restored.public()["model_failure_injection"]["requests_submitted"],
+            0
+        );
+        assert_eq!(
+            restored.public()["model_failure_injection"]["synthetic"],
+            true
+        );
+        assert_eq!(
+            restored.public()["model_failure_injection"]["turn_version"],
+            1
+        );
+        assert_eq!(app.store.actions("audio-fixture").await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn injected_first_failure_submits_no_http_then_real_native_loop_saves_preserved_facts() {
+        use axum::{Json, Router, routing::post};
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+        let calls = Arc::new(AtomicUsize::new(0));
+        let requests = Arc::new(std::sync::Mutex::new(Vec::<Value>::new()));
+        let count = calls.clone();
+        let captured = requests.clone();
+        let router = Router::new().route("/chat", post(move |Json(body): Json<Value>| {
+            let index = count.fetch_add(1, Ordering::SeqCst);
+            captured.lock().unwrap().push(body.clone());
+            async move {
+                let context: Value = serde_json::from_str(body["messages"].as_array().unwrap().iter().find(|m| m["role"] == "user").unwrap()["content"].as_str().unwrap()).unwrap();
+                let turns = context["turns"].as_array().unwrap();
+                let latest = turns.iter().rev().find(|t| t["speaker"] == "caller").unwrap();
+                let original = turns.iter().find(|t| t["speaker"] == "caller").unwrap();
+                let evidence = json!([{"turn_id":latest["id"],"quote":latest["text"]}]);
+                let (name, arguments) = if index == 0 { ("record_assessment", json!({"observation":{"speech_act":"request","requested_object":"routine_information","direction":"caller_requests_from_sarah"},"evidence_refs":evidence,"understanding":{"version":1,"claimed_identity":null,"purpose":"Pass along the appointment reminder","requested_action":"Save the supplied message","supplied_facts":[{"turn_id":original["id"],"quote":original["text"]}],"missing_information":[],"readiness":"caller_declined"}})) } else { ("take_message", json!({"summary":"Sarah has an appointment tomorrow at four.","evidence_refs":evidence})) };
+                Json(json!({"model":"local-recovery-fixture","choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","content":null,"tool_calls":[{"id":format!("recovery-native-{index}"),"type":"function","function":{"name":name,"arguments":arguments.to_string()}}]}}]}))
+            }
+        }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut app = app().await;
+        let config = Arc::make_mut(&mut app.config);
+        config.mode = ExecutionMode::Live;
+        config.nvidia_key = "local-recovery-only".into();
+        config.model_url = format!("http://{}/chat", listener.local_addr().unwrap());
+        config.model = "local-recovery-fixture".into();
+        let provider = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+        let (run, session) = recovery_fixture(&app).await;
+        let (handle, _) = app.incoming(&session.inbound_sid).await.unwrap();
+        let mut audio = handle.audio.subscribe();
+        handle
+            .send(crate::calls::actor::Input::FinalPrompt {
+                text: "Sarah has an appointment tomorrow at four.".into(),
+            })
+            .await
+            .unwrap();
+        let first = tokio::time::timeout(std::time::Duration::from_secs(2), audio.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(first.payload["type"], "text");
+        assert!(
+            first.payload["token"]
+                .as_str()
+                .unwrap()
+                .contains("couldn't save")
+        );
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            0,
+            "Injected failure must precede HTTP"
+        );
+        let events = app.store.events_after(0).await.unwrap();
+        let injected = events
+            .iter()
+            .find(|event| event.kind == "model.failure.injected")
+            .expect("Explicit synthetic provenance is required");
+        assert_eq!(injected.payload["requests_submitted"], 0);
+        assert_eq!(injected.payload["synthetic"], true);
+        assert!(
+            !events
+                .iter()
+                .any(|event| event.kind == "model.request.completed")
+        );
+        assert!(events.iter().any(|event| event.kind == "dependency.failed"
+            && event.payload["provider"] == "fixture_injection"));
+        handle
+            .send(crate::calls::actor::Input::FinalPrompt {
+                text: "That’s all, please save that message.".into(),
+            })
+            .await
+            .unwrap();
+        let second = tokio::time::timeout(std::time::Duration::from_secs(2), audio.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(second.payload["type"], "end");
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        let state = handle
+            .send(crate::calls::actor::Input::Snapshot)
+            .await
+            .unwrap();
+        assert_eq!(
+            state["message"]["summary"],
+            "Sarah has an appointment tomorrow at four."
+        );
+        assert_eq!(state["closing_reason"], "message_saved");
+        assert_eq!(state["inbound_ended"], false);
+        {
+            let captured = requests.lock().unwrap();
+            assert_eq!(
+                captured[1]["messages"].as_array().unwrap().last().unwrap()["tool_call_id"],
+                "recovery-native-0"
+            );
+            assert!(
+                captured[0]
+                    .to_string()
+                    .contains("Sarah has an appointment tomorrow at four.")
+            );
+        }
+        assert_eq!(app.store.actions("audio-fixture").await.unwrap().len(), 1);
+        assert!(
+            load_action(&app.store, &run.leg.action_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .correction
+                .is_none()
+        );
+        provider.abort();
+    }
+
     #[tokio::test]
     async fn focused_appointments_play_exact_one_clip_without_implicit_correction() {
         let app = app().await;
@@ -1684,6 +2031,84 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(actions, 0);
+    }
+
+    #[tokio::test]
+    async fn identity_human_decline_runs_three_actual_reply_gates_without_forcing_later_turns() {
+        let app = app().await;
+        let scenario = "identity_human_decline_george";
+        let clips =
+            scenario_clips(scenario).expect("Focused identity/human scenario must be allowlisted");
+        assert_eq!(clips.len(), 3);
+        for (index, expected) in [
+            "identity_question_caller_george",
+            "identity_human_request_caller_george",
+            "identity_message_declined_caller_george",
+        ]
+        .iter()
+        .enumerate()
+        {
+            assert_eq!(CLIPS[clips[index]].0, *expected);
+        }
+        let mut run = Run::new();
+        run.scenario_id = scenario.into();
+        assert!(
+            !run.respond("https://fixture.example", SID, 0, "", "")
+                .unwrap()
+                .contains("<Play>")
+        );
+        for (step, actual_reply) in [
+            (1, "How can I help?"),
+            (2, "I'm Sarah's assistant."),
+            (
+                3,
+                "Sarah cannot take this call. Would you like to leave a message?",
+            ),
+        ] {
+            let xml = run
+                .respond("https://fixture.example", SID, step, actual_reply, "0.9")
+                .unwrap();
+            assert!(xml.contains(&format!("/{}</Play>", step - 1)));
+            assert_eq!(
+                run.observations.last().unwrap()["speech_result"],
+                actual_reply
+            );
+        }
+        assert_eq!(
+            run.respond(
+                "https://fixture.example",
+                SID,
+                4,
+                "Thanks for calling. Goodbye.",
+                "0.9"
+            )
+            .unwrap(),
+            "<Response><Hangup/></Response>"
+        );
+        assert!(run.correction.is_none() && run.model_failure_injection.is_none());
+        let mut early = Run::new();
+        early.scenario_id = scenario.into();
+        early
+            .respond("https://fixture.example", SID, 0, "", "")
+            .unwrap();
+        early
+            .respond("https://fixture.example", SID, 1, "How can I help?", "0.9")
+            .unwrap();
+        early.inbound_ended = true;
+        assert_eq!(
+            early
+                .respond("https://fixture.example", SID, 2, "Goodbye.", "0.9")
+                .unwrap(),
+            "<Response><Hangup/></Response>"
+        );
+        assert!(
+            start_request(&app, scenario, Some(&uuid::Uuid::new_v4().to_string()))
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("Replay cannot call")
+        );
+        assert!(app.store.actions("audio-fixture").await.unwrap().is_empty());
     }
 
     #[tokio::test]
@@ -2199,13 +2624,14 @@ mod tests {
             "Replay must remain inert"
         );
         assert!(matches!(
-            app.twilio.create_fixture(&run.leg).await,
+            app.twilio.create_fixture(&run.leg, "+15555550102").await,
             CreateOutcome::Rejected { status: 503, .. }
         ));
     }
     #[tokio::test]
     async fn provider_fixture_form_pins_owned_number_and_recording_duration() {
-        let app = app().await;
+        let mut app = app().await;
+        app.twilio.fixture_from_e164 = "+15555550102".into();
         let run = Run::new();
         let form = app.twilio.fixture_call_form(&run.leg);
         let field = |key: &str| {
@@ -2219,13 +2645,167 @@ mod tests {
             field("To"),
             "sip:+15555550101@sip.example.invalid:5061;transport=tls;secure=true"
         );
-        assert_eq!(field("From"), app.config.photon_number);
+        assert_eq!(field("From"), "+15555550102");
+        assert_ne!(field("From"), app.config.photon_number);
+        assert_eq!(field("SipAuthUsername"), app.config.sip_username);
+        assert_eq!(field("SipAuthPassword"), app.config.sip_password);
         assert_eq!(field("TimeLimit"), "90");
         assert_eq!(field("Record"), "true");
         assert_eq!(field("RecordingChannels"), "dual");
         assert!(field("Url").ends_with(&format!("/voice/fixture/{}/0", run.leg.action_id)));
         assert!(field("StatusCallback").ends_with(&format!("action_id={}", run.leg.action_id)));
         assert!(!form.iter().any(|(key, _)| key == "Twiml"));
+        assert_eq!(
+            form.iter()
+                .filter(|(key, _)| key == "StatusCallbackEvent")
+                .map(|(_, value)| value.as_str())
+                .collect::<Vec<_>>(),
+            ["initiated", "ringing", "answered", "completed"]
+        );
+        let ordinary = app
+            .twilio
+            .call_form(&run.leg, "+15555550103", "/voice/alert");
+        assert_eq!(
+            ordinary.iter().find(|(key, _)| key == "From").unwrap().1,
+            app.config.photon_number
+        );
+    }
+
+    #[tokio::test]
+    async fn distinct_fixture_origin_is_private_persisted_and_binds_after_restart_without_reset() {
+        let mut app = app().await;
+        let mut config = (*app.config).clone();
+        config.mode = ExecutionMode::Live;
+        app.config = std::sync::Arc::new(config);
+        for n in 0..14 {
+            if n == 4 {
+                app.store
+                    .record_fixture_authorization(&additional_grant("second-line-does-not-reset"))
+                    .await
+                    .unwrap();
+            }
+            seed_terminal(&app, &format!("historical-{n}"), "completed", true).await;
+        }
+        let run = Run::new();
+        let mut raw = serde_json::to_value(&run).unwrap();
+        raw["originating_e164"] = json!("+15555550102");
+        app.store
+            .reserve(
+                "audio-fixture",
+                "new-distinct-origin",
+                &run.leg,
+                ExecutionMode::Live,
+            )
+            .await
+            .unwrap();
+        app.store
+            .set_metadata(&run_key(&run.leg.action_id), &raw.to_string())
+            .await
+            .unwrap();
+        app.store
+            .set_metadata(ACTIVE, &run.leg.action_id)
+            .await
+            .unwrap();
+        let reloaded = load(&app.store).await.unwrap().unwrap();
+        assert_eq!(
+            serde_json::to_value(&reloaded).unwrap()["originating_e164"],
+            "+15555550102"
+        );
+        assert!(!reloaded.public().to_string().contains("+15555550102"));
+        assert_eq!(
+            bind_inbound(&app, SID, &app.config.photon_number)
+                .await
+                .unwrap(),
+            0
+        );
+        assert_eq!(bind_inbound(&app, SID, "+15555550103").await.unwrap(), 0);
+        assert_eq!(
+            bind_inbound(&app, SID, "sip:+15555550102@sip.example.invalid")
+                .await
+                .unwrap(),
+            1
+        );
+        assert_eq!(bind_inbound(&app, SID, "+15555550102").await.unwrap(), 0);
+        let saved = load_action(&app.store, &run.leg.action_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.inbound_sid.as_deref(), Some(SID));
+        assert_eq!(
+            serde_json::to_value(saved).unwrap()["originating_e164"],
+            "+15555550102"
+        );
+        let public = view(&app).await.unwrap();
+        assert_eq!(public["attempt_count"], 15);
+        assert_eq!(public["max_attempts"], 26);
+        assert_eq!(public["remaining_attempts"], 11);
+    }
+
+    #[tokio::test]
+    async fn new_fixture_requires_a_distinct_server_origin_before_reservation_and_replay_stays_inert()
+     {
+        let mut app = app().await;
+        app.twilio.fixture_from_e164 = "+15555550102".into();
+        assert!(
+            start_request(&app, SCENARIO, Some(&uuid::Uuid::new_v4().to_string()))
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("Replay cannot call")
+        );
+        let mut config = (*app.config).clone();
+        config.mode = ExecutionMode::Live;
+        config.nvidia_key = "fixture-no-network".into();
+        app.config = std::sync::Arc::new(config);
+        // The provider adapter itself remains replay, so even a failed gate test cannot dial.
+        for origin in [
+            "",
+            "+15555550101",
+            "sip:+15555550102@example.invalid",
+            " +15555550102",
+        ] {
+            app.twilio.fixture_from_e164 = origin.into();
+            let error = start_request(&app, SCENARIO, Some(&uuid::Uuid::new_v4().to_string()))
+                .await
+                .unwrap_err();
+            assert!(
+                error.to_string().contains("AUTOMATED_CALLER_FROM_E164"),
+                "{error}"
+            );
+            assert!(app.store.actions("audio-fixture").await.unwrap().is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn legacy_fixture_callbacks_keep_the_original_origin_without_new_configuration() {
+        let mut app = app().await;
+        let run = reserved(&app).await;
+        let mut config = (*app.config).clone();
+        config.mode = ExecutionMode::Live;
+        app.config = std::sync::Arc::new(config);
+        app.twilio.fixture_from_e164 = "+15555550102".into();
+        assert_eq!(bind_inbound(&app, SID, "+15555550102").await.unwrap(), 0);
+        assert_eq!(
+            bind_inbound(&app, SID, &app.config.photon_number)
+                .await
+                .unwrap(),
+            1
+        );
+        assert!(
+            status(
+                &app,
+                &run.leg.action_id,
+                "CA22222222222222222222222222222222",
+                "completed"
+            )
+            .await
+            .unwrap()
+        );
+        assert_eq!(
+            load(&app.store).await.unwrap().unwrap().leg.status,
+            "completed"
+        );
+        assert_eq!(view(&app).await.unwrap()["attempt_count"], 1);
     }
     #[tokio::test]
     async fn signed_status_reconciles_lost_create_and_never_regresses() {

@@ -9,6 +9,7 @@ use std::{sync::Arc, time::Duration};
 pub struct Twilio {
     pub config: Arc<Config>,
     client: reqwest::Client,
+    pub(crate) fixture_from_e164: String,
 }
 #[derive(Debug)]
 pub enum CreateOutcome {
@@ -25,6 +26,7 @@ impl Twilio {
     pub fn new(config: Arc<Config>) -> anyhow::Result<Self> {
         Ok(Self {
             config,
+            fixture_from_e164: std::env::var("AUTOMATED_CALLER_FROM_E164").unwrap_or_default(),
             client: reqwest::Client::builder()
                 .timeout(Duration::from_secs(8))
                 .redirect(reqwest::redirect::Policy::none())
@@ -87,9 +89,17 @@ impl Twilio {
         };
         self.submit(self.call_form(leg, target, twiml_path)).await
     }
-    /// Dedicated one-attempt test harness; it cannot select a contact or a number.
+    pub(crate) fn fixture_origin(&self) -> anyhow::Result<&str> {
+        anyhow::ensure!(
+            crate::config::is_e164(&self.fixture_from_e164)
+                && self.fixture_from_e164 != self.config.photon_number,
+            "AUTOMATED_CALLER_FROM_E164 must be a designated E.164 Photon line distinct from PHOTON_NUMBER"
+        );
+        Ok(&self.fixture_from_e164)
+    }
+    /// Dedicated bounded test harness; the model cannot select either endpoint.
     /// The harness persists its global reservation before calling this method.
-    pub(crate) async fn create_fixture(&self, leg: &Leg) -> CreateOutcome {
+    pub(crate) async fn create_fixture(&self, leg: &Leg, reserved_origin: &str) -> CreateOutcome {
         let c = &self.config;
         if c.mode != ExecutionMode::Live || !c.outbound_configured() {
             return CreateOutcome::Rejected {
@@ -102,6 +112,7 @@ impl Twilio {
             || c.smoke_authorized
             || c.handoff_enabled
             || c.family_enabled
+            || self.fixture_origin().ok() != Some(reserved_origin)
         {
             return CreateOutcome::Rejected {
                 status: 403,
@@ -120,6 +131,8 @@ impl Twilio {
         for (key, value) in &mut form {
             if key == "TimeLimit" {
                 *value = c.max_call_seconds.min(90).to_string();
+            } else if key == "From" {
+                *value = self.fixture_from_e164.clone();
             }
         }
         form.extend([

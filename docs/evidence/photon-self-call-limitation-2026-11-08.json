@@ -1,0 +1,25 @@
+{
+  "recorded_at": "2026-11-08T08:28:19.805179+00:00",
+  "source": "User-supplied email screenshot from Photon support",
+  "provider_statement": "Same-line self-calls connect but do not appear in Photon call history; recommended regular phone or another line for inbound testing.",
+  "interpretation": "Distinct source solves self-call routing/history limitation, not the carrier risk from repetitive automated traffic. Favor direct inference/development evaluation; sparse targeted phone checks only.",
+  "automated_calls": "sparse distinct-origin integration checks; direct GPU evaluation remains primary iteration",
+  "historical_attempts_reserved": 15,
+  "total_allowance": 26,
+  "remaining_attempts": 11,
+  "twilio_read_only_inventory": {
+    "account_incoming_phone_numbers": 0,
+    "account_verified_outgoing_caller_ids": 0,
+    "read_at_utc": "2026-11-08T08:27:00Z"
+  },
+  "evidence_scope": "Existing Twilio callbacks, production ASR, native inference/action receipts and captured recordings remain evidence of those actual interactions. No Photon call-history visibility is claimed.",
+  "new_calls_or_purchases": 0,
+  "followup_at": "2026-11-08T08:37:01.947791+00:00",
+  "provider_clarification": "User supplied follow-up: self-calling is not prohibited by current policy; repeated automated calls may trigger carrier spam flags. Photon recommends regular phone or direct LiveKit tests; self-calls absent from call history.",
+  "distinct_origin_readback": "2026-11-08T08:32:46Z: active voice-capable line, effective default profile outbound MD5/TLS/SRTP ready; account readback only.",
+  "distinct_origin_live_proof": {
+    "attempt": 16,
+    "result": "correct appointment message saved; caller-side goodbye recognized; both legs completed; recording retained",
+    "receipt": "automated-caller-campaign-2026-11-08.json"
+  }
+}

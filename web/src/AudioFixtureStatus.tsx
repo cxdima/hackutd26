@@ -17,6 +17,8 @@ const fixtureStatus = z.object({
     "exact_appointment_george",
     "maya_appointment_george",
     "appointment_correction_george",
+    "model_failure_recovery_george",
+    "identity_human_decline_george",
   ]),
   destination: z.literal("owned_firstring_number_only"),
   test_kind: z.literal("automated_audio_caller"),
@@ -59,6 +61,10 @@ const scenarioNames: Record<FixtureStatus["scenario_id"], string> = {
   exact_appointment_george: "Appointment with exact time",
   maya_appointment_george: "Maya appointment",
   appointment_correction_george: "Appointment time correction",
+  model_failure_recovery_george:
+    "Deliberately injected model failure → recovery",
+  identity_human_decline_george:
+    "Assistant identity → human request → message declined",
 };
 
 /** Read-only: refreshing this panel cannot start or retry a caller leg. */

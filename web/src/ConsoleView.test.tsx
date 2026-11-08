@@ -828,6 +828,42 @@ it("shows a persisted message only in the private view without claiming it was d
   );
 });
 
+it("marks an earlier saved message when a later correction has not been stored", () => {
+  const snapshot = stateSchema.parse({
+    ...state,
+    sessions: [
+      {
+        ...state.sessions[0],
+        offer: null,
+        legs: [],
+        turn_version: 2,
+        message: {
+          summary: "Appointment tomorrow at four.",
+          recorded_at: "2026-11-08T00:00:00Z",
+          turn_version: 1,
+          evidence_turn_ids: ["t1"],
+        },
+      },
+    ],
+  });
+  render(
+    <ConsoleView
+      state={snapshot}
+      events={[]}
+      stale={false}
+      busy={null}
+      onAction={vi.fn()}
+    />,
+  );
+  const saved = screen.getByRole("article", { name: "Private saved message" });
+  expect(within(saved).getByRole("heading")).toHaveTextContent(
+    "Earlier saved message",
+  );
+  expect(saved).toHaveTextContent("Saved from caller turn 1");
+  expect(saved).toHaveTextContent("Latest caller turn 2 is not included");
+  expect(saved).toHaveTextContent("Appointment tomorrow at four.");
+});
+
 it.each([false, true])(
   "distinguishes saved-message closing from a received call end: ended=%s",
   (ended) => {

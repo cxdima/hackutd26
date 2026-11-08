@@ -1,0 +1,14 @@
+{
+  "status": "deployed",
+  "recorded_at": "2026-11-08T08:00:00.180469+00:00",
+  "pid": 8768,
+  "command": ".tools/firstring-campaign-flux-trial",
+  "backend": "brev_hosted",
+  "binary_sha256": "c7a82580bbe55fd4dfc8c7fbcc46e2c2815b173f259710aa3031f63fb630a501",
+  "supervisor_pid": 8770,
+  "public_base_url": "https://printers-saints-hay-camcorder.trycloudflare.com",
+  "handoff_calls_enabled": false,
+  "family_calls_enabled": false,
+  "calls_started": 0,
+  "database_backup": "local_only"
+}

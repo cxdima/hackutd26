@@ -1,0 +1,41 @@
+{
+  "reviewed_at": "2026-11-08T08:51:00.726413+00:00",
+  "method": "Separate frontend agent inspected actual arguments/results against frozen authored rubric; no model self-grading, no phone proof.",
+  "behavior_passes": 3,
+  "total": 7,
+  "cases": [
+    {
+      "id": "caller-experience-exact-appointment",
+      "verdict": "pass"
+    },
+    {
+      "id": "caller-experience-two-sentence-identity",
+      "verdict": "pass"
+    },
+    {
+      "id": "caller-experience-who-answering",
+      "verdict": "fail"
+    },
+    {
+      "id": "caller-experience-known-purpose-human-request",
+      "verdict": "fail"
+    },
+    {
+      "id": "caller-experience-declines-message",
+      "verdict": "native_failure"
+    },
+    {
+      "id": "caller-experience-corrected-unqualified-time",
+      "verdict": "pass_with_detail_omission"
+    },
+    {
+      "id": "caller-experience-pickup-recipient",
+      "verdict": "fail"
+    }
+  ],
+  "remaining_defects": [
+    "Human request repeats known purpose and omits honest unavailable-connection/message response.",
+    "Pickup recipient reversed in candidate2; candidate3 knows Alex but redundantly asks who needs pickup.",
+    "Candidate3 identity speech improves but internal purpose still misattributes the identity question."
+  ]
+}

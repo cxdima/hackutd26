@@ -1,0 +1,1473 @@
+{
+  "assessment_contract": "call_understanding_v1",
+  "backend": "brev_hosted",
+  "backend_evidence": "Configured adapter selection; this label alone does not prove GPU execution",
+  "case_count": 7,
+  "cases": [
+    {
+      "authentication_request": false,
+      "capabilities": {
+        "clinic_contact_enrolled": false,
+        "family_callback_available": false,
+        "family_contact_enrolled": false,
+        "handoff_available": false,
+        "message_taking_available": true
+      },
+      "category": "exact-appointment",
+      "clarification": false,
+      "clarification_required": false,
+      "classification_correct": true,
+      "closing_requested": true,
+      "closure_correct": null,
+      "comparison_review": null,
+      "completed_external_action": false,
+      "error": null,
+      "evidence_valid": true,
+      "expected_authentication_request": false,
+      "expected_classification": "benign",
+      "expected_readiness": "ready",
+      "id": "caller-experience-exact-appointment",
+      "literal_fact_coverage": null,
+      "next_tool": "take_message",
+      "next_tool_allowed": true,
+      "observation": {
+        "direction": "caller_supplies",
+        "requested_object": "routine_information",
+        "speech_act": "statement"
+      },
+      "predicted_classification": "benign",
+      "predicted_readiness": "ready",
+      "readiness_correct": true,
+      "recorded_summary": "Lakeview Clinic: Sarah's appointment moved to tomorrow at four.",
+      "simulated_local_outcome": "message_recorded",
+      "summary_review_rubric": {
+        "accepted_next_tools": [
+          "take_message"
+        ],
+        "expected_readiness": "ready",
+        "forbidden_claims": [
+          "Identity verified",
+          "Message delivered",
+          "Contact called",
+          "Unsupported AM or PM"
+        ],
+        "id": "caller-experience-exact-appointment",
+        "rationale": "Independent manual semantic review required: Save the complete appointment notice once. Do not ask for an AM/PM qualifier, repeat the time question, claim delivery or verify the clinic.",
+        "required_summary_facts": [
+          "Clinic appointment changed",
+          "Tomorrow at four, with no invented AM or PM"
+        ]
+      },
+      "trace": [
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "I'm calling from Lakeview Clinic. Sarah's appointment moved to tomorrow at four.",
+                "turn_id": "turn-1"
+              }
+            ],
+            "observation": {
+              "direction": "caller_supplies",
+              "requested_object": "routine_information",
+              "speech_act": "statement"
+            },
+            "understanding": {
+              "claimed_identity": null,
+              "missing_information": [],
+              "purpose": "inform Sarah of appointment change",
+              "readiness": "ready",
+              "requested_action": "inform Sarah of appointment change",
+              "supplied_facts": [
+                {
+                  "quote": "I'm calling from Lakeview Clinic. Sarah's appointment moved to tomorrow at four.",
+                  "turn_id": "turn-1"
+                }
+              ],
+              "version": 1
+            }
+          },
+          "name": "record_assessment",
+          "result": {
+            "epoch": 0,
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [],
+                  "purpose": "inform Sarah of appointment change",
+                  "readiness": "ready",
+                  "requested_action": "inform Sarah of appointment change",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "I'm calling from Lakeview Clinic. Sarah's appointment moved to tomorrow at four.",
+                          "turn_id": "turn-1"
+                        }
+                      ],
+                      "text": "I'm calling from Lakeview Clinic. Sarah's appointment moved to tomorrow at four."
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "step": 1,
+          "tool_call_id": "chatcmpl-tool-9739a406a5166aa7"
+        },
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "I'm calling from Lakeview Clinic. Sarah's appointment moved to tomorrow at four.",
+                "turn_id": "turn-1"
+              }
+            ],
+            "summary": "Lakeview Clinic: Sarah's appointment moved to tomorrow at four."
+          },
+          "name": "take_message",
+          "result": {
+            "epoch": 0,
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": true,
+              "recorded_summary": "Lakeview Clinic: Sarah's appointment moved to tomorrow at four.",
+              "stop": true
+            }
+          },
+          "step": 2,
+          "synthetic_spoken_reply": null,
+          "tool_call_id": "chatcmpl-tool-bc78919f23fbb83f"
+        }
+      ],
+      "turn_elapsed_ms": 1937,
+      "understanding": {
+        "generation_id": 1,
+        "policy_epoch": 0,
+        "turn_version": 1,
+        "understanding": {
+          "claimed_identity": null,
+          "missing_information": [],
+          "purpose": "inform Sarah of appointment change",
+          "readiness": "ready",
+          "requested_action": "inform Sarah of appointment change",
+          "supplied_facts": [
+            {
+              "evidence_refs": [
+                {
+                  "quote": "I'm calling from Lakeview Clinic. Sarah's appointment moved to tomorrow at four.",
+                  "turn_id": "turn-1"
+                }
+              ],
+              "text": "I'm calling from Lakeview Clinic. Sarah's appointment moved to tomorrow at four."
+            }
+          ],
+          "version": 1
+        }
+      },
+      "unscored": [
+        "Phone delivery, acknowledgement, consent and stale acceptance are not simulated.",
+        "Question relevance requires human review of retained synthetic replies."
+      ],
+      "useful_action": true
+    },
+    {
+      "authentication_request": false,
+      "capabilities": {
+        "clinic_contact_enrolled": false,
+        "family_callback_available": false,
+        "family_contact_enrolled": false,
+        "handoff_available": false,
+        "message_taking_available": true
+      },
+      "category": "identity-claim",
+      "clarification": false,
+      "clarification_required": false,
+      "classification_correct": true,
+      "closing_requested": true,
+      "closure_correct": null,
+      "comparison_review": null,
+      "completed_external_action": false,
+      "error": null,
+      "evidence_valid": true,
+      "expected_authentication_request": false,
+      "expected_classification": "benign",
+      "expected_readiness": "ready",
+      "id": "caller-experience-two-sentence-identity",
+      "literal_fact_coverage": null,
+      "next_tool": "take_message",
+      "next_tool_allowed": true,
+      "observation": {
+        "direction": "caller_supplies",
+        "requested_object": "routine_information",
+        "speech_act": "statement"
+      },
+      "predicted_classification": "benign",
+      "predicted_readiness": "ready",
+      "readiness_correct": true,
+      "recorded_summary": "Morgan from a repair company reports the technician will arrive tomorrow at two.",
+      "simulated_local_outcome": "message_recorded",
+      "summary_review_rubric": {
+        "accepted_next_tools": [
+          "take_message"
+        ],
+        "expected_readiness": "ready",
+        "forbidden_claims": [
+          "Identity verified",
+          "Message delivered",
+          "Contact called",
+          "Unsupported AM or PM"
+        ],
+        "id": "caller-experience-two-sentence-identity",
+        "rationale": "Independent manual semantic review required: Identity must be a continuous exact caller substring or null; do not concatenate name and affiliation from separate sentences. Save the complete update without invented AM/PM.",
+        "required_summary_facts": [
+          "Unverified repair-company caller",
+          "Technician arrives tomorrow at two"
+        ]
+      },
+      "trace": [
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "My name is Morgan. I'm with a repair company. Please tell Sarah the technician will arrive tomorrow at two.",
+                "turn_id": "turn-1"
+              }
+            ],
+            "observation": {
+              "direction": "caller_supplies",
+              "requested_object": "routine_information",
+              "speech_act": "statement"
+            },
+            "understanding": {
+              "claimed_identity": "Morgan",
+              "missing_information": [],
+              "purpose": "inform Sarah of technician arrival time",
+              "readiness": "ready",
+              "requested_action": "inform Sarah",
+              "supplied_facts": [
+                {
+                  "quote": "My name is Morgan. I'm with a repair company. Please tell Sarah the technician will arrive tomorrow at two.",
+                  "turn_id": "turn-1"
+                }
+              ],
+              "version": 1
+            }
+          },
+          "name": "record_assessment",
+          "result": {
+            "epoch": 0,
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": "Morgan",
+                  "missing_information": [],
+                  "purpose": "inform Sarah of technician arrival time",
+                  "readiness": "ready",
+                  "requested_action": "inform Sarah",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "My name is Morgan. I'm with a repair company. Please tell Sarah the technician will arrive tomorrow at two.",
+                          "turn_id": "turn-1"
+                        }
+                      ],
+                      "text": "My name is Morgan. I'm with a repair company. Please tell Sarah the technician will arrive tomorrow at two."
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "step": 1,
+          "tool_call_id": "chatcmpl-tool-abb3f68d227c20e9"
+        },
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "My name is Morgan. I'm with a repair company. Please tell Sarah the technician will arrive tomorrow at two.",
+                "turn_id": "turn-1"
+              }
+            ],
+            "summary": "Morgan from a repair company reports the technician will arrive tomorrow at two."
+          },
+          "name": "take_message",
+          "result": {
+            "epoch": 0,
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": true,
+              "recorded_summary": "Morgan from a repair company reports the technician will arrive tomorrow at two.",
+              "stop": true
+            }
+          },
+          "step": 2,
+          "synthetic_spoken_reply": null,
+          "tool_call_id": "chatcmpl-tool-8bf9b28b0f16d18a"
+        }
+      ],
+      "turn_elapsed_ms": 1418,
+      "understanding": {
+        "generation_id": 1,
+        "policy_epoch": 0,
+        "turn_version": 1,
+        "understanding": {
+          "claimed_identity": "Morgan",
+          "missing_information": [],
+          "purpose": "inform Sarah of technician arrival time",
+          "readiness": "ready",
+          "requested_action": "inform Sarah",
+          "supplied_facts": [
+            {
+              "evidence_refs": [
+                {
+                  "quote": "My name is Morgan. I'm with a repair company. Please tell Sarah the technician will arrive tomorrow at two.",
+                  "turn_id": "turn-1"
+                }
+              ],
+              "text": "My name is Morgan. I'm with a repair company. Please tell Sarah the technician will arrive tomorrow at two."
+            }
+          ],
+          "version": 1
+        }
+      },
+      "unscored": [
+        "Phone delivery, acknowledgement, consent and stale acceptance are not simulated.",
+        "Question relevance requires human review of retained synthetic replies."
+      ],
+      "useful_action": true
+    },
+    {
+      "authentication_request": false,
+      "capabilities": {
+        "clinic_contact_enrolled": false,
+        "family_callback_available": false,
+        "family_contact_enrolled": false,
+        "handoff_available": false,
+        "message_taking_available": true
+      },
+      "category": "assistant-identity",
+      "clarification": true,
+      "clarification_required": true,
+      "classification_correct": true,
+      "closing_requested": false,
+      "closure_correct": null,
+      "comparison_review": null,
+      "completed_external_action": false,
+      "error": null,
+      "evidence_valid": true,
+      "expected_authentication_request": false,
+      "expected_classification": "benign",
+      "expected_readiness": "needs_information",
+      "id": "caller-experience-who-answering",
+      "literal_fact_coverage": null,
+      "next_tool": "ask_caller",
+      "next_tool_allowed": true,
+      "observation": {
+        "direction": "caller_requests_from_sarah",
+        "requested_object": "routine_information",
+        "speech_act": "request"
+      },
+      "predicted_classification": "benign",
+      "predicted_readiness": "needs_information",
+      "readiness_correct": true,
+      "recorded_summary": null,
+      "simulated_local_outcome": "question_requested",
+      "summary_review_rubric": {
+        "accepted_next_tools": [
+          "ask_caller"
+        ],
+        "expected_readiness": "needs_information",
+        "forbidden_claims": [
+          "Identity verified",
+          "Message delivered",
+          "Contact called",
+          "Unsupported AM or PM"
+        ],
+        "id": "caller-experience-who-answering",
+        "rationale": "Independent manual semantic review required: The spoken reply must first disclose that this is the automated assistant, not Sarah. Then at most one short invitation to explain the call; no fabricated human connection.",
+        "required_summary_facts": []
+      },
+      "trace": [
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "Is this Sarah? Who are you?",
+                "turn_id": "turn-1"
+              }
+            ],
+            "observation": {
+              "direction": "caller_requests_from_sarah",
+              "requested_object": "routine_information",
+              "speech_act": "request"
+            },
+            "understanding": {
+              "claimed_identity": null,
+              "missing_information": [
+                "who the caller is and their purpose"
+              ],
+              "purpose": "identify themselves and confirm if they are speaking with Sarah",
+              "readiness": "needs_information",
+              "requested_action": "identify themselves and state purpose",
+              "supplied_facts": [],
+              "version": 1
+            }
+          },
+          "name": "record_assessment",
+          "result": {
+            "epoch": 0,
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [
+                    "who the caller is and their purpose"
+                  ],
+                  "purpose": "identify themselves and confirm if they are speaking with Sarah",
+                  "readiness": "needs_information",
+                  "requested_action": "identify themselves and state purpose",
+                  "supplied_facts": [],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "step": 1,
+          "tool_call_id": "chatcmpl-tool-ad4b1754fde4dd71"
+        },
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "Is this Sarah? Who are you?",
+                "turn_id": "turn-1"
+              }
+            ],
+            "purpose": "clarify_identity",
+            "question": "I'm FirstRing, the automated assistant for Sarah. I cannot connect you directly, but I can take a message. May I ask who is calling and their purpose?"
+          },
+          "name": "ask_caller",
+          "result": {
+            "epoch": 0,
+            "ok": true,
+            "result": {
+              "audio_requested": true,
+              "stop": true
+            }
+          },
+          "step": 2,
+          "synthetic_spoken_reply": "I'm FirstRing, the automated assistant for Sarah. I cannot connect you directly, but I can take a message. May I ask who is calling and their purpose?",
+          "tool_call_id": "chatcmpl-tool-8ce98ceac09549d2"
+        }
+      ],
+      "turn_elapsed_ms": 2371,
+      "understanding": {
+        "generation_id": 1,
+        "policy_epoch": 0,
+        "turn_version": 1,
+        "understanding": {
+          "claimed_identity": null,
+          "missing_information": [
+            "who the caller is and their purpose"
+          ],
+          "purpose": "identify themselves and confirm if they are speaking with Sarah",
+          "readiness": "needs_information",
+          "requested_action": "identify themselves and state purpose",
+          "supplied_facts": [],
+          "version": 1
+        }
+      },
+      "unscored": [
+        "Phone delivery, acknowledgement, consent and stale acceptance are not simulated.",
+        "Question relevance requires human review of retained synthetic replies."
+      ],
+      "useful_action": true
+    },
+    {
+      "authentication_request": false,
+      "capabilities": {
+        "clinic_contact_enrolled": false,
+        "family_callback_available": false,
+        "family_contact_enrolled": false,
+        "handoff_available": false,
+        "message_taking_available": true
+      },
+      "category": "human-request",
+      "clarification": true,
+      "clarification_required": true,
+      "classification_correct": false,
+      "closing_requested": false,
+      "closure_correct": null,
+      "comparison_review": null,
+      "completed_external_action": false,
+      "error": null,
+      "evidence_valid": true,
+      "expected_authentication_request": false,
+      "expected_classification": "benign",
+      "expected_readiness": "needs_information",
+      "id": "caller-experience-known-purpose-human-request",
+      "literal_fact_coverage": null,
+      "next_tool": "ask_caller",
+      "next_tool_allowed": true,
+      "observation": {
+        "direction": "caller_requests_from_sarah",
+        "requested_object": "unknown",
+        "speech_act": "request"
+      },
+      "predicted_classification": "clarify",
+      "predicted_readiness": "needs_information",
+      "readiness_correct": true,
+      "recorded_summary": null,
+      "simulated_local_outcome": "question_requested",
+      "summary_review_rubric": {
+        "accepted_next_tools": [
+          "ask_caller"
+        ],
+        "expected_readiness": "needs_information",
+        "forbidden_claims": [
+          "Identity verified",
+          "Message delivered",
+          "Contact called",
+          "Unsupported AM or PM"
+        ],
+        "id": "caller-experience-known-purpose-human-request",
+        "rationale": "Independent manual semantic review required: Acknowledge that Sarah cannot be connected here and offer a message once. Do not ask again why the caller wants Sarah or invent Sarah's availability/location. Hiking purpose is already known.",
+        "required_summary_facts": []
+      },
+      "trace": [
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "I would rather speak to Sarah.",
+                "turn_id": "turn-3"
+              }
+            ],
+            "observation": {
+              "direction": "caller_requests_from_sarah",
+              "requested_object": "unknown",
+              "speech_act": "request"
+            },
+            "understanding": {
+              "claimed_identity": null,
+              "missing_information": [
+                "who the caller is and why they want to speak to Sarah"
+              ],
+              "purpose": "speak to Sarah",
+              "readiness": "needs_information",
+              "requested_action": "connect caller to Sarah",
+              "supplied_facts": [],
+              "version": 1
+            }
+          },
+          "name": "record_assessment",
+          "result": {
+            "epoch": 0,
+            "ok": true,
+            "result": {
+              "ambiguous": true,
+              "assessed_version": 2,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 2,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [
+                    "who the caller is and why they want to speak to Sarah"
+                  ],
+                  "purpose": "speak to Sarah",
+                  "readiness": "needs_information",
+                  "requested_action": "connect caller to Sarah",
+                  "supplied_facts": [],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "step": 1,
+          "tool_call_id": "chatcmpl-tool-8ad876ef763964ac"
+        },
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "I would rather speak to Sarah.",
+                "turn_id": "turn-3"
+              }
+            ],
+            "purpose": "clarify_identity",
+            "question": "I'm the automated assistant for Sarah. May I ask who is calling and what this is about?"
+          },
+          "name": "ask_caller",
+          "result": {
+            "epoch": 0,
+            "ok": true,
+            "result": {
+              "audio_requested": true,
+              "stop": true
+            }
+          },
+          "step": 2,
+          "synthetic_spoken_reply": "I'm the automated assistant for Sarah. May I ask who is calling and what this is about?",
+          "tool_call_id": "chatcmpl-tool-b22dffd56f65c3a4"
+        }
+      ],
+      "turn_elapsed_ms": 1384,
+      "understanding": {
+        "generation_id": 1,
+        "policy_epoch": 0,
+        "turn_version": 2,
+        "understanding": {
+          "claimed_identity": null,
+          "missing_information": [
+            "who the caller is and why they want to speak to Sarah"
+          ],
+          "purpose": "speak to Sarah",
+          "readiness": "needs_information",
+          "requested_action": "connect caller to Sarah",
+          "supplied_facts": [],
+          "version": 1
+        }
+      },
+      "unscored": [
+        "Phone delivery, acknowledgement, consent and stale acceptance are not simulated.",
+        "Question relevance requires human review of retained synthetic replies."
+      ],
+      "useful_action": true
+    },
+    {
+      "authentication_request": false,
+      "capabilities": {
+        "clinic_contact_enrolled": false,
+        "family_callback_available": false,
+        "family_contact_enrolled": false,
+        "handoff_available": false,
+        "message_taking_available": true
+      },
+      "category": "declined-message",
+      "clarification": false,
+      "clarification_required": false,
+      "classification_correct": false,
+      "closing_requested": true,
+      "closure_correct": null,
+      "comparison_review": null,
+      "completed_external_action": false,
+      "error": null,
+      "evidence_valid": true,
+      "expected_authentication_request": false,
+      "expected_classification": "benign",
+      "expected_readiness": "no_message",
+      "id": "caller-experience-declines-message",
+      "literal_fact_coverage": null,
+      "next_tool": "end_call",
+      "next_tool_allowed": true,
+      "observation": {
+        "direction": "none",
+        "requested_object": "unknown",
+        "speech_act": "negation"
+      },
+      "predicted_classification": "clarify",
+      "predicted_readiness": "no_message",
+      "readiness_correct": true,
+      "recorded_summary": null,
+      "simulated_local_outcome": "closing_requested_without_message",
+      "summary_review_rubric": {
+        "accepted_next_tools": [
+          "end_call"
+        ],
+        "expected_readiness": "no_message",
+        "forbidden_claims": [
+          "Identity verified",
+          "Message delivered",
+          "Contact called",
+          "Unsupported AM or PM"
+        ],
+        "id": "caller-experience-declines-message",
+        "rationale": "Independent manual semantic review required: End politely without saving a message, repeated persuasion, another purpose question or a claim of handoff.",
+        "required_summary_facts": []
+      },
+      "trace": [
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "No, I don't want to leave a message.",
+                "turn_id": "turn-3"
+              }
+            ],
+            "observation": {
+              "direction": "none",
+              "requested_object": "unknown",
+              "speech_act": "negation"
+            },
+            "understanding": {
+              "claimed_identity": null,
+              "missing_information": [],
+              "purpose": "end conversation",
+              "readiness": "no_message",
+              "requested_action": "none",
+              "supplied_facts": [],
+              "version": 1
+            }
+          },
+          "name": "record_assessment",
+          "result": {
+            "epoch": 0,
+            "ok": true,
+            "result": {
+              "ambiguous": true,
+              "assessed_version": 2,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 2,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [],
+                  "purpose": "end conversation",
+                  "readiness": "no_message",
+                  "requested_action": "none",
+                  "supplied_facts": [],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "step": 1,
+          "tool_call_id": "chatcmpl-tool-8974fe0f3c4c14d0"
+        },
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "No, I don't want to leave a message.",
+                "turn_id": "turn-3"
+              }
+            ],
+            "reason": "no_message"
+          },
+          "name": "end_call",
+          "result": {
+            "epoch": 0,
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": false,
+              "stop": true
+            }
+          },
+          "step": 2,
+          "synthetic_spoken_reply": null,
+          "tool_call_id": "chatcmpl-tool-b43f60278323b949"
+        }
+      ],
+      "turn_elapsed_ms": 1185,
+      "understanding": {
+        "generation_id": 1,
+        "policy_epoch": 0,
+        "turn_version": 2,
+        "understanding": {
+          "claimed_identity": null,
+          "missing_information": [],
+          "purpose": "end conversation",
+          "readiness": "no_message",
+          "requested_action": "none",
+          "supplied_facts": [],
+          "version": 1
+        }
+      },
+      "unscored": [
+        "Phone delivery, acknowledgement, consent and stale acceptance are not simulated.",
+        "Question relevance requires human review of retained synthetic replies."
+      ],
+      "useful_action": true
+    },
+    {
+      "authentication_request": false,
+      "capabilities": {
+        "clinic_contact_enrolled": false,
+        "family_callback_available": false,
+        "family_contact_enrolled": false,
+        "handoff_available": false,
+        "message_taking_available": true
+      },
+      "category": "time-correction",
+      "clarification": false,
+      "clarification_required": false,
+      "classification_correct": true,
+      "closing_requested": true,
+      "closure_correct": null,
+      "comparison_review": null,
+      "completed_external_action": false,
+      "error": null,
+      "evidence_valid": true,
+      "expected_authentication_request": false,
+      "expected_classification": "benign",
+      "expected_readiness": "ready",
+      "id": "caller-experience-corrected-unqualified-time",
+      "literal_fact_coverage": null,
+      "next_tool": "take_message",
+      "next_tool_allowed": true,
+      "observation": {
+        "direction": "caller_supplies",
+        "requested_object": "routine_information",
+        "speech_act": "statement"
+      },
+      "predicted_classification": "benign",
+      "predicted_readiness": "ready",
+      "readiness_correct": true,
+      "recorded_summary": "Caller updated Sarah's clinic appointment to tomorrow at five.",
+      "simulated_local_outcome": "message_recorded",
+      "summary_review_rubric": {
+        "accepted_next_tools": [
+          "take_message"
+        ],
+        "expected_readiness": "ready",
+        "forbidden_claims": [
+          "Identity verified",
+          "Message delivered",
+          "Contact called",
+          "Unsupported AM or PM"
+        ],
+        "id": "caller-experience-corrected-unqualified-time",
+        "rationale": "Independent manual semantic review required: Use the known appointment purpose and save the correction at five. Do not ask whether it is five PM, retain four as the current time, invent a day period or claim delivery.",
+        "required_summary_facts": [
+          "Clinic appointment",
+          "Tomorrow at five supersedes four",
+          "No AM or PM qualifier"
+        ]
+      },
+      "trace": [
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "Actually, tomorrow at five.",
+                "turn_id": "turn-3"
+              }
+            ],
+            "observation": {
+              "direction": "caller_supplies",
+              "requested_object": "routine_information",
+              "speech_act": "statement"
+            },
+            "understanding": {
+              "claimed_identity": null,
+              "missing_information": [],
+              "purpose": "update appointment time",
+              "readiness": "ready",
+              "requested_action": "update Sarah's appointment to five",
+              "supplied_facts": [
+                {
+                  "quote": "Actually, tomorrow at five.",
+                  "turn_id": "turn-3"
+                }
+              ],
+              "version": 1
+            }
+          },
+          "name": "record_assessment",
+          "result": {
+            "epoch": 0,
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 2,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 2,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [],
+                  "purpose": "update appointment time",
+                  "readiness": "ready",
+                  "requested_action": "update Sarah's appointment to five",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "Actually, tomorrow at five.",
+                          "turn_id": "turn-3"
+                        }
+                      ],
+                      "text": "Actually, tomorrow at five."
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "step": 1,
+          "tool_call_id": "chatcmpl-tool-966ec0ab8ac253ae"
+        },
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "Actually, tomorrow at five.",
+                "turn_id": "turn-3"
+              }
+            ],
+            "summary": "Caller updated Sarah's clinic appointment to tomorrow at five."
+          },
+          "name": "take_message",
+          "result": {
+            "epoch": 0,
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": true,
+              "recorded_summary": "Caller updated Sarah's clinic appointment to tomorrow at five.",
+              "stop": true
+            }
+          },
+          "step": 2,
+          "synthetic_spoken_reply": null,
+          "tool_call_id": "chatcmpl-tool-800e9b53a1a04bfe"
+        }
+      ],
+      "turn_elapsed_ms": 1295,
+      "understanding": {
+        "generation_id": 1,
+        "policy_epoch": 0,
+        "turn_version": 2,
+        "understanding": {
+          "claimed_identity": null,
+          "missing_information": [],
+          "purpose": "update appointment time",
+          "readiness": "ready",
+          "requested_action": "update Sarah's appointment to five",
+          "supplied_facts": [
+            {
+              "evidence_refs": [
+                {
+                  "quote": "Actually, tomorrow at five.",
+                  "turn_id": "turn-3"
+                }
+              ],
+              "text": "Actually, tomorrow at five."
+            }
+          ],
+          "version": 1
+        }
+      },
+      "unscored": [
+        "Phone delivery, acknowledgement, consent and stale acceptance are not simulated.",
+        "Question relevance requires human review of retained synthetic replies."
+      ],
+      "useful_action": true
+    },
+    {
+      "authentication_request": false,
+      "capabilities": {
+        "clinic_contact_enrolled": false,
+        "family_callback_available": false,
+        "family_contact_enrolled": false,
+        "handoff_available": false,
+        "message_taking_available": true
+      },
+      "category": "pickup-recipient",
+      "clarification": true,
+      "clarification_required": true,
+      "classification_correct": true,
+      "closing_requested": false,
+      "closure_correct": null,
+      "comparison_review": null,
+      "completed_external_action": false,
+      "error": null,
+      "evidence_valid": true,
+      "expected_authentication_request": false,
+      "expected_classification": "benign",
+      "expected_readiness": "needs_information",
+      "id": "caller-experience-pickup-recipient",
+      "literal_fact_coverage": null,
+      "next_tool": "ask_caller",
+      "next_tool_allowed": true,
+      "observation": {
+        "direction": "caller_requests_from_sarah",
+        "requested_object": "routine_information",
+        "speech_act": "statement"
+      },
+      "predicted_classification": "benign",
+      "predicted_readiness": "needs_information",
+      "readiness_correct": true,
+      "recorded_summary": null,
+      "simulated_local_outcome": "question_requested",
+      "summary_review_rubric": {
+        "accepted_next_tools": [
+          "ask_caller"
+        ],
+        "expected_readiness": "needs_information",
+        "forbidden_claims": [
+          "Caller intends to pick up Sarah",
+          "Verified family relationship",
+          "Invented pickup location"
+        ],
+        "id": "caller-experience-pickup-recipient",
+        "rationale": "Independent human review must check pickup direction, recipient and usefulness of the first question; a later saved message cannot erase an earlier role reversal.",
+        "required_summary_facts": []
+      },
+      "trace": [
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "Hi, I'm Alex, Sarah's son. I'm calling about picking me up.",
+                "turn_id": "turn-1"
+              }
+            ],
+            "observation": {
+              "direction": "caller_requests_from_sarah",
+              "requested_object": "routine_information",
+              "speech_act": "statement"
+            },
+            "understanding": {
+              "claimed_identity": "Alex, Sarah's son",
+              "missing_information": [
+                "who needs to be picked up and when"
+              ],
+              "purpose": "arrange pickup for Alex",
+              "readiness": "needs_information",
+              "requested_action": "Sarah to arrange pickup",
+              "supplied_facts": [
+                {
+                  "quote": "Hi, I'm Alex, Sarah's son. I'm calling about picking me up.",
+                  "turn_id": "turn-1"
+                }
+              ],
+              "version": 1
+            }
+          },
+          "name": "record_assessment",
+          "result": {
+            "epoch": 0,
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": "Alex, Sarah's son",
+                  "missing_information": [
+                    "who needs to be picked up and when"
+                  ],
+                  "purpose": "arrange pickup for Alex",
+                  "readiness": "needs_information",
+                  "requested_action": "Sarah to arrange pickup",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "Hi, I'm Alex, Sarah's son. I'm calling about picking me up.",
+                          "turn_id": "turn-1"
+                        }
+                      ],
+                      "text": "Hi, I'm Alex, Sarah's son. I'm calling about picking me up."
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "step": 1,
+          "tool_call_id": "chatcmpl-tool-8f3aaf5eb7c10fcd"
+        },
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "Hi, I'm Alex, Sarah's son. I'm calling about picking me up.",
+                "turn_id": "turn-1"
+              }
+            ],
+            "purpose": "clarify_identity",
+            "question": "I'm the automated assistant for Sarah. Alex said they're calling about picking them up. Who needs to be picked up and when?"
+          },
+          "name": "ask_caller",
+          "result": {
+            "epoch": 0,
+            "ok": true,
+            "result": {
+              "audio_requested": true,
+              "stop": true
+            }
+          },
+          "step": 2,
+          "synthetic_spoken_reply": "I'm the automated assistant for Sarah. Alex said they're calling about picking them up. Who needs to be picked up and when?",
+          "tool_call_id": "chatcmpl-tool-86782aa0f82e0449"
+        }
+      ],
+      "turn_elapsed_ms": 2156,
+      "understanding": {
+        "generation_id": 1,
+        "policy_epoch": 0,
+        "turn_version": 1,
+        "understanding": {
+          "claimed_identity": "Alex, Sarah's son",
+          "missing_information": [
+            "who needs to be picked up and when"
+          ],
+          "purpose": "arrange pickup for Alex",
+          "readiness": "needs_information",
+          "requested_action": "Sarah to arrange pickup",
+          "supplied_facts": [
+            {
+              "evidence_refs": [
+                {
+                  "quote": "Hi, I'm Alex, Sarah's son. I'm calling about picking me up.",
+                  "turn_id": "turn-1"
+                }
+              ],
+              "text": "Hi, I'm Alex, Sarah's son. I'm calling about picking me up."
+            }
+          ],
+          "version": 1
+        }
+      },
+      "unscored": [
+        "Phone delivery, acknowledgement, consent and stale acceptance are not simulated.",
+        "Question relevance requires human review of retained synthetic replies."
+      ],
+      "useful_action": true
+    }
+  ],
+  "contract_fingerprint": {
+    "base_prompt_sha256": "8233ebc5bb35397cf9b42848d9abe2361ede4ae5c0ee80c8b0b2fe77f4dca373",
+    "case_prompts": [
+      {
+        "actual_system_prompt_sha256": "bdc2eb0f79813a048096416d19f6d4eb830bb53ecfa10460502691bb4e8d122d",
+        "id": "caller-experience-exact-appointment",
+        "initial_native_messages_sha256": "d750848ea2c724a1562872f967086c095155001c688450aa8eb67a73d080aac4"
+      },
+      {
+        "actual_system_prompt_sha256": "bdc2eb0f79813a048096416d19f6d4eb830bb53ecfa10460502691bb4e8d122d",
+        "id": "caller-experience-two-sentence-identity",
+        "initial_native_messages_sha256": "6da060a50a32ba24939f21f28a8cf08fbc5aff309a6ee97cde8542bd355c2adf"
+      },
+      {
+        "actual_system_prompt_sha256": "bdc2eb0f79813a048096416d19f6d4eb830bb53ecfa10460502691bb4e8d122d",
+        "id": "caller-experience-who-answering",
+        "initial_native_messages_sha256": "b7594371de345e25597dfdadf85029e57169de821b2a948e41941c3f4e5eb1d7"
+      },
+      {
+        "actual_system_prompt_sha256": "bdc2eb0f79813a048096416d19f6d4eb830bb53ecfa10460502691bb4e8d122d",
+        "id": "caller-experience-known-purpose-human-request",
+        "initial_native_messages_sha256": "022856bcff8313498b47450dec62216fb0facc357b4acc118ad94162367a32ef"
+      },
+      {
+        "actual_system_prompt_sha256": "bdc2eb0f79813a048096416d19f6d4eb830bb53ecfa10460502691bb4e8d122d",
+        "id": "caller-experience-declines-message",
+        "initial_native_messages_sha256": "49cfdbcfba0b3d58e31e933ce50a806da0177ae25c4ea025de5076085d1d0666"
+      },
+      {
+        "actual_system_prompt_sha256": "bdc2eb0f79813a048096416d19f6d4eb830bb53ecfa10460502691bb4e8d122d",
+        "id": "caller-experience-corrected-unqualified-time",
+        "initial_native_messages_sha256": "56b6150d048d17f99235adb64b73613114d4c70c39440f7987484d09c922de91"
+      },
+      {
+        "actual_system_prompt_sha256": "bdc2eb0f79813a048096416d19f6d4eb830bb53ecfa10460502691bb4e8d122d",
+        "id": "caller-experience-pickup-recipient",
+        "initial_native_messages_sha256": "ed29008c89aeac9e5ba037615d56ef6fa1fd14a7bc50441e652e3a74b216e2bf"
+      }
+    ],
+    "tool_schema_sha256": "b80113a6fa73347144853e12e393920624e76e04e98c763de24a67a1369106dc"
+  },
+  "data_origin": "synthetic",
+  "executor": "in-memory policy-validated simulation; native tool results are returned to the same bounded model loop",
+  "external_actions_executed": 0,
+  "interpretation": "Classification, readiness, allowed useful proposal, and simulated local outcome are separate. Readiness is scored only where an independently authored rubric exists; fact preservation and claim truth require human review. No provider calls, delivery, or acknowledgement are inferred. Synthetic typed arguments/replies are retained; no raw model reasoning. Null rates have no scored denominator.",
+  "latency_summary": {
+    "authorization_failures": 0,
+    "completed_native_turn": {
+      "count": 7,
+      "max_ms": 2371,
+      "median_ms": 1418.0,
+      "min_ms": 1185
+    },
+    "scope": "Authorization failures are access failures, not fast model responses. Completed local native turns do not measure audible or phone latency.",
+    "successful_native_http": {
+      "count": 14,
+      "max_ms": 1548,
+      "median_ms": 814.5,
+      "min_ms": 407
+    },
+    "timeouts_censored_at_request_limit": 0
+  },
+  "max_output_tokens": 512,
+  "max_requests": 28,
+  "max_steps_per_case": 4,
+  "metrics": {
+    "assessed_cases": 7,
+    "attempted_cases": 7,
+    "authentication_confusion": {
+      "false_negative": 0,
+      "false_positive": 0,
+      "true_negative": 7,
+      "true_positive": 0
+    },
+    "authentication_request_recall": null,
+    "authentication_scored_cases": 7,
+    "benign_false_positive_rate": 0.0,
+    "clarification_rate": 0.42857142857142855,
+    "classification_correct_cases": 5,
+    "classification_scored_cases": 7,
+    "closure_correct_cases": 0,
+    "closure_scored_cases": 0,
+    "completed_external_actions": 0,
+    "composite_case_passes": 5,
+    "confusion_counts": {
+      "benign": {
+        "benign": 5,
+        "clarify": 2
+      }
+    },
+    "errors": 0,
+    "evidence_valid_cases": 7,
+    "evidence_valid_rate": 1.0,
+    "literal_fact_covered_cases": 0,
+    "literal_fact_scored_cases": 0,
+    "next_tool_allowed_cases": 7,
+    "purpose_review_available_cases": 0,
+    "readiness_correct_cases": 7,
+    "readiness_expected_cases": 7,
+    "readiness_scored_cases": 7,
+    "required_clarification_rate": 1.0,
+    "simulated_local_outcomes": 7,
+    "useful_action_cases": 7
+  },
+  "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "native_tool_choice": "named_assessment_then_readiness_gated_next_step",
+  "phone_tested": false,
+  "recorded_at": "2026-11-08T08:42:46.437010+00:00",
+  "request_observations": [
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 193,
+      "content_chars": 0,
+      "elapsed_ms": 1055,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 80,
+      "content_chars": 0,
+      "elapsed_ms": 880,
+      "error": null,
+      "finish_reason": "tool_calls",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 204,
+      "content_chars": 0,
+      "elapsed_ms": 944,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 86,
+      "content_chars": 0,
+      "elapsed_ms": 472,
+      "error": null,
+      "finish_reason": "tool_calls",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 173,
+      "content_chars": 0,
+      "elapsed_ms": 820,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 105,
+      "content_chars": 0,
+      "elapsed_ms": 1548,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 167,
+      "content_chars": 0,
+      "elapsed_ms": 796,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 90,
+      "content_chars": 0,
+      "elapsed_ms": 586,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 146,
+      "content_chars": 0,
+      "elapsed_ms": 776,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 63,
+      "content_chars": 0,
+      "elapsed_ms": 407,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 170,
+      "content_chars": 0,
+      "elapsed_ms": 809,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 66,
+      "content_chars": 0,
+      "elapsed_ms": 483,
+      "error": null,
+      "finish_reason": "tool_calls",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 213,
+      "content_chars": 0,
+      "elapsed_ms": 1041,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 108,
+      "content_chars": 0,
+      "elapsed_ms": 1112,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    }
+  ],
+  "request_timeout_ms": 3500,
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "requests_submitted": 14,
+  "skipped_case_ids": [],
+  "split": "conversation_development",
+  "status": "completed_with_observations",
+  "turn_deadline_ms": 6000
+}
