@@ -44,7 +44,7 @@ import { WarningTrail } from './warning-trail';
         Active warnings
       </h2>
       <div class="table-scroll">
-        <table class="data-table min-w-[64rem]">
+        <table class="data-table stack-table min-w-[64rem]">
           <thead>
             <tr>
               <th scope="col">Trick</th>
@@ -73,12 +73,18 @@ import { WarningTrail } from './warning-trail';
                     why(tactic)
                   }}</span>
                 </td>
-                <td>{{ label(tactic.requested_action, ACTION) }}</td>
-                <td>{{ label(tactic.pretext_category, PRETEXT) }}</td>
-                <td>{{ label(tactic.pressure_category, PRESSURE) }}</td>
-                <td>{{ label(tactic.recommended_action ?? 'independent_contact', ACTION) }}</td>
-                <td class="num">v{{ tactic.version }}</td>
-                <td class="whitespace-nowrap">{{ expiry(tactic.expires_at) }}</td>
+                <td data-label="Asks the person to">
+                  {{ label(tactic.requested_action, ACTION) }}
+                </td>
+                <td data-label="Excuse">{{ label(tactic.pretext_category, PRETEXT) }}</td>
+                <td data-label="Pressure">{{ label(tactic.pressure_category, PRESSURE) }}</td>
+                <td data-label="Safer next step">
+                  {{ label(tactic.recommended_action ?? 'independent_contact', ACTION) }}
+                </td>
+                <td data-label="Version" class="num">v{{ tactic.version }}</td>
+                <td data-label="Expires" class="whitespace-nowrap">
+                  {{ expiry(tactic.expires_at) }}
+                </td>
               </tr>
             } @empty {
               <tr>
@@ -102,7 +108,7 @@ import { WarningTrail } from './warning-trail';
           Lines in the network
         </h2>
         <div class="table-scroll">
-          <table class="data-table">
+          <table class="data-table stack-table">
             <thead>
               <tr>
                 <th scope="col">Line</th>
@@ -114,8 +120,8 @@ import { WarningTrail } from './warning-trail';
               @for (h of state.community; track h.household_id) {
                 <tr>
                   <td class="font-bold whitespace-nowrap">{{ h.display_name }}</td>
-                  <td>{{ people(h.household_id) }}</td>
-                  <td class="tabular">
+                  <td data-label="Who">{{ people(h.household_id) }}</td>
+                  <td data-label="Warnings applied" class="tabular">
                     {{
                       h.last_applied_version
                         ? 'Up to v' + h.last_applied_version
@@ -134,7 +140,7 @@ import { WarningTrail } from './warning-trail';
           Recent activity
         </h2>
         <div class="table-scroll">
-          <table class="data-table">
+          <table class="data-table stack-table">
             <thead>
               <tr>
                 <th scope="col">When</th>
@@ -145,8 +151,8 @@ import { WarningTrail } from './warning-trail';
             <tbody>
               @for (event of receipts(); track event.id) {
                 <tr>
-                  <td class="whitespace-nowrap">{{ age(event.received_at) }}</td>
-                  <td>
+                  <td data-label="When" class="whitespace-nowrap">{{ age(event.received_at) }}</td>
+                  <td data-label="What happened">
                     {{
                       event.type === 'tactic.created'
                         ? 'Warning shared'
@@ -155,7 +161,7 @@ import { WarningTrail } from './warning-trail';
                           : 'Same trick matched on a call'
                     }}
                   </td>
-                  <td class="num">#{{ event.sequence }}</td>
+                  <td data-label="Receipt" class="num">#{{ event.sequence }}</td>
                 </tr>
               } @empty {
                 <tr>
@@ -232,8 +238,12 @@ export class CommunityPage {
       reputation: 'After 14 days',
     },
   ];
+  /** "Latest" means the newest shared version, not the most complete story. */
   readonly story = computed(
-    () => buildCommunityStories(this.store.state(), this.store.events(), this.store.calls())[0],
+    () =>
+      [...buildCommunityStories(this.store.state(), this.store.events(), this.store.calls())].sort(
+        (a, b) => b.version - a.version,
+      )[0],
   );
   readonly tactics = computed(() =>
     [...(this.store.state()?.tactics ?? [])].sort((a, b) => b.version - a.version),

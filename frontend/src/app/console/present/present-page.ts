@@ -276,14 +276,7 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
               aria-labelledby="waiting-heading"
             >
               <div class="lg:col-span-6">
-                <p class="flex items-center gap-3 text-[1.25rem] font-bold">
-                  <span class="relative flex size-4" aria-hidden="true">
-                    <span
-                      class="absolute inset-0 rounded-full bg-lime"
-                      [class.waiting-ping]="!motion.reduced()"
-                    ></span>
-                    <span class="relative size-4 rounded-full bg-lime"></span>
-                  </span>
+                <p class="text-[1.25rem] font-bold">
                   {{
                     store.isDemo()
                       ? 'Rehearsal ready. Play a fictional call above.'

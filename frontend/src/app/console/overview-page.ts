@@ -221,11 +221,7 @@ type Tab = 'watch' | 'warnings' | 'trusted' | 'system';
           routerLink="/console/calls"
           queryParamsHandling="preserve"
           class="inline-flex items-center gap-1 text-[1rem] font-bold text-ink"
-          >All {{ calls().length }} calls<svg
-            lucideChevronRight
-            [size]="17"
-            aria-hidden="true"
-          ></svg
+          >All calls<svg lucideChevronRight [size]="17" aria-hidden="true"></svg
         ></a>
       </div>
       <ul class="divide-y divide-paper-3 md:hidden">
@@ -327,7 +323,7 @@ type Tab = 'watch' | 'warnings' | 'trusted' | 'system';
           @case ('watch') {
             @if (watch().length) {
               <div class="table-scroll">
-                <table class="data-table min-w-[38rem]">
+                <table class="data-table stack-table min-w-[38rem]">
                   <thead>
                     <tr>
                       <th scope="col">Caller</th>
@@ -349,12 +345,17 @@ type Tab = 'watch' | 'warnings' | 'trusted' | 'system';
                             >{{ c.label }}</a
                           >
                         </td>
-                        <td class="font-bold whitespace-nowrap text-magenta-ink">
+                        <td
+                          data-label="Reputation"
+                          class="font-bold whitespace-nowrap text-magenta-ink"
+                        >
                           {{ standing(c.standing) }}
                         </td>
-                        <td>{{ reasons(c.reputation?.scam_categories ?? []) }}</td>
-                        <td class="num">{{ c.calls.length }}</td>
-                        <td class="whitespace-nowrap">{{ age(c.lastAt) }}</td>
+                        <td data-label="Why">{{ reasons(c.reputation?.scam_categories ?? []) }}</td>
+                        <td data-label="Calls" class="num">{{ c.calls.length }}</td>
+                        <td data-label="Last call" class="whitespace-nowrap">
+                          {{ age(c.lastAt) }}
+                        </td>
                       </tr>
                     }
                   </tbody>
@@ -459,7 +460,10 @@ export class OverviewPage {
   readonly trusted = inject(TrustedDirectory);
   private readonly directory = inject(CallerDirectory);
   private readonly router = inject(Router);
-  readonly calls = this.store.calls;
+  /** Only this line's calls: the page is titled for one line. */
+  readonly calls = computed(() =>
+    this.store.calls().filter((c) => c.session.household_id === this.householdId()),
+  );
   readonly period = signal<'today' | 'all'>('today');
   readonly tab = signal<Tab>('watch');
 

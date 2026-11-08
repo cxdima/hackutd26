@@ -254,7 +254,7 @@ import { ReputationPanel } from './reputation-panel';
           payment or call anyone on its own.
         </p>
         <div class="table-scroll mt-4">
-          <table class="data-table min-w-[64rem]">
+          <table class="data-table stack-table min-w-[64rem]">
             <thead>
               <tr>
                 <th scope="col" class="num">#</th>
@@ -268,15 +268,15 @@ import { ReputationPanel } from './reputation-panel';
             <tbody>
               @for (t of turns(); track t.index) {
                 <tr>
-                  <td class="num font-bold">{{ t.index || '—' }}</td>
-                  <td>
+                  <td data-label="Turn" class="num font-bold">{{ t.index || '—' }}</td>
+                  <td data-label="Caller said">
                     @if (t.said) {
                       <q class="text-[1rem]">{{ t.said }}</q>
                     } @else {
                       <span class="text-muted">Call answered</span>
                     }
                   </td>
-                  <td>
+                  <td data-label="AI understood">
                     @for (line of t.understood; track line) {
                       <p class="text-[1rem]">{{ line }}</p>
                     } @empty {
@@ -288,7 +288,7 @@ import { ReputationPanel } from './reputation-panel';
                       </p>
                     }
                   </td>
-                  <td>
+                  <td data-label="Safety rule">
                     @if (t.decision; as d) {
                       <p
                         class="text-[1rem] font-bold"
@@ -312,7 +312,7 @@ import { ReputationPanel } from './reputation-panel';
                       <span class="text-muted">—</span>
                     }
                   </td>
-                  <td>
+                  <td data-label="FirstRing did">
                     @for (line of t.did; track line) {
                       <p class="text-[1rem]">{{ line }}</p>
                     }
@@ -326,7 +326,7 @@ import { ReputationPanel } from './reputation-panel';
                       <span class="text-muted">—</span>
                     }
                   </td>
-                  <td class="num">
+                  <td data-label="AI time" class="num">
                     @if (t.modelRequests) {
                       {{ ms(t.modelMs) }}
                       <span class="block text-[0.95rem] text-muted"

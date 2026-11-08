@@ -86,34 +86,26 @@ const LINK_OR_NUMBER = /(https?:\/\/|www\.|\b\d{3}[\s.-]?\d{3}[\s.-]?\d{4}\b)/i;
           The name and greeting FirstRing uses, per line. FirstRing never pretends to be the person
           it answers for.
         </p>
-        <h3 class="mt-6 text-[1.0625rem] font-extrabold">Who answers the next call</h3>
-        <p class="mt-1 text-[1rem] text-ink-3">Picks the line for the next incoming call only.</p>
-        <div class="mt-3 flex flex-wrap gap-2">
-          @for (h of state.community; track h.household_id) {
-            <button
-              type="button"
-              class="min-h-11 rounded-full border-2 px-4 text-[1rem] font-bold disabled:cursor-not-allowed"
-              [class]="
-                state.selected_household === h.household_id
-                  ? 'border-ink bg-lime text-ink'
-                  : 'border-rule bg-paper hover:border-ink'
-              "
-              [attr.aria-pressed]="state.selected_household === h.household_id"
-              [disabled]="store.isDemo() || access.readOnly || !!store.busy() || store.stale()"
-              (click)="selectNext(h.household_id)"
-            >
-              {{ h.display_name }}
-            </button>
-          }
-        </div>
-        @if (store.isDemo()) {
-          <p class="mt-2 text-[1rem] text-muted">Available when connected to a server.</p>
-        }
+        <label id="next-call-label" for="next-call" class="field-label mt-6"
+          >Next call is answered for</label
+        >
+        <app-select-menu
+          inputId="next-call"
+          labelledBy="next-call-label"
+          describedBy="next-call-help"
+          [options]="lineOptions()"
+          [value]="state.selected_household"
+          [disabled]="store.isDemo() || access.readOnly || !!store.busy() || store.stale()"
+          (valueChange)="selectNext($event)"
+        />
+        <p id="next-call-help" class="field-help">
+          {{
+            store.isDemo()
+              ? 'Available when connected to a server.'
+              : 'Applies to the next incoming call only.'
+          }}
+        </p>
         <dl class="mt-6 space-y-3 text-[1rem]">
-          <div>
-            <dt class="font-bold">Custom voice</dt>
-            <dd class="text-ink-3">{{ cloneStatus() }}</dd>
-          </div>
           <div>
             <dt class="font-bold">Familiar voices</dt>
             <dd class="text-ink-3">
@@ -325,6 +317,12 @@ export class SettingsPage {
     { id: 'handoff', label: 'Ring the phone' },
     { id: 'voice', label: 'Owner voice' },
   ];
+  readonly lineOptions = computed<SelectOption[]>(() =>
+    (this.store.state()?.community ?? []).map((h) => ({
+      value: h.household_id,
+      label: `${h.display_name}’s line`,
+    })),
+  );
   readonly ringsFirst = computed(
     () => household(this.store.state()?.selected_household)?.ringsFirst.name ?? 'the owner',
   );
@@ -346,13 +344,6 @@ export class SettingsPage {
     if (LINK_OR_NUMBER.test(greeting)) return 'Remove links and phone numbers from the greeting.';
     return '';
   });
-  readonly cloneStatus = computed(() => {
-    const clone = this.store.state()?.capabilities.find((c) => c.id === 'voice_clone');
-    return clone && clone.status !== 'disabled'
-      ? `Status: ${clone.status}. ${clone.detail}`
-      : 'Off. Not available in this prototype; FirstRing uses preset synthetic voices.';
-  });
-
   constructor() {
     effect(() => {
       const household = this.household();
@@ -454,7 +445,8 @@ export class SettingsPage {
     history.replaceState(history.state, '', `${location.pathname}${location.search}#${id}`);
   }
 
-  selectNext(id: string) {
+  selectNext(id: string | null) {
+    if (!id || id === this.store.state()?.selected_household) return;
     void this.store.action('/api/demo/household', { household_id: id });
   }
 }

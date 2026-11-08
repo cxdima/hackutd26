@@ -75,7 +75,7 @@ import { OutcomeText } from './outcome-chip';
               </p>
             }
             <div class="table-scroll mt-4">
-              <table class="data-table min-w-[44rem]">
+              <table class="data-table stack-table min-w-[44rem]">
                 <thead>
                   <tr>
                     <th scope="col">Reported</th>
@@ -88,11 +88,20 @@ import { OutcomeText } from './outcome-chip';
                 <tbody>
                   @for (r of detail()?.reports ?? []; track r.report_id) {
                     <tr>
-                      <td class="whitespace-nowrap">{{ dateTime(r.created_at) }}</td>
-                      <td>{{ lineName(r.household_id) }}</td>
-                      <td>{{ r.scam_category ? category(r.scam_category) : 'Not recorded' }}</td>
-                      <td class="whitespace-nowrap">{{ until(r.expires_at) }}</td>
-                      <td [class]="r.retracted ? 'text-muted' : 'font-bold text-magenta-ink'">
+                      <td data-label="Reported" class="whitespace-nowrap">
+                        {{ dateTime(r.created_at) }}
+                      </td>
+                      <td data-label="By the line of">{{ lineName(r.household_id) }}</td>
+                      <td data-label="Why">
+                        {{ r.scam_category ? category(r.scam_category) : 'Not recorded' }}
+                      </td>
+                      <td data-label="Expires" class="whitespace-nowrap">
+                        {{ until(r.expires_at) }}
+                      </td>
+                      <td
+                        data-label="Status"
+                        [class]="r.retracted ? 'text-muted' : 'font-bold text-magenta-ink'"
+                      >
                         {{ r.retracted ? 'Withdrawn' : 'Active' }}
                       </td>
                     </tr>
