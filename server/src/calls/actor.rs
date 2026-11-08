@@ -11,9 +11,11 @@ use tokio::sync::{Mutex, mpsc, oneshot};
 #[derive(Clone)]
 pub struct App {
     pub config: Arc<Config>,
+    pub model_availability: crate::model_availability::ModelAvailability,
     pub store: Store,
     pub twilio: Twilio,
     pub speech: Option<Arc<crate::providers::speech::SpeechCache>>,
+    pub reputation: Option<Arc<crate::reputation::ReputationService>>,
     pub sessions: Arc<Mutex<HashMap<String, Handle>>>,
 }
 #[derive(Clone)]
@@ -216,6 +218,8 @@ impl App {
             None
         };
         let app = Self {
+            model_availability: crate::model_availability::ModelAvailability::from_env(),
+            reputation: None,
             speech,
             config,
             store,
@@ -245,6 +249,25 @@ impl App {
         }
         std::mem::drop(crate::patterns::spawn_subscriber(app.store.clone()));
         Ok(app)
+    }
+    /// Replay-only diagnostic entry point. Uses the real actor with no provider side effects.
+    pub async fn restore_synthetic_context(&self, session: Session) -> anyhow::Result<Handle> {
+        anyhow::ensure!(
+            self.config.mode == ExecutionMode::Replay
+                && session.execution_mode == ExecutionMode::Replay
+                && session.data_origin == "synthetic",
+            "Only inert synthetic replay contexts may be restored"
+        );
+        anyhow::ensure!(
+            session.legs.is_empty() && !session.bridge_committed,
+            "Diagnostic contexts cannot contain active call legs"
+        );
+        anyhow::ensure!(
+            !self.sessions.lock().await.contains_key(&session.id),
+            "Context already restored"
+        );
+        self.store.save(&session).await?;
+        Ok(self.spawn(session).await)
     }
     async fn spawn(&self, session: Session) -> Handle {
         let (tx, rx) = mpsc::channel(64);

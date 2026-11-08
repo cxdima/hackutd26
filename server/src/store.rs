@@ -26,6 +26,7 @@ impl Store {
             .connect_with(options)
             .await?;
         sqlx::raw_sql("CREATE TABLE IF NOT EXISTS sessions(id TEXT PRIMARY KEY,inbound_sid TEXT UNIQUE NOT NULL,data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS actions(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,idempotency_key TEXT UNIQUE NOT NULL,kind TEXT NOT NULL,mode TEXT NOT NULL,data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS tactics(id TEXT PRIMARY KEY,version INTEGER UNIQUE NOT NULL,data TEXT NOT NULL,expires_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS household_tactic_versions(household_id TEXT PRIMARY KEY,version INTEGER NOT NULL DEFAULT 0); INSERT OR IGNORE INTO household_tactic_versions VALUES('sarah',0),('maya',0);").execute(&pool).await?;
+        crate::reputation::initialize(&pool).await?;
         let (bus, _) = broadcast::channel(256);
         Ok(Self { pool, bus })
     }

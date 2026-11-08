@@ -78,12 +78,40 @@ pub fn router(app: App) -> Router {
         .route_layer(middleware::from_fn_with_state(app.clone(), signed));
     let api = Router::new()
         .route("/api/state", get(state))
+        .route("/api/reputation", get(crate::reputation_http::list))
+        .route(
+            "/api/reputation/reports",
+            post(crate::reputation_http::report),
+        )
+        .route(
+            "/api/reputation/{number_key}",
+            get(crate::reputation_http::detail),
+        )
+        .route(
+            "/api/reputation/{number_key}/corrections",
+            post(crate::reputation_http::correct),
+        )
+        .route(
+            "/api/reputation/{number_key}/corrections/resolve",
+            post(crate::reputation_http::resolve),
+        )
+        .route(
+            "/api/session/{id}/reputation",
+            get(crate::reputation_http::session_view),
+        )
         .route("/api/session/{id}", get(session))
+        .route(
+            "/api/session/{id}/events",
+            get(crate::console_http::session_events),
+        )
         .route(
             "/api/profile/{household_id}",
             get(profile_get).put(profile_put),
         )
         .route("/api/events", get(events))
+        .route("/api/demo/phone-demo", get(phone_demo_status))
+        .route("/api/demo/phone-demo/arm", post(phone_demo_arm))
+        .route("/api/demo/phone-demo/disarm", post(phone_demo_disarm))
         .route("/api/demo/probe", post(probe))
         .route("/api/demo/replay", post(replay))
         .route("/api/demo/household", post(household))
@@ -103,9 +131,7 @@ pub fn router(app: App) -> Router {
         .route("/media/speech/{capability}", get(speech_audio))
         .merge(voice)
         .merge(api)
-        .fallback_service(
-            tower_http::services::ServeDir::new("web/dist").append_index_html_on_directories(true),
-        )
+        .fallback_service(crate::console_http::frontend_service())
         .with_state(app)
 }
 async fn admin(State(app): State<App>, req: Request, next: Next) -> Response {
@@ -125,6 +151,38 @@ async fn admin(State(app): State<App>, req: Request, next: Next) -> Response {
             .into_response();
     }
     next.run(req).await
+}
+async fn phone_demo_status(State(app): State<App>) -> ApiResult {
+    Ok((
+        [(header::CACHE_CONTROL, "no-store")],
+        Json(crate::phone_demo::status(&app.store, &app.config).await?),
+    )
+        .into_response())
+}
+async fn phone_demo_arm(
+    State(app): State<App>,
+    Json(request): Json<crate::phone_demo::ArmRequest>,
+) -> ApiResult {
+    let status = crate::phone_demo::arm(&app.store, &app.config, request).await?;
+    let _=app.store.append(None,"system","phone_demo.armed",json!({"arm_id":status.arm_id,"session_id":status.session_id,"expires_at":status.expires_at,"scope":status.scope}),app.config.mode).await;
+    Ok(([(header::CACHE_CONTROL, "no-store")], Json(status)).into_response())
+}
+async fn phone_demo_disarm(
+    State(app): State<App>,
+    Json(request): Json<crate::phone_demo::DisarmRequest>,
+) -> ApiResult {
+    let status = crate::phone_demo::disarm(&app.store, &app.config, &request.arm_id).await?;
+    let _ = app
+        .store
+        .append(
+            None,
+            "system",
+            "phone_demo.disarmed",
+            json!({"arm_id":status.arm_id,"scope":status.scope}),
+            app.config.mode,
+        )
+        .await;
+    Ok(([(header::CACHE_CONTROL, "no-store")], Json(status)).into_response())
 }
 async fn profile_get(State(app): State<App>, Path(household_id): Path<String>) -> ApiResult {
     let profile = crate::profile::Profile::load(&app.store, &household_id).await?;
@@ -223,6 +281,15 @@ async fn incoming(State(app): State<App>, Extension(form): Extension<FormData>) 
         )));
     }
     let (_, snapshot) = app.incoming(form.field("CallSid")).await?;
+    let session: Session = serde_json::from_value(snapshot.clone())?;
+    if let Some(reputation) = &app.reputation
+        && let Err(error) = reputation
+            .capture_identity(&session, Some(form.field("From")))
+            .await
+    {
+        app.store.append(Some(&session), "system", "dependency.failed", json!({"dependency":"reputation","operation":"capture_identity","detail":error.to_string()}), session.execution_mode).await?;
+    }
+    crate::phone_demo::bind_signed_inbound(&app.store, &app.config, &session).await?;
     if binding == 1 {
         crate::audio_fixture::watch_inbound(app.clone(), form.field("CallSid").into());
     }
@@ -511,8 +578,10 @@ async fn state(State(app): State<App>) -> ApiResult {
     let c = &app.config;
     let (community, tactics) = crate::patterns::view(&app.store, c.mode).await?;
     let evidence = crate::evidence::view(&app.store).await?;
-    let model_backend = crate::evidence::model_backend(c, &app.store).await?;
+    let mut model_backend = crate::evidence::model_backend(c, &app.store).await?;
+    model_backend["current"] = app.model_availability.view(c, &app.store).await;
     let phone_b = crate::evidence::phone_b(c, &app.store).await?;
+    let phone_demo = crate::phone_demo::status(&app.store, c).await?;
     let selected_household = app
         .store
         .metadata("selected_household")
@@ -525,10 +594,12 @@ async fn state(State(app): State<App>) -> ApiResult {
     {"id":"nemotron","status":if c.model_configured(){"configured"}else{"pending"},"detail":"Selected Nemotron backend inputs; protocol evidence and behavior evaluation are separate"},
     {"id":"relay","status":if c.relay_configured(){"configured"}else{"pending"},"detail":"Local signed-WebSocket inputs only; onboarding and real phone protocol test pending"},
     {"id":"smoke_test","status":if c.smoke_authorized{"configured"}else{"pending"},"detail":"Exactly one authorized outbound attempt to Sarah/Phone B"},
+    {"id":"private_handoff_demo","status":if phone_demo.state=="armed" && phone_demo.recipient_enrolled && phone_demo.outbound_configured && c.mode==crate::config::ExecutionMode::Live {"configured"}else{"disabled"},"detail":"One operator arm authorizes only its bound session; independent of the Phone B transport probe"},
     {"id":"family","status":if c.family_enabled{"configured"}else{"disabled"},"detail":"Family calls require separate enrollment and authorization"},
+    {"id":"reputation","status":if app.reputation.is_some(){"configured"}else{"disabled"},"detail":"Scoped presented-number reports; demo profiles simulate independence, never verify caller identity"},
     {"id":"voice_clone","status":"disabled","detail":"Preset assistant voice; no clone endpoint verified"}
     ]);
-    Ok(Json(json!({"execution_mode":c.mode,"data_origin":"synthetic","transport":c.transport,"phone_display":if c.photon_number.is_empty(){"Not configured"}else{&c.photon_number},"selected_household":app.store.metadata("selected_household").await?.unwrap_or_else(||"sarah".into()),"capabilities":capabilities,"evidence":evidence,"model_backend":model_backend,"phone_b":phone_b,"profile":profile,"speech":relay::speech_configuration_for(&c.transport, &profile),"sessions":snapshots,"community":community,"tactics":tactics})).into_response())
+    Ok(Json(json!({"execution_mode":c.mode,"data_origin":"synthetic","transport":c.transport,"phone_display":if c.photon_number.is_empty(){"Not configured"}else{&c.photon_number},"selected_household":app.store.metadata("selected_household").await?.unwrap_or_else(||"sarah".into()),"capabilities":capabilities,"evidence":evidence,"model_backend":model_backend,"phone_b":phone_b,"phone_demo":phone_demo,"profile":profile,"speech":relay::speech_configuration_for(&c.transport, &profile),"sessions":snapshots,"community":community,"tactics":tactics})).into_response())
 }
 async fn ready(State(app): State<App>) -> Response {
     let c = &app.config;
@@ -536,10 +607,11 @@ async fn ready(State(app): State<App>) -> Response {
     let evidence = crate::evidence::view(&app.store).await.unwrap_or_default();
     let inbound = evidence["inbound_phone"]["status"] == "passed";
     let relay = evidence["relay_phone"]["status"] == "passed";
-    let model_backend = crate::evidence::model_backend(c, &app.store)
+    let mut model_backend = crate::evidence::model_backend(c, &app.store)
         .await
         .unwrap_or_default();
-    let model = model_backend["protocol_verified"] == true;
+    model_backend["current"] = app.model_availability.view(c, &app.store).await;
+    let model = model_backend["current"]["available"] == true;
     let selected = ready
         && c.mode == crate::config::ExecutionMode::Live
         && match c.transport.as_str() {

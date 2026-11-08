@@ -12,6 +12,30 @@ BASE = "https://brevapi.us-west-2-prod.control-plane.brev.dev"
 ROOT = pathlib.Path("/opt/firstring-brev-guard")
 
 
+def budget_v2_limit(config):
+    """Validate the same explicit rehearsal budget as the local watchdog."""
+    for field in ["created_at", "deadline", "warmup_deadline", "hourly_usd",
+                  "balance_usd", "max_spend_usd", "total_budget_usd",
+                  "prior_spend_usd", "reserve_usd", "cleanup_allowance_usd"]:
+        value = config.get(field)
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or not math.isfinite(value) or value < 0):
+            raise ValueError("Invalid v2 budget or deadline field")
+    if any(field in config for field in
+           ["campaign_authorized", "campaign_started_at", "campaign_work_deadline"]):
+        raise ValueError("Cannot combine campaign and rehearsal budget policies")
+    duration = config["deadline"] - config["created_at"]
+    if not math.isfinite(duration) or not 0 < duration <= 8 * 3600:
+        raise ValueError("Rehearsal exceeds eight hours")
+    if not 0 <= config["prior_spend_usd"] < config["total_budget_usd"] <= 60:
+        raise ValueError("Rehearsal exceeds total authorization")
+    if config["cleanup_allowance_usd"] != 2:
+        raise ValueError("Rehearsal requires the fixed two-dollar cleanup allowance")
+    return min(config["balance_usd"] - config["reserve_usd"],
+               config["total_budget_usd"] - config["prior_spend_usd"],
+               config["max_spend_usd"])
+
+
 def log_event(operation, error=None, **fields):
     event = {"observed_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
              "operation": operation, **fields}
@@ -29,7 +53,15 @@ def cleanup_due(config, now, ready):
         value = config.get(field)
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
             raise ValueError("Invalid deadline field")
-    if config.get("campaign_authorized") is True:
+    if "budget_policy_version" in config and (
+            type(config["budget_policy_version"]) is not int or config["budget_policy_version"] != 2):
+        raise ValueError("Unsupported explicit budget policy version")
+    if config.get("budget_policy_version") == 2:
+        limit = budget_v2_limit(config)
+        cost = config["hourly_usd"] * (config["deadline"] - config["created_at"]) / 3600 + 2
+        if config["hourly_usd"] <= 0 or cost > limit:
+            raise ValueError("Quote lacks cleanup reserve or would consume protected credits")
+    elif config.get("campaign_authorized") is True:
         for field in ["campaign_started_at", "campaign_work_deadline"]:
             value = config.get(field)
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):

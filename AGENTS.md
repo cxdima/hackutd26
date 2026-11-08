@@ -2,6 +2,14 @@
 
 FirstRing is a Rust application for a live HackUTD 2026 voice demonstration. Follow the current user request and preserve existing work. A request to inspect or plan is not a request to implement; the unified starting prompt explicitly requests implementation after a brief audit.
 
+## Current post-campaign implementation pass (Nov 8)
+
+The campaign at `44ecc40` is complete. The current user request supersedes its expired timer and A-only stopping point: restore a new bounded Nemotron deployment, reproduce attempt 19 through the actual runtime contract, enable an explicitly armed physical-phone handoff when the recipient is enrolled and ready, and implement durable scoped reputation with real lookup receipts. Preserve the existing 26-call total ledger and unused Sarah probe. Family calling remains disabled. No new training/NeMo/LoRA project in this pass.
+
+Claude owns `frontend/`, assets and visual design in the separate `frontend/angular-console` worktree; backend agents own Rust, additive contracts, SQLite and deployment. Do not overwrite Claude's uncommitted work. Angular production artifacts belong at `frontend/dist/firstring-web/browser/`; retain the prior console until integration is verified.
+
+Use a new Brev resource identity and versioned budget policy within the original $60 lifetime authorization. Never repurpose a deleted instance pointer or expired campaign identity. Historical model receipts must not make an offline backend appear available. A private handoff requires explicit short-lived operator arming; page loads, refreshes and reconnects never initiate calls.
+
 ## Specification and sources
 
 Read `docs/FirstRing_Master_Guide.md`, or the root `FirstRing_Master_Guide.md` if the docs copy is absent. The master guide replaces the older Perplexity/Claude blueprint as the product and implementation specification. `FirstRing_Codex_Start.md` replaces the earlier initialization-only, transport-only and kickoff prompts.

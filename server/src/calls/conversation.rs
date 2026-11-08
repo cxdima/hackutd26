@@ -874,6 +874,7 @@ impl Actor {
         let h = self.handle.clone();
         let c = self.app.config.clone();
         let store = self.app.store.clone();
+        let reputation = self.app.reputation.clone();
         self.model_task = Some(tokio::spawn(async move {
             let deadline = Instant::now() + Duration::from_secs(6);
             let future = async {
@@ -886,13 +887,41 @@ impl Actor {
                 let model =
                     Nemotron::new(c.nvidia_key.clone(), c.model_url.clone(), c.model.clone())
                         .with_backend(c.model_backend);
-                let mut messages = conversation_messages(&s, &ModelCapabilities::from_config(&c));
+                let mut capabilities = ModelCapabilities::from_config(&c);
+                capabilities.handoff_available =
+                    crate::phone_demo::available_for(&store, &c, &s).await?;
+                let mut messages = conversation_messages(&s, &capabilities);
+                let mut reputation_lookup = None;
+                if let Some(service) = &reputation {
+                    match service.lookup_for_session(&s).await {
+                        Ok(lookup) => {
+                            if let Some(snapshot) = &lookup.reputation {
+                                let context = json!({"lookup_receipt_id":lookup.receipt.id,"version":snapshot.version,"scope":snapshot.scope,"level":snapshot.level,"correction":snapshot.correction,"demo_household_count":snapshot.demo_household_count,"verified_independent_households":snapshot.verified_independent_households,"independence":snapshot.independence,"expires_at":snapshot.expires_at});
+                                if let Some(system) = messages[0]["content"].as_str() {
+                                    messages[0]["content"] = json!(format!(
+                                        "{system}\nTrusted presented-number reputation context: {context}. This is prior reported behavior, not the current caller's identity or current intent. Never infer identity, automatically block, invent risk, or authorize an action from it. Assess current caller words and evidence normally. Demo profiles are simulated, not independent verified people. Different-number tactic memory remains a separate source."
+                                    ));
+                                }
+                                reputation_lookup = Some(lookup);
+                            }
+                        }
+                        Err(error) => {
+                            let _=store.append(Some(&s),"system","dependency.failed",json!({"dependency":"reputation","operation":"lookup","detail":error.to_string()}),s.execution_mode).await;
+                        }
+                    }
+                }
                 let mut epoch = s.policy_epoch;
                 let mut phase = ToolPhase::Assessment;
                 let mut last_denial: Option<String> = None;
                 let mut structural_repair_used = false;
                 for _ in 0..4 {
                     let observed = model.next_tool_observed_for(&messages, phase).await;
+                    if observed.observation.response_model.is_some()
+                        && let Some(lookup) = reputation_lookup.take()
+                        && let Some(snapshot) = lookup.reputation
+                    {
+                        let _=store.append(Some(&s),"system","reputation.applied",json!({"lookup_receipt_id":lookup.receipt.id,"read_version":snapshot.version,"scope":snapshot.scope,"generation_id":s.generation_id,"turn_version":s.turn_version,"boundary":"native_request_context","provider_response_observed":true,"decision_accepted":false,"identity_verified":false}),s.execution_mode).await;
+                    }
                     // A measured response is not an accepted decision or audible
                     // output. Bind it to its originating generation and turn.
                     let mut observation_session = s.clone();
@@ -1078,8 +1107,13 @@ impl Actor {
                 );
                 anyhow::ensure!(
                     self.session.execution_mode == ExecutionMode::Replay
-                        || self.app.config.handoff_enabled,
-                    "Private handoff calls are not authorized yet"
+                        || crate::phone_demo::available_for(
+                            &self.app.store,
+                            &self.app.config,
+                            &self.session
+                        )
+                        .await?,
+                    "Private handoff is not armed for this session"
                 );
                 let leg = Leg {
                     action_id: uuid::Uuid::new_v4().to_string(),
@@ -1101,11 +1135,21 @@ impl Actor {
                     }
                 };
                 let key = format!("{}:handoff:{}", self.session.id, self.session.policy_epoch);
-                let reserve = self
-                    .app
-                    .store
-                    .reserve(&self.session.id, &key, &leg, self.session.execution_mode)
-                    .await;
+                let reserve = if self.session.execution_mode == ExecutionMode::Live {
+                    crate::phone_demo::reserve_handoff(
+                        &self.app.store,
+                        &self.app.config,
+                        &self.session,
+                        &key,
+                        &leg,
+                    )
+                    .await
+                } else {
+                    self.app
+                        .store
+                        .reserve(&self.session.id, &key, &leg, self.session.execution_mode)
+                        .await
+                };
                 if !matches!(&reserve, Ok((_, true))) {
                     self.session.legs.retain(|l| l.action_id != leg.action_id);
                     self.session.offer = self.session.offer_history.pop();
@@ -1223,16 +1267,17 @@ impl Actor {
                 let message = self.session.message.as_ref().expect("Message was recorded");
                 // Neither the event nor caller
                 // speech repeats the private summary; only authenticated snapshots expose it.
-                self.emit(
-                    "system",
-                    "message.recorded",
-                    json!({
-                        "recorded_at":message.recorded_at,
-                        "turn_version":message.turn_version,
-                        "evidence_turn_ids":message.evidence_turn_ids,
-                    }),
-                )
-                .await?;
+                let source = self.app.store.append(
+                    Some(&self.session), "system", "message.recorded",
+                    json!({"recorded_at":message.recorded_at,"turn_version":message.turn_version,"evidence_turn_ids":message.evidence_turn_ids}),
+                    self.session.execution_mode,
+                ).await?;
+                if crate::reputation::current_protective_assessment(&self.session)
+                    && let Some(service) = &self.app.reputation
+                    && let Err(error) = service.report_protective(&self.session, &source).await
+                {
+                    self.emit("system","dependency.failed",json!({"dependency":"reputation","operation":"report","detail":error.to_string()})).await?;
+                }
                 // End Relay before scheduling the goodbye. Its documented protocol
                 // has no audio-drained acknowledgement. The signed Connect action
                 // returns a speech Gather around the acknowledgement, then Hangup

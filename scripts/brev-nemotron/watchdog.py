@@ -18,6 +18,31 @@ import urllib.error
 BASE = "https://brevapi.us-west-2-prod.control-plane.brev.dev"
 IMMUTABLE = ["name", "created_at", "deadline", "warmup_deadline", "hourly_usd", "balance_usd", "max_spend_usd"]
 IMMUTABLE += ["campaign_authorized", "campaign_started_at", "campaign_work_deadline", "prior_spend_usd", "total_budget_usd"]
+IMMUTABLE += ["budget_policy_version", "reserve_usd", "cleanup_allowance_usd"]
+
+
+def budget_v2_limit(receipt):
+    """Explicit rehearsal policy; keep validation aligned with remote_guard.py."""
+    for field in ["created_at", "deadline", "warmup_deadline", "hourly_usd",
+                  "balance_usd", "max_spend_usd", "total_budget_usd",
+                  "prior_spend_usd", "reserve_usd", "cleanup_allowance_usd"]:
+        value = receipt.get(field)
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or not math.isfinite(value) or value < 0):
+            raise ValueError("Invalid v2 budget or deadline field")
+    if any(field in receipt for field in
+           ["campaign_authorized", "campaign_started_at", "campaign_work_deadline"]):
+        raise ValueError("Cannot combine campaign and rehearsal budget policies")
+    duration = receipt["deadline"] - receipt["created_at"]
+    if not math.isfinite(duration) or not 0 < duration <= 8 * 3600:
+        raise ValueError("Rehearsal exceeds eight hours")
+    if not 0 <= receipt["prior_spend_usd"] < receipt["total_budget_usd"] <= 60:
+        raise ValueError("Rehearsal exceeds total authorization")
+    if receipt["cleanup_allowance_usd"] != 2:
+        raise ValueError("Rehearsal requires the fixed two-dollar cleanup allowance")
+    return min(receipt["balance_usd"] - receipt["reserve_usd"],
+               receipt["total_budget_usd"] - receipt["prior_spend_usd"],
+               receipt["max_spend_usd"])
 
 
 def log_event(operation, error=None, **fields):
@@ -40,8 +65,13 @@ def expiry(receipt):
             raise ValueError("Invalid numeric receipt field")
     if not isinstance(receipt.get("ready", False), bool):
         raise ValueError("Invalid readiness state")
+    if "budget_policy_version" in receipt and (
+            type(receipt["budget_policy_version"]) is not int or receipt["budget_policy_version"] != 2):
+        raise ValueError("Unsupported explicit budget policy version")
     duration = receipt["deadline"] - receipt["created_at"]
-    if receipt.get("campaign_authorized") is True:
+    if receipt.get("budget_policy_version") == 2:
+        limit = budget_v2_limit(receipt)
+    elif receipt.get("campaign_authorized") is True:
         for field in ["campaign_started_at", "campaign_work_deadline", "prior_spend_usd", "total_budget_usd"]:
             value = receipt.get(field)
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):

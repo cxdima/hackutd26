@@ -2440,6 +2440,8 @@ mod tests {
             reasoning_tokens: None,
             native_argument_diagnostic: None,
             provider_error_diagnostic: None,
+            started_at: "2026-11-08T00:00:00Z".into(),
+            completed_at: "2026-11-08T00:00:00.100Z".into(),
             elapsed_ms: 100,
             outcome: "authorization".into(),
             error: Some("HTTP403".into()),
