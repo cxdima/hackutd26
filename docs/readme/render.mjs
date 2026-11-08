@@ -13,7 +13,7 @@ const sharp = require('sharp');
 
 // name -> [source html, output file, css width]
 const targets = {
-  hero: ['hero.html', 'hero-v2.webp', 1280],
+  hero: ['hero.html', 'hero-v3.webp', 1280],
   'banner-voice': ['banner.html?k=voice', 'banner-voice-v2.webp', 1280],
   'banner-nvidia': ['banner.html?k=nvidia', 'banner-nvidia-v2.webp', 1280],
   'banner-safety': ['banner.html?k=safety', 'banner-safety-v2.webp', 1280],

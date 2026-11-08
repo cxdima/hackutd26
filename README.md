@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/readme/hero-v2.webp" width="100%" alt="FirstRing: Ringo the sea lion balances a lime ring on its nose; a noisy waveform from the left becomes a calm line as it reaches the ring. Stack: Rust, Axum, Tokio, SQLite; Photon SIP to Twilio ConversationRelay; NVIDIA Nemotron 3.5 Lightning 30B-A3B; Brev H100 with vLLM and NVFP4; Angular console.">
+<img src="docs/readme/hero-v3.webp" width="100%" alt="FirstRing: Ringo the sea lion balances a lime ring on its nose; a noisy waveform from the left becomes a calm line as it reaches the ring. Stack: Rust, Axum, Tokio, SQLite; Photon SIP to Twilio ConversationRelay; NVIDIA Nemotron 3.5 Lightning 30B-A3B; Brev H100 with vLLM and NVFP4; Angular console.">
 
 <br>
 
