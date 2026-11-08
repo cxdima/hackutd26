@@ -25,7 +25,6 @@ import {
   LucideRotateCcw,
   LucideShieldAlert,
   LucideSkipForward,
-  LucideWifiOff,
   LucideX,
 } from '@lucide/angular';
 import { OUTCOME_LABEL } from '../../core/calls';
@@ -33,22 +32,18 @@ import { buildCommunityStories } from '../../core/community-story';
 import { ConsoleStore } from '../../core/console-store';
 import { STAGED_INFO, type StagedKind } from '../../core/demo-staged';
 import { formatDuration, formatPhone, formatTime, isE164 } from '../../core/format';
-import {
-  handoffView,
-  liveStages,
-  modelAvailability,
-  modelEvidence,
-  presentFocus,
-} from '../../core/live';
+import { handoffView, liveStages, modelEvidence, presentFocus } from '../../core/live';
 import { resolvePresentation } from '../../core/present-selection';
 import { replayDuration, replayRecord } from '../../core/replay';
 import { gsap, Motion } from '../../shared/motion';
+import { SelectMenu, SelectOptionTemplate, type SelectOption } from '../../shared/select-menu';
 import { Wordmark } from '../../shared/wordmark';
 import { DecisionSpine } from '../decision-spine';
 import { HandoffTimeline } from '../handoff-timeline';
 import { ModelEvidence } from '../model-evidence';
+import { OutcomeIcon } from '../outcome-chip';
+import { PhoneDemoControl } from '../phone-demo-control';
 import { ReputationPanel } from '../reputation-panel';
-import { StatusBug } from '../status-bug';
 import { CommunityStoryView } from './community-story';
 import { PhoneQr } from './phone-qr';
 import { PresentState } from './present-state';
@@ -68,8 +63,11 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
     NgTemplateOutlet,
     RouterLink,
     LucideChevronDown,
+    SelectMenu,
+    SelectOptionTemplate,
+    OutcomeIcon,
+    PhoneDemoControl,
     Wordmark,
-    StatusBug,
     StageRail,
     PhoneQr,
     CommunityStoryView,
@@ -87,14 +85,13 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
     LucidePanelRightOpen,
     LucideRotateCcw,
     LucideX,
-    LucideWifiOff,
     LucideQrCode,
     LucidePlay,
     LucideSkipForward,
   ],
   host: { class: 'block' },
   template: `
-    <div class="on-ink flex min-h-dvh flex-col bg-ink text-paper">
+    <div class="on-ink flex min-h-dvh flex-col bg-ink text-paper lg:h-dvh lg:overflow-hidden">
       <header class="border-b border-white/10">
         <div class="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 sm:px-8">
           <a routerLink="/console" class="shrink-0 rounded-lg" aria-label="Back to the dashboard"
@@ -124,7 +121,31 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
             <ng-container [ngTemplateOutlet]="showing" />
           </div>
           <div class="ml-auto flex flex-wrap items-center gap-2">
-            <span class="present-bug"><app-status-bug [connection]="store.connection()" /></span>
+            @if (store.connection() === 'paused') {
+              <span class="text-[1rem] font-semibold text-paper/70" role="status"
+                >Reconnecting…</span
+              >
+            }
+            @if (store.isDemo()) {
+              <div class="hidden flex-wrap gap-2 sm:flex">
+                <ng-container [ngTemplateOutlet]="stagedButtons" />
+              </div>
+            }
+            @if (replay()) {
+              @if (!replayDone()) {
+                <button type="button" class="btn btn-quiet" (click)="skipReplay()">
+                  <svg lucideSkipForward [size]="16" aria-hidden="true"></svg> Skip to end
+                </button>
+              }
+              <button type="button" class="btn btn-quiet" (click)="stopReplay()">
+                Stop replay
+              </button>
+            } @else if (resolution().newer; as newer) {
+              <button type="button" class="btn btn-primary" (click)="ui.pin(newer.id)">
+                New call at {{ clock(newer.startedAt) }}
+              </button>
+            }
+            <app-phone-demo-control tone="ink" />
             <button
               type="button"
               class="btn btn-quiet"
@@ -157,20 +178,43 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
           </div>
         </details>
         <ng-template #showing>
-          <label class="flex min-w-0 flex-1 items-center gap-2">
-            <span class="text-[0.95rem] font-bold text-muted-on-ink">Showing</span>
-            <select
-              class="min-h-11 min-w-0 flex-1 rounded-full border-2 border-white/20 bg-ink px-4 text-[1rem] font-bold text-paper sm:w-[19rem] sm:flex-none"
-              [value]="selectValue()"
-              (change)="choose($any($event.target).value)"
-              aria-describedby="follow-help"
+          <div class="flex min-w-0 flex-1 items-center gap-2">
+            <span class="text-[0.95rem] font-bold text-muted-on-ink" aria-hidden="true"
+              >Showing</span
             >
-              <option value="follow">Follow newest call</option>
-              @for (call of recent(); track call.id) {
-                <option [value]="call.id">{{ optionLabel(call) }}</option>
-              }
-            </select>
-          </label>
+            <app-select-menu
+              class="flex-1 sm:w-[19rem] sm:flex-none"
+              tone="ink"
+              ariaLabel="Showing"
+              describedBy="follow-help"
+              [options]="showingOptions()"
+              [value]="selectValue()"
+              (valueChange)="choose($event)"
+            >
+              <ng-template appSelectOption let-option let-selected="selected">
+                @let call = callById().get(option.value);
+                @if (call) {
+                  <span class="tabular w-[4.75rem] shrink-0 self-start font-bold leading-snug">{{
+                    clock(call.startedAt)
+                  }}</span>
+                  <span class="min-w-0 flex-1 leading-snug">
+                    <span class="block" [class.font-bold]="selected">{{ call.name }}</span>
+                    <span
+                      class="mt-0.5 flex items-center gap-1.5 text-[0.875rem] font-semibold"
+                      [class]="outcomeTone(call.outcome)"
+                    >
+                      <app-outcome-icon [outcome]="call.outcome" [size]="15" />
+                      {{ outcomeLabel(call.outcome) }}
+                    </span>
+                  </span>
+                } @else {
+                  <span class="min-w-0 flex-1 leading-snug" [class.font-bold]="selected">{{
+                    option.label
+                  }}</span>
+                }
+              </ng-template>
+            </app-select-menu>
+          </div>
         </ng-template>
         <ng-template #resetExit>
           <button type="button" class="btn btn-quiet" (click)="reset()">
@@ -202,79 +246,16 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
           Follow newest shows only calls that start after the screen was reset, or calls that are
           live now. Earlier calls never take over the screen.
         </p>
-        @if (store.isDemo()) {
-          <div class="border-t border-white/10 bg-ink-2 px-4 py-3 sm:px-8">
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <p class="text-[1rem]">
-                <strong>Fictional rehearsal.</strong>
-                <span class="text-muted-on-ink"> No phone line, model or server is involved.</span>
-              </p>
-              <div class="hidden flex-wrap gap-2 sm:flex">
-                <ng-container [ngTemplateOutlet]="stagedButtons" />
-              </div>
-              @if (!store.stagedPlayed().includes('branch')) {
-                <p class="hidden w-full text-[0.95rem] text-muted-on-ink sm:block">
-                  “Maya was ready” plays after “The request changes”, which shares the warning.
-                </p>
-              }
-            </div>
-          </div>
-        }
-        @if (store.connection() === 'paused') {
-          <div
-            class="flex items-center gap-3 bg-amber-wash px-4 py-3 text-amber-ink sm:px-8"
-            role="status"
-          >
-            <svg lucideWifiOff [size]="20" class="shrink-0" aria-hidden="true"></svg>
-            <p class="text-[1.0625rem] font-semibold">
-              Signal lost. Showing the last snapshot{{
-                lastReceipt() ? ' from ' + lastReceipt() : ''
-              }}. Reconnecting automatically.
-            </p>
-          </div>
-        }
-        @if (replay(); as r) {
-          <div
-            class="flex flex-wrap items-center gap-3 bg-paper px-4 py-3 text-ink sm:px-8"
-            role="status"
-          >
-            <p class="text-[1.0625rem]">
-              <span class="bug mr-2 bg-ink text-paper">Replay</span>
-              <strong>Recorded call from {{ clock(replaySource()?.startedAt) }}.</strong>
-              Its actual receipts, replayed at real speed. Not a live call.
-            </p>
-            <div class="flex gap-2">
-              @if (!replayDone()) {
-                <button type="button" class="btn btn-quiet" (click)="skipReplay()">
-                  <svg lucideSkipForward [size]="16" aria-hidden="true"></svg> Skip to end
-                </button>
-              }
-              <button type="button" class="btn btn-ink" (click)="stopReplay()">Stop replay</button>
-            </div>
-          </div>
-        } @else if (resolution().newer; as newer) {
-          <div
-            class="flex flex-wrap items-center gap-3 bg-paper px-4 py-3 text-ink sm:px-8"
-            role="status"
-          >
-            <p class="text-[1.0625rem] font-semibold">
-              A new call started at {{ clock(newer.startedAt) }}. This screen stays on the pinned
-              call.
-            </p>
-            <button type="button" class="btn btn-ink" (click)="ui.pin(newer.id)">
-              Show the new call
-            </button>
-          </div>
-        }
       </header>
 
-      <main id="present-main" class="flex-1 px-4 py-8 sm:px-8 sm:py-10" #stage>
+      <main
+        id="present-main"
+        class="flex-1 px-4 py-8 sm:px-8 lg:min-h-0 lg:overflow-hidden lg:py-[3.5vh]"
+        #stage
+      >
         @switch (screen()) {
           @case ('unavailable') {
             <section class="mx-auto max-w-[60rem] py-10" aria-labelledby="unavailable-heading">
-              <p class="bug bug-lost">
-                <svg lucideWifiOff [size]="15" aria-hidden="true"></svg> Signal lost
-              </p>
               <h1
                 id="unavailable-heading"
                 class="mt-6 text-[clamp(2.5rem,1.5rem+4vw,5rem)] font-extrabold leading-[1.02] tracking-[-0.035em]"
@@ -291,10 +272,10 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
           }
           @case ('waiting') {
             <section
-              class="grid items-center gap-10 lg:grid-cols-12"
+              class="grid gap-x-12 gap-y-10 lg:h-full lg:grid-cols-12 lg:items-center"
               aria-labelledby="waiting-heading"
             >
-              <div class="lg:col-span-7">
+              <div class="lg:col-span-6">
                 <p class="flex items-center gap-3 text-[1.25rem] font-bold">
                   <span class="relative flex size-4" aria-hidden="true">
                     <span
@@ -311,16 +292,32 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                 </p>
                 <h1
                   id="waiting-heading"
-                  class="mt-8 text-[clamp(2.5rem,1.4rem+4.4vw,5.5rem)] font-extrabold leading-[1] tracking-[-0.035em]"
+                  class="mt-[3vh] text-[clamp(2.5rem,min(5.2vw,8vh),5.5rem)] font-extrabold leading-[1] tracking-[-0.035em]"
                 >
                   Call FirstRing
                 </h1>
                 @if (number(); as n) {
-                  <p
-                    class="tabular mt-4 text-[clamp(2.25rem,1.2rem+4.2vw,5.25rem)] font-extrabold leading-[1.05] tracking-[-0.02em] text-lime"
+                  <div class="mt-[1.5vh] flex flex-wrap items-center gap-x-6 gap-y-4">
+                    <p
+                      class="tabular text-[clamp(2rem,min(4.6vw,7vh),5rem)] font-extrabold leading-[1.05] tracking-[-0.02em] text-lime"
+                    >
+                      {{ n.display }}
+                    </p>
+                    @if (ui.showQr()) {
+                      <div class="rounded-xl bg-white p-2.5 text-ink">
+                        <app-phone-qr class="size-[clamp(7rem,16vh,10rem)]" [number]="n.e164" />
+                      </div>
+                    }
+                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-quiet mt-[2vh]"
+                    [attr.aria-pressed]="ui.showQr()"
+                    (click)="ui.showQr.set(!ui.showQr())"
                   >
-                    {{ n.display }}
-                  </p>
+                    <svg lucideQrCode [size]="17" aria-hidden="true"></svg>
+                    {{ ui.showQr() ? 'Hide QR code' : 'Show a QR code that dials this number' }}
+                  </button>
                 } @else {
                   <p class="mt-4 max-w-[40ch] text-[1.375rem] text-muted-on-ink">
                     {{
@@ -331,14 +328,14 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                   </p>
                 }
                 <ul
-                  class="mt-8 max-w-[44rem] border-t border-white/15"
+                  class="mt-[3vh] max-w-[44rem] border-t border-white/15"
                   aria-label="Service readiness"
                 >
                   @for (item of readiness(); track item.label) {
                     <li
-                      class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-white/10 py-3"
+                      class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-white/10 py-[1.1vh]"
                     >
-                      <span class="flex items-center gap-2 text-[1.125rem] font-bold">
+                      <span class="flex items-center gap-2 text-[1.0625rem] font-bold">
                         @if (item.ok) {
                           <svg lucideCheck [size]="18" class="text-lime" aria-hidden="true"></svg>
                         } @else {
@@ -351,23 +348,34 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                         }
                         {{ item.label }}
                       </span>
-                      <span class="text-[1rem] text-muted-on-ink">{{ item.detail }}</span>
+                      <span class="text-[0.95rem] text-muted-on-ink">{{ item.detail }}</span>
                     </li>
                   }
                 </ul>
+              </div>
+              <div class="lg:col-span-6">
                 @if (highlights().length) {
-                  <section class="mt-10 max-w-[44rem]" aria-labelledby="highlights-heading">
-                    <h2 id="highlights-heading" class="text-[1.25rem] font-extrabold">
-                      Recorded calls to show
-                    </h2>
-                    <p class="mt-1 max-w-[60ch] text-[1rem] text-muted-on-ink">
+                  <section aria-labelledby="highlights-heading">
+                    <div class="flex items-end justify-between gap-4">
+                      <h2 id="highlights-heading" class="text-[1.375rem] font-extrabold">
+                        Recorded calls to show
+                      </h2>
+                      <img
+                        src="media/ringo-rest-480.webp"
+                        alt=""
+                        width="480"
+                        height="480"
+                        class="hidden w-[clamp(5rem,12vh,8rem)] opacity-95 lg:block"
+                      />
+                    </div>
+                    <p class="mt-1 max-w-[56ch] text-[1rem] text-muted-on-ink">
                       Earlier calls never take over this screen. Show one, or replay its actual
                       receipts at real speed.
                     </p>
                     <ul class="mt-3 border-t border-white/15">
                       @for (h of highlights(); track h.call.id) {
                         <li
-                          class="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-white/10 py-3"
+                          class="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-white/10 py-[1.4vh]"
                         >
                           <div class="min-w-0 flex-1">
                             <p class="text-[1.0625rem] font-bold">{{ h.title }}</p>
@@ -392,35 +400,13 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                       }
                     </ul>
                   </section>
-                }
-              </div>
-              <div class="flex flex-col items-center gap-6 lg:col-span-5">
-                @if (number(); as n) {
-                  @if (ui.showQr()) {
-                    <div
-                      class="w-full max-w-[22rem] rounded-[var(--radius-card)] bg-white p-5 text-ink"
-                    >
-                      <app-phone-qr [number]="n.e164" />
-                      <p class="mt-3 text-center text-[1rem] font-bold">Scan to call FirstRing</p>
-                    </div>
-                  }
-                  <button
-                    type="button"
-                    class="btn btn-quiet"
-                    [attr.aria-pressed]="ui.showQr()"
-                    (click)="ui.showQr.set(!ui.showQr())"
-                  >
-                    <svg lucideQrCode [size]="17" aria-hidden="true"></svg>
-                    {{ ui.showQr() ? 'Hide QR code' : 'Show QR code' }}
-                  </button>
-                }
-                @if (!ui.showQr()) {
+                } @else {
                   <img
                     src="media/ringo-rest-480.webp"
                     alt=""
                     width="480"
                     height="480"
-                    class="w-[min(18rem,60vw)] opacity-95"
+                    class="mx-auto w-[clamp(12rem,30vh,18rem)] opacity-95"
                   />
                 }
               </div>
@@ -443,11 +429,6 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
             <section class="mx-auto max-w-[80rem]" aria-label="Community protection">
               @if (story(); as s) {
                 <app-community-story [story]="s" variant="ink" [timezone]="timezone()">
-                  @if (storyIsFixture()) {
-                    <p class="mt-4 text-[1.0625rem] font-bold">
-                      <span class="bug bug-demo mr-2">Demo</span> Fictional rehearsal data.
-                    </p>
-                  }
                 </app-community-story>
               } @else {
                 <h1
@@ -468,7 +449,7 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
             @let call = shown()!;
             @let f = focus()!;
             <article
-              class="grid gap-x-10 gap-y-8 lg:grid-cols-12"
+              class="grid gap-x-10 gap-y-[2.6vh] lg:grid-cols-12"
               aria-labelledby="present-caption"
             >
               <div class="lg:col-span-8">
@@ -492,7 +473,6 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                     >
                   }
                   @if (ui.selection().mode === 'pinned' && !replay()) {
-                    <span class="bug bug-off">Pinned</span>
                     @if (!f.live) {
                       <button
                         type="button"
@@ -505,7 +485,7 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                   }
                 </p>
 
-                <div class="mt-6">
+                <div class="mt-[2.4vh]">
                   <p class="caption-speaker !text-[0.95rem]">
                     &gt;&gt; Caller{{ f.caller?.partial ? ' (speaking)' : '' }}
                   </p>
@@ -525,27 +505,31 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                   @let before = f.turns[f.branchAt - 1];
                   @let after = f.turns[f.branchAt];
                   <ol
-                    class="mt-8 max-w-[52rem] border-t-2 border-paper/40"
+                    class="mt-[2.6vh] max-w-[52rem] border-t-2 border-paper/40"
                     aria-label="How the request changed"
                   >
-                    <li class="grid grid-cols-[2.25rem_1fr] gap-3 border-b border-white/10 py-3">
+                    <li
+                      class="grid grid-cols-[2.25rem_1fr] gap-3 border-b border-white/10 py-[1.2vh]"
+                    >
                       <span
                         class="mt-1.5 size-5 rounded-full border-2 border-muted-on-ink bg-ink-3"
                         aria-hidden="true"
                       ></span>
-                      <p class="text-[1.125rem]">
+                      <p class="text-[clamp(1rem,2.1vh,1.125rem)]">
                         <strong>Before:</strong> an ordinary request.
                         <span class="text-muted-on-ink line-through decoration-paper/50"
                           >“{{ clip(before.text) }}”</span
                         >
                       </p>
                     </li>
-                    <li class="grid grid-cols-[2.25rem_1fr] gap-3 border-b border-white/10 py-3">
+                    <li
+                      class="grid grid-cols-[2.25rem_1fr] gap-3 border-b border-white/10 py-[1.2vh]"
+                    >
                       <span
                         class="mt-0.5 grid size-8 place-items-center rounded-md bg-magenta-on-ink text-ink"
                         ><svg lucideShieldAlert [size]="17" aria-hidden="true"></svg
                       ></span>
-                      <p class="text-[1.125rem]">
+                      <p class="text-[clamp(1rem,2.1vh,1.125rem)]">
                         <strong class="text-magenta-on-ink">Then the request changed.</strong>
                         {{ after.summary }}
                       </p>
@@ -554,7 +538,7 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                 }
 
                 <div
-                  class="lower-third mt-8 max-w-[56rem] overflow-hidden rounded-[var(--radius-band)] bg-paper text-ink shadow-[var(--shadow-lift)]"
+                  class="lower-third mt-[2.8vh] max-w-[56rem] overflow-hidden rounded-[var(--radius-band)] bg-paper text-ink shadow-[var(--shadow-lift)]"
                 >
                   <div
                     class="lower-tally flex items-center justify-between gap-3 px-5 py-2"
@@ -567,17 +551,19 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                       <time class="tabular text-[0.95rem] font-bold">{{ clock(f.step.at) }}</time>
                     }
                   </div>
-                  <div class="px-5 py-5">
+                  <div class="px-5 py-[2vh]">
                     <p
-                      class="text-[clamp(1.5rem,1.1rem+1.5vw,2.5rem)] font-extrabold leading-[1.12] tracking-[-0.02em]"
+                      class="text-[clamp(1.375rem,min(2.3vw,3.9vh),2.5rem)] font-extrabold leading-[1.12] tracking-[-0.02em]"
                     >
                       {{ f.step?.label ?? 'Answering' }}
                     </p>
                     @if (f.step?.detail; as detail) {
-                      <p class="mt-1 text-[1.1875rem] text-ink-3">{{ detail }}</p>
+                      <p class="mt-1 text-[clamp(1rem,2.2vh,1.1875rem)] text-ink-3">{{ detail }}</p>
                     }
                     @if (f.firstring) {
-                      <p class="mt-4 border-t border-paper-3 pt-3 text-[1.125rem] leading-snug">
+                      <p
+                        class="mt-[1.6vh] border-t border-paper-3 pt-[1.2vh] text-[clamp(1rem,2.1vh,1.125rem)] leading-snug"
+                      >
                         <span class="caption-speaker !text-[0.95rem] !text-lime-ink"
                           >&gt;&gt; FirstRing</span
                         >
@@ -588,23 +574,28 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                 </div>
               </div>
 
-              <aside class="flex flex-col gap-6 lg:col-span-4" aria-label="Request and outcome">
+              <aside
+                class="flex flex-col gap-[2.6vh] lg:col-span-4"
+                aria-label="Request and outcome"
+              >
                 <div>
                   <h2 class="text-[1.0625rem] font-bold text-muted-on-ink">
                     What the caller wants
                   </h2>
-                  <p class="mt-2 text-[clamp(1.25rem,1rem+0.8vw,1.75rem)] font-bold leading-snug">
+                  <p
+                    class="mt-2 text-[clamp(1.125rem,min(1.7vw,2.8vh),1.75rem)] font-bold leading-snug"
+                  >
                     {{ f.request }}
                   </p>
                 </div>
                 <div
-                  class="outcome-graphic rounded-[var(--radius-card)] p-6"
+                  class="outcome-graphic rounded-[var(--radius-card)] p-[clamp(1rem,2.6vh,1.5rem)]"
                   [class]="outcomeClass()"
                   role="status"
                   aria-live="polite"
                 >
                   <h2
-                    class="flex items-start gap-3 text-[clamp(1.6rem,1.2rem+1.4vw,2.6rem)] font-extrabold leading-[1.08] tracking-[-0.02em]"
+                    class="flex items-start gap-3 text-[clamp(1.375rem,min(2.5vw,4.2vh),2.6rem)] font-extrabold leading-[1.08] tracking-[-0.02em]"
                   >
                     <span class="visually-hidden">Outcome: </span>
                     @switch (f.outcome.kind) {
@@ -657,7 +648,9 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                     }
                     <span>{{ f.outcome.label }}</span>
                   </h2>
-                  <p class="mt-2 text-[1.125rem] leading-snug opacity-90">{{ f.outcome.detail }}</p>
+                  <p class="mt-2 text-[clamp(1rem,2.1vh,1.125rem)] leading-snug opacity-90">
+                    {{ f.outcome.detail }}
+                  </p>
                 </div>
                 @if (handoff(); as h) {
                   <div>
@@ -726,8 +719,8 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                 }
               </aside>
 
-              <div class="lg:col-span-12">
-                <app-stage-rail [stages]="stages()" [timezone]="timezone()" [max]="5" />
+              <div class="lg:col-span-12 [@media(max-height:800px)]:hidden">
+                <app-stage-rail [stages]="stages()" [timezone]="timezone()" [max]="4" />
               </div>
             </article>
           }
@@ -873,6 +866,14 @@ export class PresentPage {
     return call ? handoffView(call) : undefined;
   });
   readonly recent = computed(() => this.store.calls().slice(0, 15));
+  readonly callById = computed(() => new Map(this.recent().map((call) => [call.id, call])));
+  readonly showingOptions = computed<SelectOption[]>(() => [
+    { value: 'follow', label: 'Follow newest call' },
+    ...this.recent().map((call) => ({
+      value: call.id,
+      label: `${this.clock(call.startedAt)} · ${call.name}`,
+    })),
+  ]);
   readonly timezone = computed(() => this.store.state()?.profile?.timezone);
   readonly credit = computed(() => modelEvidence(this.shown(), this.store.state()).credit);
   readonly selectValue = computed(() => {
@@ -906,54 +907,45 @@ export class PresentPage {
     const state = this.store.state();
     if (!state) return [];
     if (this.store.isDemo())
-      return [
-        { label: 'Demo data', ok: true, detail: 'Fictional calls play in this browser only' },
-      ];
-    const cap = (id: string) => state.capabilities.find((c) => c.id === id);
-    const ok = (id: string) => ['configured', 'verified'].includes(cap(id)?.status ?? '');
-    const transport =
-      state.transport === 'relay'
-        ? { ok: true, detail: 'Live conversation (ConversationRelay)' }
-        : state.transport === 'gather'
-          ? { ok: true, detail: 'Turn-by-turn speech' }
-          : {
-              ok: false,
-              detail: `Phone-line test mode (${state.transport}); callers hear a keypad test`,
-            };
-    const handoff = cap('handoff');
+      return [{ label: 'Demo data', ok: true, detail: 'Fictional calls in this browser' }];
+    const ok = (id: string) =>
+      ['configured', 'verified'].includes(
+        state.capabilities.find((c) => c.id === id)?.status ?? '',
+      );
+    const model = state.model_backend;
+    const conversation = state.transport === 'relay' || state.transport === 'gather';
+    const phone = state.phone_demo;
+    const phoneArmed =
+      phone?.state === 'armed' &&
+      (!phone.expires_at || Date.parse(phone.expires_at) > this.store.now());
     return [
+      { label: 'Phone line', ok: ok('inbound'), detail: ok('inbound') ? 'Ready' : 'Not set up' },
       {
-        label: 'Phone line',
-        ok: ok('inbound'),
-        detail: ok('inbound') ? 'Configured' : 'Not configured',
+        label: 'AI conversation',
+        ok: conversation && !!model?.configured,
+        detail: !conversation
+          ? 'Keypad test mode'
+          : model?.configured
+            ? `NVIDIA Nemotron · ${model.backend === 'brev_hosted' ? 'GPU' : 'hosted'}`
+            : 'Model not set up',
       },
-      { label: 'Screening conversation', ...transport },
-      (() => {
-        const model = modelAvailability(state);
-        return {
-          label: 'Decision model',
-          ok: model.known ? model.available : !!state.model_backend?.configured,
-          detail: model.text,
-        };
-      })(),
       {
-        label: 'Private permission calls',
-        ok: !!handoff && ok('handoff'),
-        detail: handoff
-          ? ok('handoff')
-            ? 'Armed on the server'
-            : 'Not armed on the server'
-          : 'The server does not report this yet',
+        label: 'Ring my phone first',
+        ok: phoneArmed || ok('handoff'),
+        detail: phoneArmed
+          ? `Armed until ${this.clock(phone?.expires_at ?? undefined)}`
+          : ok('handoff')
+            ? 'Armed for the next call'
+            : 'Off',
       },
     ];
   });
-
-  /** Long captions step down so the outcome and rundown stay on a projected screen. */
+  /** Long captions step down so the outcome stays on a projected screen. */
   readonly captionClass = computed(() => {
     const length = this.focus()?.caller?.text.length ?? 0;
-    return length > 110
-      ? 'max-w-[32ch] text-[clamp(1.75rem,1rem+2.2vw,3.25rem)]'
-      : 'max-w-[28ch] text-[clamp(1.875rem,1.1rem+2.9vw,4.25rem)]';
+    if (length > 160) return 'max-w-[38ch] text-[clamp(1.375rem,min(2.6vw,4.2vh),2.75rem)]';
+    if (length > 90) return 'max-w-[32ch] text-[clamp(1.5rem,min(3.2vw,5.2vh),3.25rem)]';
+    return 'max-w-[28ch] text-[clamp(1.75rem,min(4.2vw,6.6vh),4.25rem)]';
   });
   readonly tallyLabel = computed(() => {
     const kind = this.focus()?.outcome.kind;
@@ -1056,8 +1048,8 @@ export class PresentPage {
     });
   }
 
-  choose(value: string) {
-    if (value === 'follow') this.ui.follow();
+  choose(value: string | null) {
+    if (!value || value === 'follow') this.ui.follow();
     else this.ui.pin(value);
   }
 
@@ -1100,8 +1092,20 @@ export class PresentPage {
     this.returnFocus?.focus();
   }
 
-  optionLabel(call: { startedAt?: string; name: string; outcome: keyof typeof OUTCOME_LABEL }) {
-    return `${this.clock(call.startedAt)} · ${call.name} · ${OUTCOME_LABEL[call.outcome]}`;
+  /** Outcome words in the "Showing" list: small coloured text, readable on charcoal. */
+  outcomeTone(outcome: keyof typeof OUTCOME_LABEL) {
+    switch (outcome) {
+      case 'blocked':
+        return 'text-magenta-on-ink';
+      case 'connected':
+      case 'message_saved':
+      case 'in_progress':
+        return 'text-lime';
+      case 'needs_review':
+        return 'text-[#f4c46b]';
+      default:
+        return 'text-muted-on-ink';
+    }
   }
   outcomeLabel(outcome: keyof typeof OUTCOME_LABEL) {
     return OUTCOME_LABEL[outcome];

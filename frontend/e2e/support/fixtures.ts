@@ -1,6 +1,5 @@
 import { test as base, expect, type Page, type Route } from '@playwright/test';
 
-export const TOKEN = 'test-operator-token';
 let seq = 0;
 
 export function event(
@@ -107,6 +106,30 @@ export function liveState(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** The server's "ring my phone on the next call" status. */
+export function phoneDemo(overrides: Record<string, unknown> = {}) {
+  return {
+    state: 'unarmed',
+    arm_id: null,
+    session_id: null,
+    household_id: null,
+    contact_id: 'sarah',
+    expires_at: null,
+    action_id: null,
+    remaining_attempts: 3,
+    recipient_enrolled: true,
+    outbound_configured: true,
+    can_arm: true,
+    can_disarm: false,
+    scope: 'next_inbound_call',
+    probe_budget_unchanged: true,
+    private_summary_provider: 'ElevenLabs',
+    private_summary_voice: 'Jessica',
+    private_summary_source: 'configured',
+    ...overrides,
+  };
+}
+
 export function liveEvents() {
   return [
     event('call.inbound.received', {
@@ -160,12 +183,9 @@ export function sse(events: unknown[]) {
 export const test = base.extend<{ apiGuard: void }>({
   apiGuard: [
     async ({ page }, use) => {
+      // The console connects to the local server by itself; with /api aborted it reports
+      // that the server is not running. Tests that need a server mock /api/state.
       await page.route('**/api/**', (route) => route.abort('blockedbyclient'));
-      // Tests opt in to the local operator session explicitly (see console-live.spec.ts).
-      await page.addInitScript(() => {
-        (globalThis as { __FIRSTRING_NO_AUTOCONNECT__?: boolean }).__FIRSTRING_NO_AUTOCONNECT__ =
-          true;
-      });
       await use();
     },
     { auto: true },

@@ -45,6 +45,23 @@ pub struct Status {
     pub private_summary_source: &'static str,
 }
 const KEY: &str = "phone_demo.v1";
+const USED_KEY: &str = "phone_demo.attempts_used";
+/// Demo-day allowance of private handoff attempts (`PHONE_DEMO_MAX_ATTEMPTS`, 1–30).
+/// Defaults to the original single attempt; each reserved attempt is counted durably.
+fn max_attempts() -> u32 {
+    std::env::var("PHONE_DEMO_MAX_ATTEMPTS")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .filter(|n| (1..=30).contains(n))
+        .unwrap_or(1)
+}
+async fn used(connection: &mut SqliteConnection) -> Result<u32> {
+    let raw: Option<String> = sqlx::query_scalar("SELECT value FROM metadata WHERE key=?")
+        .bind(USED_KEY)
+        .fetch_optional(connection)
+        .await?;
+    Ok(raw.and_then(|v| v.parse().ok()).unwrap_or(0))
+}
 #[derive(Clone, Serialize, Deserialize)]
 struct Arm {
     id: String,
@@ -52,6 +69,10 @@ struct Arm {
     household_id: String,
     recipient_fingerprint: String,
     armed_at: DateTime<Utc>,
+    /// Global receipt boundary captured in the same transaction as operator arming.
+    /// Older persisted arms lack this proof and cannot authorize a handoff.
+    #[serde(default)]
+    bind_after_sequence: Option<i64>,
     expires_at: DateTime<Utc>,
     state: String,
     action_id: Option<String>,
@@ -93,6 +114,7 @@ fn active_session(session: &Session) -> bool {
 }
 fn matches(arm: &Arm, config: &Config, session: &Session) -> bool {
     configured(config)
+        && arm.bind_after_sequence.is_some()
         && active(arm)
         && active_session(session)
         && arm.session_id.as_deref() == Some(session.id.as_str())
@@ -111,8 +133,11 @@ async fn write(connection: &mut SqliteConnection, arm: &Arm) -> Result<()> {
     sqlx::query("INSERT INTO metadata(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(KEY).bind(serde_json::to_string(arm)?).execute(connection).await?;
     Ok(())
 }
-fn view(config: &Config, arm: Option<&Arm>) -> Status {
+fn view(config: &Config, arm: Option<&Arm>, used: u32) -> Status {
     let consumed = arm.is_some_and(|value| value.action_id.is_some());
+    // A legacy record consumed before counting existed still counts as one attempt.
+    let used = used.max(u32::from(consumed));
+    let remaining = max_attempts().saturating_sub(used);
     let armed = arm.is_some_and(active);
     Status {
         state: arm
@@ -132,10 +157,10 @@ fn view(config: &Config, arm: Option<&Arm>) -> Status {
         contact_id: "sarah",
         expires_at: arm.map(|value| value.expires_at.to_rfc3339()),
         action_id: arm.and_then(|value| value.action_id.clone()),
-        remaining_attempts: u8::from(!consumed),
+        remaining_attempts: u8::try_from(remaining).unwrap_or(u8::MAX),
         recipient_enrolled: recipient(config).is_some(),
         outbound_configured: config.outbound_configured(),
-        can_arm: configured(config) && !armed && !consumed,
+        can_arm: configured(config) && !armed && remaining > 0,
         can_disarm: armed,
         scope: "one_private_handoff",
         probe_budget_unchanged: true,
@@ -146,7 +171,9 @@ fn view(config: &Config, arm: Option<&Arm>) -> Status {
 }
 pub async fn status(store: &Store, config: &Config) -> Result<Status> {
     let mut connection = store.pool.acquire().await?;
-    Ok(view(config, read(&mut connection).await?.as_ref()))
+    let arm = read(&mut connection).await?;
+    let used = used(&mut connection).await?;
+    Ok(view(config, arm.as_ref(), used))
 }
 pub async fn arm(store: &Store, config: &Config, request: ArmRequest) -> Result<Status> {
     ensure!(
@@ -163,10 +190,12 @@ pub async fn arm(store: &Store, config: &Config, request: ArmRequest) -> Result<
         "Arm expiry must be between 60 and 600 seconds"
     );
     let mut tx = store.pool.begin().await?;
+    let attempts = used(&mut tx).await?;
     if let Some(previous) = read(&mut tx).await? {
+        let spent = attempts.max(u32::from(previous.action_id.is_some()));
         ensure!(
-            previous.action_id.is_none(),
-            "The single private-handoff attempt is already reserved; reconcile it without retrying"
+            spent < max_attempts(),
+            "The private-handoff allowance is used up; reconcile it without retrying"
         );
         ensure!(
             !active(&previous),
@@ -195,6 +224,9 @@ pub async fn arm(store: &Store, config: &Config, request: ArmRequest) -> Result<
         ["sarah", "maya"].contains(&household_id.as_str()),
         "Unknown household"
     );
+    let boundary: i64 = sqlx::query_scalar("SELECT COALESCE(MAX(sequence),0) FROM events")
+        .fetch_one(&mut *tx)
+        .await?;
     let now = Utc::now();
     let value = Arm {
         id: uuid::Uuid::new_v4().to_string(),
@@ -202,13 +234,14 @@ pub async fn arm(store: &Store, config: &Config, request: ArmRequest) -> Result<
         household_id,
         recipient_fingerprint: fingerprint(config).expect("configured recipient"),
         armed_at: now,
+        bind_after_sequence: Some(boundary),
         expires_at: now + chrono::Duration::seconds(i64::from(ttl)),
         state: "armed".into(),
         action_id: None,
     };
     write(&mut tx, &value).await?;
     tx.commit().await?;
-    Ok(view(config, Some(&value)))
+    Ok(view(config, Some(&value), attempts))
 }
 pub async fn disarm(store: &Store, config: &Config, arm_id: &str) -> Result<Status> {
     let mut tx = store.pool.begin().await?;
@@ -225,8 +258,9 @@ pub async fn disarm(store: &Store, config: &Config, arm_id: &str) -> Result<Stat
     );
     value.state = "disarmed".into();
     write(&mut tx, &value).await?;
+    let attempts = used(&mut tx).await?;
     tx.commit().await?;
-    Ok(view(config, Some(&value)))
+    Ok(view(config, Some(&value), attempts))
 }
 /// Call only after signed inbound validation; synthetic/replay sessions never bind.
 pub async fn bind_signed_inbound(
@@ -246,6 +280,15 @@ pub async fn bind_signed_inbound(
         || value.household_id != session.household_id
         || fingerprint(config).as_deref() != Some(value.recipient_fingerprint.as_str())
     {
+        return Ok(false);
+    }
+    let Some(boundary) = value.bind_after_sequence else {
+        return Ok(false);
+    };
+    let first_inbound: Option<i64> = sqlx::query_scalar(
+        "SELECT MIN(sequence) FROM events WHERE json_extract(data,'$.session_id')=? AND json_extract(data,'$.type')='call.inbound.received' AND json_extract(data,'$.execution_mode')='live'",
+    ).bind(&session.id).fetch_one(&mut *tx).await?;
+    if first_inbound.is_none_or(|sequence| sequence <= boundary) {
         return Ok(false);
     }
     value.session_id = Some(session.id.clone());
@@ -310,6 +353,12 @@ pub async fn reserve_handoff(
     value.action_id = Some(leg.action_id.clone());
     value.state = "reserved".into();
     write(&mut tx, &value).await?;
+    let spent = used(&mut tx).await? + 1;
+    sqlx::query("INSERT INTO metadata(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+        .bind(USED_KEY)
+        .bind(spent.to_string())
+        .execute(&mut *tx)
+        .await?;
     tx.commit().await?;
     Ok((leg.clone(), true))
 }
@@ -328,6 +377,7 @@ pub async fn awaiting_signed_inbound(store: &Store, config: &Config) -> Result<b
             .fetch_optional(&mut *connection)
             .await?;
     Ok(active(&arm)
+        && arm.bind_after_sequence.is_some()
         && arm.session_id.is_none()
         && arm.household_id == household.as_deref().unwrap_or("sarah")
         && fingerprint(config).as_deref() == Some(arm.recipient_fingerprint.as_str()))

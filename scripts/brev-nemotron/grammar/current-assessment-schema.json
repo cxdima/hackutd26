@@ -1,0 +1,164 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "evidence_refs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "quote": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "type": "string"
+          },
+          "turn_id": {
+            "maxLength": 96,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id",
+          "quote"
+        ],
+        "type": "object"
+      },
+      "maxItems": 8,
+      "minItems": 1,
+      "type": "array"
+    },
+    "observation": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "description": "Flow of information or requested action, not speaker identity. Caller gives an update/reference: caller_supplies. Caller seeks Sarah's secret/payment/action: caller_requests_from_sarah. Quoting a stranger or warning not to share: none. 'Please tell Sarah my train time' supplies information; it does not request a secret from Sarah.",
+          "enum": [
+            "caller_requests_from_sarah",
+            "caller_supplies",
+            "none",
+            "unclear"
+          ],
+          "type": "string"
+        },
+        "requested_object": {
+          "description": "What information/action is actually sought. Unexplained digits/code sought from the household are unknown even after benign context; account access makes them authentication_secret. Classify a warning's object as the warned-about object while speech_act negation preserves its benign meaning.",
+          "enum": [
+            "authentication_secret",
+            "appointment_reference",
+            "payment",
+            "payment_diversion",
+            "remote_access",
+            "routine_information",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "speech_act": {
+          "enum": [
+            "request",
+            "statement",
+            "negation",
+            "quotation",
+            "unclear"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "speech_act",
+        "requested_object",
+        "direction"
+      ],
+      "type": "object"
+    },
+    "understanding": {
+      "additionalProperties": false,
+      "properties": {
+        "claimed_identity": {
+          "description": "Copy one continuous exact substring of caller words, preserving punctuation. A name alone is enough; never concatenate a name and affiliation from separate phrases. Use null if absent. This is an unverified claim.",
+          "maxLength": 120,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "missing_information": {
+          "description": "Essential unanswered details for the actual caller purpose. Must be [] for ready or no_message; a caller declining a message does not owe more information. Do not invent mandatory intake.",
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 3,
+          "type": "array"
+        },
+        "purpose": {
+          "maxLength": 180,
+          "minLength": 1,
+          "type": "string"
+        },
+        "readiness": {
+          "description": "needs_information for an unresolved request for assistance or incomplete opening. ready for a complete notice/update, a clear correction replacing an earlier supplied detail, or a fully understood risky action. Reuse the earlier purpose when the caller corrects one value; do not ask them to repeat or confirm that value. Unspecified AM/PM alone does not make a supplied time incomplete. Never mark an unresolved assistance request ready merely because its words can be saved. A request to arrange a ride, delivery, visit or collection is still an opening when its practical when/where detail is absent; ask for the most useful missing detail. A complete update or explicit callback message does not need extra intake. Unknown code purpose needs_information; established account-access extraction ready for protection, never seek its value.",
+          "enum": [
+            "needs_information",
+            "ready",
+            "caller_declined",
+            "no_message"
+          ],
+          "type": "string"
+        },
+        "requested_action": {
+          "description": "Who should do what for whom. Preserve the caller's roles: I/me/my refer to the caller, not the household person. Do not reverse the requested actor and recipient.",
+          "maxLength": 180,
+          "type": "string"
+        },
+        "supplied_facts": {
+          "description": "Optional literal caller evidence, each quoted once. Never paraphrase. Use [] for sensitive content.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "quote": {
+                "maxLength": 180,
+                "minLength": 1,
+                "type": "string"
+              },
+              "turn_id": {
+                "maxLength": 96,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "turn_id",
+              "quote"
+            ],
+            "type": "object"
+          },
+          "maxItems": 2,
+          "type": "array"
+        },
+        "version": {
+          "enum": [
+            1
+          ],
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "claimed_identity",
+        "purpose",
+        "requested_action",
+        "supplied_facts",
+        "missing_information",
+        "readiness"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "observation",
+    "evidence_refs",
+    "understanding"
+  ],
+  "type": "object"
+}

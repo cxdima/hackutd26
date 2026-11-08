@@ -302,6 +302,60 @@
     color: var(--color-lime);
   }
 
+  /* Data-source status: a dot and a word, no badge. */
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-weight: 750;
+    font-size: 1rem;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .status-dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 999px;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+  .status[data-state='live'] .status-dot {
+    background: var(--color-lime);
+    box-shadow: 0 0 0 4px rgb(118 185 0 / 0.22);
+  }
+  .status[data-state='demo'] .status-dot,
+  .status[data-state='replay'] .status-dot {
+    background: transparent;
+    box-shadow: inset 0 0 0 2px currentColor;
+  }
+  .status[data-state='paused'] {
+    color: var(--color-amber-ink);
+  }
+  .on-ink .status[data-state='paused'] {
+    color: #f4c46b;
+  }
+  .status[data-state='locked'],
+  .status[data-state='connecting'] {
+    color: var(--color-muted);
+  }
+  .on-ink .status[data-state='locked'],
+  .on-ink .status[data-state='connecting'] {
+    color: var(--color-muted-on-ink);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .status[data-state='connecting'] .status-dot {
+      animation: status-pulse 1.2s ease-in-out infinite alternate;
+    }
+  }
+  @keyframes status-pulse {
+    to {
+      opacity: 0.35;
+    }
+  }
+  .present-bug .status {
+    font-size: 1.1875rem;
+  }
+
   /* Presentation stages: a broadcast rundown. Word + dot shape; colour is never the only signal. */
   .stage-chip {
     display: inline-flex;
@@ -374,11 +428,6 @@
       opacity: 0;
     }
   }
-  /* The station bug on the projected screen must read from a few feet away. */
-  .present-bug .bug {
-    font-size: 1.0625rem;
-    padding: 0.45rem 0.9rem 0.45rem 0.7rem;
-  }
   .evidence-drawer::backdrop {
     background: rgb(23 28 24 / 0.55);
   }
@@ -418,6 +467,19 @@
     outline: 3px solid var(--color-lime);
     outline-offset: 1px;
   }
+  /* Custom select list (app-select-menu): opens in the top layer with a short settle. */
+  .select-list {
+    transition:
+      opacity 140ms ease-out,
+      transform 160ms var(--ease-out-expo);
+  }
+  @starting-style {
+    .select-list:popover-open {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
   .field[aria-invalid='true'] {
     border-color: var(--color-magenta-ink);
   }

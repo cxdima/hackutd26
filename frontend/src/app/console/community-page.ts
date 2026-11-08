@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { LucideChevronDown, LucideClock3, LucideShieldAlert, LucideUnplug } from '@lucide/angular';
+import { LucideChevronDown, LucideClock3, LucideShieldAlert } from '@lucide/angular';
 import { buildCommunityStories } from '../core/community-story';
 import { ConsoleStore } from '../core/console-store';
 import { formatDateTime, relativeAge, relativeUntil } from '../core/format';
@@ -15,7 +15,7 @@ import { CommunityStoryView } from './present/community-story';
 
 @Component({
   selector: 'app-community-page',
-  imports: [LucideShieldAlert, LucideClock3, LucideChevronDown, LucideUnplug, CommunityStoryView],
+  imports: [LucideShieldAlert, LucideClock3, LucideChevronDown, CommunityStoryView],
   template: `
     @let state = store.state()!;
     <div class="grid gap-10 lg:grid-cols-12">
@@ -36,9 +36,6 @@ import { CommunityStoryView } from './present/community-story';
               class="flex flex-wrap items-center justify-between gap-3 border-b-2 border-ink pb-3"
             >
               <h2 id="story-heading" class="text-[1.5rem] font-extrabold">How a warning travels</h2>
-              @if (store.isDemo()) {
-                <span class="bug bug-example">Example data</span>
-              }
             </div>
             <div class="mt-6">
               <app-community-story [story]="s" [timezone]="state.profile?.timezone" />
@@ -134,15 +131,6 @@ import { CommunityStoryView } from './present/community-story';
             <h2 id="reputation-heading" class="text-[1.5rem] font-extrabold">
               Reported-number history
             </h2>
-            @if (reputationConnected()) {
-              <span class="bug bug-live">Connected</span>
-            } @else if (store.isDemo()) {
-              <span class="bug bug-example">Example data on demo calls</span>
-            } @else {
-              <span class="bug bug-example"
-                ><svg lucideUnplug [size]="15" aria-hidden="true"></svg> Not connected</span
-              >
-            }
           </div>
           <p class="mt-4 max-w-[64ch] text-[1.0625rem] text-ink-3">
             A separate idea from tactic warnings: history about one number, counted by independent

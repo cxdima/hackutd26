@@ -5,7 +5,7 @@ provider "aws" {
   # Never put access keys in this directory or in Git.
   default_tags {
     tags = {
-      Project     = "firstring"
+      Project     = "FirstRing"
       Environment = var.environment
       ManagedBy   = "terraform"
     }

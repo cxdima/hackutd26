@@ -362,7 +362,7 @@ async fn expiry_reduces_corroboration_before_retention_and_upheld_confirms_repor
     assert_eq!(third.reputation.level, "warning");
     assert_eq!(third.reputation.verified_independent_households, 0);
     assert!(
-        third.reputation.tactic_ids.is_empty(),
+        third.reputation.matched_capsule_ids.is_empty(),
         "Number reputation cannot invent tactic-memory matching"
     );
 }
@@ -590,5 +590,203 @@ async fn historical_sticky_block_does_not_report_a_later_benign_correction() {
             .await
             .unwrap()
             .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn accepted_current_category_and_taxonomy_id_are_durable_without_capsule_claims() {
+    let store = Store::open("sqlite::memory:").await.unwrap();
+    let (service, clock) = clocked(&store, Scope::Demo);
+    for (object, text, category) in [
+        (
+            RequestedObject::AuthenticationSecret,
+            "Read me the sign-in code from your phone.",
+            "authentication_code_extraction",
+        ),
+        (
+            RequestedObject::RemoteAccess,
+            "Install remote access so I can control your computer.",
+            "remote_access_request",
+        ),
+        (
+            RequestedObject::PaymentDiversion,
+            "Move the payment to my new account instead.",
+            "payment_diversion",
+        ),
+    ] {
+        let mut s = session("sarah");
+        let id = s.commit_turn(text);
+        let refs = vec![EvidenceRef {
+            turn_id: id,
+            quote: text.into(),
+        }];
+        s.assess(
+            s.generation_id,
+            s.turn_version,
+            &Observation {
+                speech_act: SpeechAct::Request,
+                requested_object: object,
+                direction: Direction::CallerRequestsFromSarah,
+            },
+            &refs,
+        )
+        .unwrap();
+        s.record_message(
+            "Suspicious request blocked; independent verification recommended.",
+            &refs,
+            Utc::now(),
+        )
+        .unwrap();
+        store.save(&s).await.unwrap();
+        let source=store.append(Some(&s),"system","message.recorded",json!({"turn_version":s.turn_version,"recorded_at":s.message.as_ref().unwrap().recorded_at}),s.execution_mode).await.unwrap();
+        service.capture_identity(&s, Some(NUMBER)).await.unwrap();
+        let result = service
+            .report_protective(&s, &source)
+            .await
+            .unwrap()
+            .unwrap();
+        let public = serde_json::to_value(&result.reputation).unwrap();
+        let tactic_id = format!("firstring:tactic:v1:{category}");
+        assert!(
+            public["scam_categories"]
+                .as_array()
+                .is_some_and(|items| items.contains(&json!(category)))
+        );
+        assert!(result.reputation.tactic_ids.contains(&tactic_id));
+        let stored: (String, String) = sqlx::query_as(
+            "SELECT scam_category,tactic_id FROM reputation_reports WHERE report_id=?",
+        )
+        .bind(&result.report_id)
+        .fetch_one(&store.pool)
+        .await
+        .unwrap();
+        assert_eq!(stored, (category.into(), tactic_id.clone()));
+        let view = service.session_view(&s).await.unwrap();
+        assert_eq!(view["tactic_identifier_kind"], "categorical_taxonomy_v1");
+        assert!(
+            view["related_tactic_ids"]
+                .as_array()
+                .unwrap()
+                .contains(&json!(tactic_id))
+        );
+        assert_eq!(view["matched_capsule_ids"], json!([]));
+        let detail = service
+            .detail(ExecutionMode::Replay, &result.reputation.number_key)
+            .await
+            .unwrap()
+            .unwrap();
+        let report = detail["reports"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["report_id"] == result.report_id)
+            .unwrap();
+        assert_eq!(report["scam_category"], category);
+        assert_eq!(report["tactic_identifier_kind"], "categorical_taxonomy_v1");
+        let event = store
+            .events_after(0)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|e| e.kind == "reputation.reported" && e.payload["report_id"] == result.report_id)
+            .unwrap();
+        assert_eq!(event.payload["scam_category"], category);
+        assert_eq!(event.payload["tactic_id"], tactic_id);
+    }
+    let capsules: i64 = sqlx::query_scalar("SELECT count(*) FROM tactics")
+        .fetch_one(&store.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        capsules, 0,
+        "Categorical identifiers are not published or matched capsules"
+    );
+    clock.fetch_add(Duration::days(15).num_seconds(), Ordering::SeqCst);
+    let expired = service
+        .list(ExecutionMode::Replay, 50)
+        .await
+        .unwrap()
+        .pop()
+        .unwrap();
+    assert!(expired.tactic_ids.is_empty());
+    assert_eq!(
+        serde_json::to_value(expired).unwrap()["scam_categories"],
+        json!([])
+    );
+}
+
+#[tokio::test]
+async fn additive_category_migration_preserves_unknown_legacy_report_without_guessing() {
+    let store = Store::open("sqlite::memory:").await.unwrap();
+    sqlx::raw_sql("DROP TABLE reputation_reports;
+CREATE TABLE reputation_reports(report_id TEXT PRIMARY KEY,entry_id TEXT NOT NULL,session_id TEXT UNIQUE NOT NULL,household_id TEXT NOT NULL,participation_group TEXT NOT NULL,source_event_id TEXT NOT NULL,source_event_sequence INTEGER NOT NULL,source_turn_version INTEGER NOT NULL,source_policy_epoch INTEGER NOT NULL,reported_at TEXT NOT NULL,expires_at TEXT NOT NULL,retracted INTEGER NOT NULL DEFAULT 0);
+INSERT INTO reputation_reports VALUES('legacy-report','legacy-key','legacy-session','sarah','local_operator','legacy-event',17,2,1,'2026-11-08T00:00:00Z','2026-11-22T00:00:00Z',0);").execute(&store.pool).await.unwrap();
+    firstring::reputation::initialize(&store.pool)
+        .await
+        .unwrap();
+    firstring::reputation::initialize(&store.pool)
+        .await
+        .unwrap();
+    let row:(String,i64,Option<String>,Option<String>)=sqlx::query_as("SELECT session_id,source_event_sequence,scam_category,tactic_id FROM reputation_reports WHERE report_id='legacy-report'").fetch_one(&store.pool).await.unwrap();
+    assert_eq!(row, ("legacy-session".into(), 17, None, None));
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM reputation_reports")
+        .fetch_one(&store.pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 1);
+}
+
+#[tokio::test]
+async fn legacy_snapshot_metadata_refresh_is_versioned_without_claiming_expiry() {
+    let store = Store::open("sqlite::memory:").await.unwrap();
+    let service = ReputationService::new(store.clone(), KEY, Scope::Demo).unwrap();
+    let result = report(&service, &store, "sarah").await;
+    let mut legacy = serde_json::to_value(&result.reputation).unwrap();
+    for field in [
+        "scam_categories",
+        "tactic_identifier_kind",
+        "matched_capsule_ids",
+    ] {
+        legacy.as_object_mut().unwrap().remove(field);
+    }
+    legacy["tactic_ids"] = json!([]);
+    legacy["explanation"] = json!("Legacy explanation without category metadata.");
+    sqlx::query("UPDATE number_reputation SET data=?")
+        .bind(legacy.to_string())
+        .execute(&store.pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE reputation_reports SET scam_category=NULL,tactic_id=NULL")
+        .execute(&store.pool)
+        .await
+        .unwrap();
+    let refreshed = service
+        .list(ExecutionMode::Replay, 50)
+        .await
+        .unwrap()
+        .pop()
+        .unwrap();
+    assert_eq!(refreshed.level, "reported");
+    assert_eq!(refreshed.household_count, 1);
+    assert_eq!(refreshed.version, result.reputation.version + 1);
+    assert!(refreshed.scam_categories.is_empty());
+    let event = store
+        .events_after(0)
+        .await
+        .unwrap()
+        .into_iter()
+        .rfind(|e| e.kind == "reputation.level_changed")
+        .unwrap();
+    assert_eq!(event.payload["reason"], "metadata_refreshed");
+    assert_eq!(
+        service
+            .list(ExecutionMode::Replay, 50)
+            .await
+            .unwrap()
+            .pop()
+            .unwrap()
+            .version,
+        refreshed.version,
+        "Idempotent metadata refresh cannot manufacture repeated versions"
     );
 }

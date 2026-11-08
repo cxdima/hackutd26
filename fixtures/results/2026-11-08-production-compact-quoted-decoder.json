@@ -1,0 +1,43 @@
+{
+  "kind": "bounded_synthetic_native_decoder_diagnostic",
+  "recorded_at": "2026-11-08T14:27:54.054619+00:00",
+  "production_gate": false,
+  "request_timeout_ms": 15000,
+  "max_tokens": 512,
+  "request_sha256": "c96be31c901ae3154c34b74fc9af7f5560c8affac93600b671c7e7734cf8edf3",
+  "instrumentation": "return_token_ids; only count special tokens, no hidden reasoning retained",
+  "source": "production-candidate-matrix quoted-scam-report failed_synthetic_request",
+  "space_bias_applied": false,
+  "case_index": 7,
+  "phone_calls": 0,
+  "http_status": 200,
+  "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "finish_reason": "tool_calls",
+  "stop_reason": 15,
+  "usage": {
+    "prompt_tokens": 6355,
+    "total_tokens": 6492,
+    "completion_tokens": 137,
+    "prompt_tokens_details": null
+  },
+  "native_tool_calls": [
+    {
+      "id": "chatcmpl-tool-b1be24f67d7c3e57",
+      "type": "function",
+      "function": {
+        "name": "take_message",
+        "arguments": "{\"evidence_refs\": [{\"quote\": \"Someone called me yesterday and said, read me your login code. I did not give it to them. Please tell Sarah about that scam.\", \"turn_id\": \"44a5cdc7-7493-54e9-b803-a994a88354f1\"}], \"summary\": \"Caller reports a scam: someone claimed to need their login code yesterday; caller did not provide it and wants Sarah informed about the scam attempt.\"}"
+      }
+    }
+  ],
+  "content_chars": 0,
+  "reasoning_chars": 0,
+  "special_token_counts": {
+    "2": 0,
+    "11": 0,
+    "14": 0,
+    "15": 1
+  },
+  "generated_token_count": 137,
+  "elapsed_ms": 4170
+}

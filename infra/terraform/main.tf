@@ -1,8 +1,9 @@
-# Intentionally empty. This scaffold exists so AWS server functions (for example,
-# a transcript export Lambda or a reputation API) can be added quickly if the team
-# decides to use AWS. Nothing here creates resources; `terraform plan` shows no changes.
+# The static website (S3 + CloudFront + ACM + Route 53 for firstring.life) is defined in site.tf.
 #
-# Planned shape when needed (not implemented):
+# The Rust server remains the owner of call policy, state and provider adapters; it is not
+# hosted here. The hosted site has no backend: /api is intentionally not routed.
+#
+# Possible future AWS server functions (not implemented):
 #   module "reputation_api"   -> API Gateway + Lambda + DynamoDB, see
 #                                frontend/docs/reputation-contract.md
 #   module "transcript_export" -> Lambda reading the Rust server's authenticated API

@@ -132,6 +132,17 @@ async fn next_signed_session_binding_is_single_and_expiry_disarm_cannot_authoriz
             .unwrap()
     );
     let first = call("first");
+    store.save(&first).await.unwrap();
+    store
+        .append(
+            Some(&first),
+            "caller",
+            "call.inbound.received",
+            json!({}),
+            ExecutionMode::Live,
+        )
+        .await
+        .unwrap();
     assert!(
         phone_demo::bind_signed_inbound(&store, &c, &first)
             .await
@@ -384,4 +395,106 @@ async fn legacy_global_flag_cannot_authorize_an_unarmed_actor_handoff() {
             .unwrap()
             .is_empty()
     );
+}
+
+#[tokio::test]
+async fn next_call_arm_rejects_duplicate_old_ingress_and_legacy_missing_boundary() {
+    let store = Store::open("sqlite::memory:").await.unwrap();
+    let c = config();
+    let old = call("older");
+    store.save(&old).await.unwrap();
+    store
+        .append(
+            Some(&old),
+            "caller",
+            "call.inbound.received",
+            json!({}),
+            ExecutionMode::Live,
+        )
+        .await
+        .unwrap();
+    phone_demo::arm(&store, &c, arm_request(None))
+        .await
+        .unwrap();
+    // Even another receipt for an old session must not replace its first inbound.
+    store
+        .append(
+            Some(&old),
+            "caller",
+            "call.inbound.received",
+            json!({}),
+            ExecutionMode::Live,
+        )
+        .await
+        .unwrap();
+    // A retry of the same signed webhook reuses this old session and its receipt.
+    assert!(
+        !phone_demo::bind_signed_inbound(&store, &c, &old)
+            .await
+            .unwrap()
+    );
+    assert!(!phone_demo::available_for(&store, &c, &old).await.unwrap());
+    let fresh = call("fresh");
+    store.save(&fresh).await.unwrap();
+    store
+        .append(
+            Some(&fresh),
+            "caller",
+            "call.inbound.received",
+            json!({}),
+            ExecutionMode::Live,
+        )
+        .await
+        .unwrap();
+    assert!(
+        phone_demo::bind_signed_inbound(&store, &c, &fresh)
+            .await
+            .unwrap()
+    );
+    assert!(phone_demo::available_for(&store, &c, &fresh).await.unwrap());
+    let mut raw: serde_json::Value =
+        serde_json::from_str(&store.metadata("phone_demo.v1").await.unwrap().unwrap()).unwrap();
+    raw.as_object_mut().unwrap().remove("bind_after_sequence");
+    store
+        .set_metadata("phone_demo.v1", &raw.to_string())
+        .await
+        .unwrap();
+    assert!(!phone_demo::available_for(&store, &c, &fresh).await.unwrap());
+    raw["session_id"] = serde_json::Value::Null;
+    store
+        .set_metadata("phone_demo.v1", &raw.to_string())
+        .await
+        .unwrap();
+    assert!(
+        !phone_demo::awaiting_signed_inbound(&store, &c)
+            .await
+            .unwrap()
+    );
+    assert!(
+        !phone_demo::bind_signed_inbound(&store, &c, &fresh)
+            .await
+            .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn explicit_active_session_arm_is_not_restricted_to_future_inbound_receipts() {
+    let store = Store::open("sqlite::memory:").await.unwrap();
+    let c = config();
+    let old = call("existing");
+    store.save(&old).await.unwrap();
+    store
+        .append(
+            Some(&old),
+            "caller",
+            "call.inbound.received",
+            json!({}),
+            ExecutionMode::Live,
+        )
+        .await
+        .unwrap();
+    phone_demo::arm(&store, &c, arm_request(Some(&old.id)))
+        .await
+        .unwrap();
+    assert!(phone_demo::available_for(&store, &c, &old).await.unwrap());
 }

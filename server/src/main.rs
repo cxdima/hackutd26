@@ -18,10 +18,15 @@ async fn main() -> anyhow::Result<()> {
         ?mode,
         "FirstRing listening; configured does not mean phone verified"
     );
-    axum::serve(listener, router(app))
-        .with_graceful_shutdown(async {
-            let _ = tokio::signal::ctrl_c().await;
-        })
-        .await?;
+    // Peer addresses let the operator console on this computer skip the token
+    // (see `http::local_console`); tunnelled public requests still need it.
+    axum::serve(
+        listener,
+        router(app).into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(async {
+        let _ = tokio::signal::ctrl_c().await;
+    })
+    .await?;
     Ok(())
 }

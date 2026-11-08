@@ -2,41 +2,62 @@ import { Component, computed, effect, inject, input, signal, untracked } from '@
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { LucideArrowLeft, LucideSearch } from '@lucide/angular';
-import { OUTCOME_LABEL, type Outcome } from '../core/calls';
+import type { Outcome } from '../core/calls';
 import { ConsoleStore } from '../core/console-store';
+import { SelectMenu, type SelectOption } from '../shared/select-menu';
 import { CallDetail } from './call-detail';
 import { CallRow } from './call-row';
 
 type Filter = 'all' | Outcome;
 
+/** Short outcome names for the filter; the full wording stays on each row. */
+const FILTER_LABEL: Record<Outcome, string> = {
+  in_progress: 'On the line now',
+  blocked: 'Blocked',
+  connected: 'Connected',
+  message_saved: 'Message saved',
+  needs_review: 'Needs review',
+  no_message: 'No message',
+  incomplete: 'Incomplete',
+};
+
 @Component({
   selector: 'app-calls-page',
-  imports: [FormsModule, RouterLink, CallRow, CallDetail, LucideSearch, LucideArrowLeft],
+  imports: [
+    FormsModule,
+    RouterLink,
+    CallRow,
+    CallDetail,
+    SelectMenu,
+    LucideSearch,
+    LucideArrowLeft,
+  ],
   template: `
-    <div class="grid gap-8 lg:grid-cols-12">
+    <div class="grid grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-12">
+      <!-- The list scrolls on its own at lg; the inline padding keeps focus rings inside its clip box. -->
       <section
-        class="scroll-cue lg:sticky lg:top-[5.5rem] lg:col-span-5 lg:block lg:max-h-[calc(100dvh-6.5rem)] lg:self-start lg:overflow-y-auto lg:pr-2"
+        class="scroll-cue min-w-0 lg:sticky lg:top-[5.5rem] lg:col-span-4 lg:-ml-2 lg:block lg:max-h-[calc(100dvh-6.5rem)] lg:self-start lg:overflow-x-hidden lg:overflow-y-auto lg:pr-2 lg:pl-2"
         [class.hidden]="!!id()"
         aria-labelledby="calls-heading"
       >
         @if (id()) {
           <h2
             id="calls-heading"
-            class="text-[clamp(2rem,1.6rem+1.6vw,2.9rem)] leading-[1.05] font-extrabold tracking-[-0.03em]"
+            class="text-[2rem] leading-[1.05] font-extrabold tracking-[-0.03em]"
           >
             Calls
           </h2>
         } @else {
           <h1
             id="calls-heading"
-            class="text-[clamp(2rem,1.6rem+1.6vw,2.9rem)] leading-[1.05] font-extrabold tracking-[-0.03em]"
+            class="text-[2rem] leading-[1.05] font-extrabold tracking-[-0.03em]"
           >
             Calls
           </h1>
         }
-        <div class="mt-5 space-y-4">
+        <div class="mt-4 space-y-3">
           <div>
-            <label for="call-search" class="field-label">Search calls</label>
+            <label for="call-search" class="visually-hidden">Search calls</label>
             <div class="relative">
               <svg
                 lucideSearch
@@ -48,51 +69,43 @@ type Filter = 'all' | Outcome;
                 id="call-search"
                 type="search"
                 class="field !pl-11"
-                placeholder="Words from the call or summary"
+                placeholder="Search calls"
                 [ngModel]="query()"
                 (ngModelChange)="query.set($event)"
               />
             </div>
           </div>
-          <fieldset>
-            <legend class="field-label">Show</legend>
-            <div class="flex flex-wrap gap-2">
-              @for (option of filters(); track option.value) {
-                <button
-                  type="button"
-                  class="min-h-11 rounded-full border-2 px-4 text-[1rem] font-bold transition-colors"
-                  [class]="
-                    filter() === option.value
-                      ? 'border-ink bg-ink text-paper'
-                      : 'border-rule bg-paper text-ink hover:border-ink'
-                  "
-                  [attr.aria-pressed]="filter() === option.value"
-                  (click)="filter.set(option.value)"
-                >
-                  {{ option.label }}
-                  <span class="tabular font-semibold opacity-80">{{ option.count }}</span>
-                </button>
+          <div class="@container">
+            <div
+              class="grid gap-2"
+              [class]="households().length > 1 ? 'grid-cols-1 @[23rem]:grid-cols-2' : 'grid-cols-1'"
+            >
+              <div class="min-w-0">
+                <span id="outcome-filter-label" class="visually-hidden">Outcome</span>
+                <app-select-menu
+                  inputId="outcome-filter"
+                  labelledBy="outcome-filter-label"
+                  [options]="filters()"
+                  [value]="filter()"
+                  (valueChange)="filter.set($any($event))"
+                />
+              </div>
+              @if (households().length > 1) {
+                <div class="min-w-0">
+                  <span id="household-filter-label" class="visually-hidden">Answered for</span>
+                  <app-select-menu
+                    inputId="household-filter"
+                    labelledBy="household-filter-label"
+                    [options]="householdOptions()"
+                    [value]="household()"
+                    (valueChange)="household.set($event ?? 'all')"
+                  />
+                </div>
               }
             </div>
-          </fieldset>
-          @if (households().length > 1) {
-            <div>
-              <label for="household-filter" class="field-label">Answered for</label>
-              <select
-                id="household-filter"
-                class="field"
-                [ngModel]="household()"
-                (ngModelChange)="household.set($event)"
-              >
-                <option value="all">Everyone</option>
-                @for (h of households(); track h.id) {
-                  <option [value]="h.id">{{ h.name }}</option>
-                }
-              </select>
-            </div>
-          }
+          </div>
         </div>
-        <p class="mt-6 text-[1rem] font-semibold text-muted" role="status">
+        <p class="mt-4 text-[0.95rem] font-semibold text-muted" role="status">
           {{ visible().length }} of {{ store.calls().length }} calls
         </p>
         <ul class="mt-2 divide-y divide-paper-3">
@@ -119,7 +132,11 @@ type Filter = 'all' | Outcome;
         <div class="hidden h-6 lg:block" aria-hidden="true"></div>
       </section>
 
-      <section class="lg:col-span-7 lg:block" [class.hidden]="!id()" aria-label="Call detail">
+      <section
+        class="min-w-0 lg:col-span-8 lg:block"
+        [class.hidden]="!id()"
+        aria-label="Call detail"
+      >
         @if (id()) {
           <a
             routerLink="/console/calls"
@@ -175,16 +192,20 @@ export class CallsPage {
       'no_message',
       'incomplete',
     ];
-    const options: { value: Filter; label: string; count: number }[] = [
-      { value: 'all', label: 'All', count: calls.length },
+    const options: SelectOption[] = [
+      { value: 'all', label: 'All calls', meta: String(calls.length) },
     ];
     for (const outcome of order) {
       const count = calls.filter((c) => c.outcome === outcome).length;
       if (count || outcome === 'blocked' || outcome === 'message_saved')
-        options.push({ value: outcome, label: OUTCOME_LABEL[outcome], count });
+        options.push({ value: outcome, label: FILTER_LABEL[outcome], meta: String(count) });
     }
     return options;
   });
+  readonly householdOptions = computed<SelectOption[]>(() => [
+    { value: 'all', label: 'For everyone' },
+    ...this.households().map((h) => ({ value: h.id, label: `For ${h.name}` })),
+  ]);
   readonly visible = computed(() => {
     const q = this.query().trim().toLowerCase();
     return this.store.calls().filter((call) => {

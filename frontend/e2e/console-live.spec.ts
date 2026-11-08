@@ -1,50 +1,47 @@
-import { expect, hold, liveEvents, liveState, profile, sse, test, TOKEN } from './support/fixtures';
+import { expect, hold, liveEvents, liveState, profile, sse, test } from './support/fixtures';
 import { ConsolePage } from './support/pages';
 
 /** All responses below are explicit synthetic fixtures; no live server is contacted. */
 test.describe('connected dashboard (mocked server)', () => {
-  test('rejected token stays locked with a useful message', async ({ page }) => {
-    await page.route('**/api/state', (route) => route.fulfill({ status: 401, body: '' }));
-    await page.goto('/console');
-    await new ConsolePage(page).connect('nope');
-    await expect(page.getByRole('alert')).toContainText('token was not accepted');
-    await expect(page.getByLabel('Operator token')).toBeVisible();
-  });
-
-  test('unreachable server shows a disconnected state and offers the demo explicitly', async ({
+  test('an unreachable server is reported plainly, with a retry and the demo on offer', async ({
     page,
   }) => {
+    // Every /api request is aborted by the fixture: the server is "not running".
     await page.goto('/console');
-    await new ConsolePage(page).connect(TOKEN);
-    await expect(page.getByRole('alert')).toContainText(
-      'Check that the FirstRing server is running',
-    );
-    await expect(page.getByRole('button', { name: 'Explore the demo' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'The FirstRing server isn’t running on this computer.' }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Dashboard' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Explore the demo' }).click();
+    await expect(page.getByRole('button', { name: 'Exit demo' })).toBeVisible();
+    await expect(page).toHaveURL(/view=demo/);
   });
 
-  test('connects with a bearer token kept out of storage and renders receipts as LIVE', async ({
+  test('connects by itself with no token in the page and renders live receipts', async ({
     page,
   }) => {
-    const auth: string[] = [];
+    const headers: (string | undefined)[] = [];
+    // Stands in for the local server, which trusts its own computer.
     await page.route('**/api/state', (route) => {
-      auth.push(route.request().headers()['authorization'] ?? '');
+      headers.push(route.request().headers()['authorization']);
       return route.fulfill({ json: liveState() });
     });
     await page.route('**/api/events', (route) => hold(route));
     await page.goto('/console');
     const console = new ConsolePage(page);
-    await console.connect(TOKEN);
-    await expect(console.bug()).toHaveText(/Live/);
-    expect(auth[0]).toBe(`Bearer ${TOKEN}`);
+    await console.connected();
+    await expect(page.getByRole('button', { name: 'Exit demo' })).toHaveCount(0);
+    expect(headers.length).toBeGreaterThan(0);
+    expect(headers.every((h) => h === undefined)).toBe(true);
     const storage = await page.evaluate(
       () => localStorage.length + sessionStorage.length + document.cookie.length,
     );
     expect(storage).toBe(0);
-    expect(page.url()).not.toContain(TOKEN);
     await expect(page.getByText('Suspicious request blocked').first()).toBeVisible();
   });
 
-  test('a dropped event stream is shown as signal lost while the snapshot stays visible', async ({
+  test('a dropped event stream reads as reconnecting while the snapshot stays visible', async ({
     page,
   }) => {
     await page.route('**/api/state', (route) => route.fulfill({ json: liveState() }));
@@ -61,9 +58,8 @@ test.describe('connected dashboard (mocked server)', () => {
     });
     await page.goto('/console');
     const console = new ConsolePage(page);
-    await console.connect(TOKEN);
-    await expect(console.bug()).toHaveText(/Signal lost/);
-    await expect(page.getByText('Reconnecting automatically.', { exact: false })).toBeVisible();
+    await console.connected();
+    await expect(page.getByRole('banner').getByText('Reconnecting…')).toBeVisible();
     await console.nav('Calls').click();
     await page.locator('app-call-row a').first().click();
     await expect(page.getByText('Nemotron answered in 1.19 s.')).toBeVisible();
@@ -88,15 +84,21 @@ test.describe('connected dashboard (mocked server)', () => {
         'tts_provider',
         'voice_id',
       ]);
-      if (saves === 1)
+      if (saves === 1) {
+        // The custom timezone dropdown feeds the same form value as the old native select.
+        expect(body.timezone).toBe('America/New_York');
         return route.fulfill({ json: { ...profile, ...body, version: profile.version + 1 } });
+      }
       return route.fulfill({ status: 409, json: { error: 'rejected' } });
     });
     await page.goto('/console');
     const console = new ConsolePage(page);
-    await console.connect(TOKEN);
+    await console.connected();
     await console.nav('Settings').click();
     await page.getByLabel('Opening greeting').fill('Hello, this is FirstRing answering for Sarah.');
+    await expect(page.getByLabel('Timezone')).toHaveText(/Central time/);
+    await console.choose('Timezone', /Eastern time/);
+    await expect(page.getByLabel('Timezone')).toHaveText(/Eastern time/);
     await page.getByRole('button', { name: 'Save for new calls' }).click();
     await expect(page.getByText('Saved as version 5. New calls will use it.')).toBeVisible();
     await page.getByLabel('Opening greeting').fill('Hello again.');
@@ -115,7 +117,7 @@ test.describe('connected dashboard (mocked server)', () => {
     });
     await page.goto('/console');
     const console = new ConsolePage(page);
-    await console.connect(TOKEN);
+    await console.connected();
     await console.nav('Calls').click();
     await page.locator('app-call-row a').first().click();
     await page.getByText('Technical details').click();
@@ -123,45 +125,6 @@ test.describe('connected dashboard (mocked server)', () => {
     expect(posts).toEqual([]);
     await page.getByRole('button', { name: 'Confirm: end session' }).click();
     await expect.poll(() => posts).toEqual([{ session_id: 'live-1' }]);
-    await expect(page.getByText('Request sent.', { exact: false })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Call Phone B' })).toBeDisabled();
-  });
-
-  test('connects by itself through the local operator session, holding no token in the page', async ({
-    page,
-  }) => {
-    await page.addInitScript(() => {
-      (globalThis as { __FIRSTRING_NO_AUTOCONNECT__?: boolean }).__FIRSTRING_NO_AUTOCONNECT__ =
-        false;
-    });
-    const headers: (string | undefined)[] = [];
-    // Stands in for the dev proxy, which adds the token server-side.
-    await page.route('**/api/state', (route) => {
-      headers.push(route.request().headers()['authorization']);
-      return route.fulfill({ json: liveState() });
-    });
-    await page.route('**/api/events', (route) => hold(route));
-    await page.goto('/console');
-    const console = new ConsolePage(page);
-    await expect(console.bug()).toHaveText(/Live/);
-    await expect(page.getByLabel('Operator token')).toHaveCount(0);
-    expect(headers.every((h) => h === undefined)).toBe(true);
-    const storage = await page.evaluate(
-      () => localStorage.length + sessionStorage.length + document.cookie.length,
-    );
-    expect(storage).toBe(0);
-  });
-
-  test('falls back to the token form without an error when no local session exists', async ({
-    page,
-  }) => {
-    await page.addInitScript(() => {
-      (globalThis as { __FIRSTRING_NO_AUTOCONNECT__?: boolean }).__FIRSTRING_NO_AUTOCONNECT__ =
-        false;
-    });
-    await page.route('**/api/state', (route) => route.fulfill({ status: 401, body: '' }));
-    await page.goto('/console');
-    await expect(page.getByLabel('Operator token')).toBeVisible();
-    await expect(page.getByRole('alert')).toHaveCount(0);
   });
 });

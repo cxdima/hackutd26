@@ -39,7 +39,14 @@ pub struct Snapshot {
     pub expires_at: String,
     pub correction: String,
     pub version: u64,
+    /// Stable taxonomy identifiers, not IDs of published/matched capsules.
     pub tactic_ids: Vec<String>,
+    #[serde(default)]
+    pub scam_categories: Vec<String>,
+    #[serde(default = "taxonomy_identifier_kind")]
+    pub tactic_identifier_kind: String,
+    #[serde(default)]
+    pub matched_capsule_ids: Vec<String>,
     pub explanation: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -233,12 +240,18 @@ impl ReputationService {
                 reputation: snapshot,
             }));
         }
+        // Derive from the durable accepted state, never caller-supplied report
+        // fields or a mutable in-memory argument. This is a category, not a
+        // newly published capsule or a lookup/match receipt.
+        let category = current_tactic_category(&persisted)
+            .ok_or_else(|| anyhow::anyhow!("No accepted current tactic category"))?;
+        let tactic_id = categorical_tactic_id(category);
         let prior = self.load(&mut tx, &id).await?;
         let report_id = uuid::Uuid::new_v4().to_string();
-        sqlx::query("INSERT INTO reputation_reports(report_id,entry_id,session_id,household_id,participation_group,source_event_id,source_event_sequence,source_turn_version,source_policy_epoch,reported_at,expires_at,retracted) VALUES(?,?,?,?,?,?,?,?,?,?,?,0)")
+        sqlx::query("INSERT INTO reputation_reports(report_id,entry_id,session_id,household_id,participation_group,source_event_id,source_event_sequence,source_turn_version,source_policy_epoch,reported_at,expires_at,retracted,scam_category,tactic_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,?,?)")
             .bind(&report_id).bind(&id).bind(&session.id).bind(&session.household_id).bind("local_operator")
             .bind(&source.id).bind(source.sequence).bind(session.turn_version as i64).bind(session.policy_epoch as i64)
-            .bind(now.to_rfc3339()).bind((now+Duration::days(14)).to_rfc3339()).execute(&mut *tx).await?;
+            .bind(now.to_rfc3339()).bind((now+Duration::days(14)).to_rfc3339()).bind(category).bind(&tactic_id).execute(&mut *tx).await?;
         let mut snapshot = prior.clone().unwrap_or_else(|| Snapshot {
             number_key: identity.number_key,
             display_suffix: identity.display_suffix,
@@ -262,6 +275,9 @@ impl ReputationService {
             correction: "none".into(),
             version: 0,
             tactic_ids: vec![],
+            scam_categories: vec![],
+            tactic_identifier_kind: taxonomy_identifier_kind(),
+            matched_capsule_ids: vec![],
             explanation: String::new(),
         });
         snapshot.last_reported_at = now.to_rfc3339();
@@ -272,8 +288,8 @@ impl ReputationService {
         snapshot.version += 1;
         self.recalculate(&mut tx, &id, &mut snapshot, now).await?;
         self.persist(&mut tx, &id, &snapshot).await?;
-        let event=self.event(&mut tx,Some(session),session.execution_mode,"reputation.reported",json!({"number_key":snapshot.number_key,"scope":self.scope,"level":snapshot.level,"version":snapshot.version,"household_count":snapshot.household_count,"demo_household_count":snapshot.demo_household_count,"verified_independent_households":0,"report_id":report_id,"source_event_id":source.id,"source_event_sequence":source.sequence,"source_turn_version":session.turn_version,"source_policy_epoch":session.policy_epoch}),now).await?;
-        self.audit(&mut tx,&id,&snapshot,&event,"report",json!({"report_id":report_id,"source_event_id":source.id,"source_event_sequence":source.sequence})).await?;
+        let event=self.event(&mut tx,Some(session),session.execution_mode,"reputation.reported",json!({"number_key":snapshot.number_key,"scope":self.scope,"level":snapshot.level,"version":snapshot.version,"household_count":snapshot.household_count,"demo_household_count":snapshot.demo_household_count,"verified_independent_households":0,"report_id":report_id,"source_event_id":source.id,"source_event_sequence":source.sequence,"source_turn_version":session.turn_version,"source_policy_epoch":session.policy_epoch,"scam_category":category,"tactic_id":tactic_id,"tactic_identifier_kind":taxonomy_identifier_kind(),"matched_capsule_ids":[]}),now).await?;
+        self.audit(&mut tx,&id,&snapshot,&event,"report",json!({"report_id":report_id,"source_event_id":source.id,"source_event_sequence":source.sequence,"scam_category":category,"tactic_id":tactic_id,"tactic_identifier_kind":taxonomy_identifier_kind()})).await?;
         let mut events = vec![event];
         let before = prior.as_ref().map_or("none", |s| s.level.as_str());
         if before != snapshot.level {
@@ -360,7 +376,7 @@ impl ReputationService {
             format!("{level}; one unverified participation group")
         };
         Ok(
-            json!({"version":snapshot.as_ref().map_or(0,|s|s.version),"scope":scope_name(self.scope),"number_label":label,"band":if level=="none"{"no_reports"}else{level},"band_label":band_label,"explanation":snapshot.as_ref().map_or("No active reported-number history. Absence of reports does not prove identity or safety.",|s|s.explanation.as_str()),"independent_households":0,"verified_independent_households":0,"demo_household_count":snapshot.as_ref().map_or(0,|s|s.demo_household_count),"reports":reports,"first_reported_at":snapshot.as_ref().map(|s|&s.first_reported_at),"last_reported_at":snapshot.as_ref().map(|s|&s.last_reported_at),"expires_at":snapshot.as_ref().map(|s|&s.expires_at),"correction":{"state":snapshot.as_ref().map_or("none",|s|s.correction.as_str())},"related_tactic_ids":[],"identity_verified":false}),
+            json!({"version":snapshot.as_ref().map_or(0,|s|s.version),"scope":scope_name(self.scope),"number_label":label,"band":if level=="none"{"no_reports"}else{level},"band_label":band_label,"explanation":snapshot.as_ref().map_or("No active reported-number history. Absence of reports does not prove identity or safety.",|s|s.explanation.as_str()),"independent_households":0,"verified_independent_households":0,"demo_household_count":snapshot.as_ref().map_or(0,|s|s.demo_household_count),"reports":reports,"first_reported_at":snapshot.as_ref().map(|s|&s.first_reported_at),"last_reported_at":snapshot.as_ref().map(|s|&s.last_reported_at),"expires_at":snapshot.as_ref().map(|s|&s.expires_at),"correction":{"state":snapshot.as_ref().map_or("none",|s|s.correction.as_str())},"related_tactic_ids":snapshot.as_ref().map_or_else(Vec::new,|s|s.tactic_ids.clone()),"scam_categories":snapshot.as_ref().map_or_else(Vec::new,|s|s.scam_categories.clone()),"tactic_identifier_kind":taxonomy_identifier_kind(),"matched_capsule_ids":[],"identity_verified":false}),
         )
     }
     pub async fn list(&self, mode: ExecutionMode, limit: usize) -> anyhow::Result<Vec<Snapshot>> {
@@ -392,9 +408,14 @@ impl ReputationService {
             .iter()
             .map(|s| serde_json::from_str(s))
             .collect::<Result<_, _>>()?;
+        let report_rows=sqlx::query("SELECT report_id,household_id,reported_at,expires_at,retracted,source_event_id,source_turn_version,scam_category,tactic_id FROM reputation_reports WHERE entry_id=? ORDER BY reported_at DESC,report_id LIMIT 100")
+            .bind(&id).fetch_all(&mut *tx).await?;
+        let reports:Vec<Value>=report_rows.iter().map(|row|json!({"report_id":row.get::<String,_>("report_id"),"household_id":row.get::<String,_>("household_id"),"created_at":row.get::<String,_>("reported_at"),"expires_at":row.get::<String,_>("expires_at"),"retracted":row.get::<i64,_>("retracted")!=0,"source_event_id":row.get::<String,_>("source_event_id"),"source_turn_version":row.get::<i64,_>("source_turn_version"),"scam_category":row.get::<Option<String>,_>("scam_category"),"tactic_id":row.get::<Option<String>,_>("tactic_id"),"tactic_identifier_kind":taxonomy_identifier_kind(),"matched_capsule_ids":[]})).collect();
         tx.commit().await?;
         self.broadcast(e);
-        Ok(Some(json!({"reputation":s,"audit":audit})))
+        Ok(Some(
+            json!({"reputation":s,"audit":audit,"reports":reports}),
+        ))
     }
     pub async fn request_correction(
         &self,
@@ -515,12 +536,23 @@ impl ReputationService {
         s: &mut Snapshot,
         now: DateTime<Utc>,
     ) -> anyhow::Result<()> {
-        let rows=sqlx::query("SELECT household_id,participation_group,reported_at FROM reputation_reports WHERE entry_id=? AND retracted=0 AND expires_at>?").bind(id).bind(now.to_rfc3339()).fetch_all(conn).await?;
+        let rows=sqlx::query("SELECT household_id,participation_group,reported_at,scam_category,tactic_id FROM reputation_reports WHERE entry_id=? AND retracted=0 AND expires_at>?").bind(id).bind(now.to_rfc3339()).fetch_all(conn).await?;
         let mut households = BTreeSet::new();
         let mut recent = BTreeSet::new();
         let mut groups = BTreeSet::new();
         let mut recent_groups = BTreeSet::new();
+        let mut categories = BTreeSet::new();
+        let mut tactic_ids = BTreeSet::new();
         for row in rows {
+            if let (Some(category), Some(tactic_id)) = (
+                row.get::<Option<String>, _>("scam_category"),
+                row.get::<Option<String>, _>("tactic_id"),
+            ) && serde_json::from_value::<crate::tools::TacticKind>(json!(&category)).is_ok()
+                && tactic_id == categorical_tactic_id(&category)
+            {
+                categories.insert(category);
+                tactic_ids.insert(tactic_id);
+            }
             let h: String = row.get("household_id");
             let g: String = row.get("participation_group");
             let at = DateTime::parse_from_rfc3339(row.get::<&str, _>("reported_at"))?;
@@ -531,6 +563,10 @@ impl ReputationService {
             households.insert(h);
             groups.insert(g);
         }
+        s.scam_categories = categories.into_iter().collect();
+        s.tactic_ids = tactic_ids.into_iter().collect();
+        s.tactic_identifier_kind = taxonomy_identifier_kind();
+        s.matched_capsule_ids.clear();
         s.demo_household_count = if self.scope == Scope::Demo {
             households.len()
         } else {
@@ -561,6 +597,7 @@ impl ReputationService {
             s.level = level.into();
         }
         s.explanation=if self.scope==Scope::Demo {"Demo profile reports simulate independent households; verified independence is zero. Presented caller ID can be spoofed. No automatic blocking."}else{"Reports are from one local participation group, not verified independent households. Presented caller ID can be spoofed. No automatic blocking."}.into();
+        s.explanation.push_str(" Tactic IDs identify categories, not published capsule matches; legacy reports may have no category.");
         Ok(())
     }
     async fn refresh(
@@ -580,15 +617,33 @@ impl ReputationService {
         if serde_json::to_value(&s)? == before {
             return Ok((s, vec![]));
         }
+        let expired = previous != s.level
+            || before["household_count"] != json!(s.household_count)
+            || before["corroborating_household_count"] != json!(s.corroborating_household_count)
+            || before["tactic_ids"].as_array().is_some_and(|ids| {
+                ids.iter().any(|id| {
+                    id.as_str()
+                        .is_some_and(|id| !s.tactic_ids.iter().any(|active| active == id))
+                })
+            });
+        let reason = if expired {
+            "expired"
+        } else {
+            "metadata_refreshed"
+        };
         s.version += 1;
         self.persist(conn, id, &s).await?;
-        let event=self.event(conn,None,mode,"reputation.level_changed",json!({"number_key":s.number_key,"scope":self.scope,"from":previous,"to":s.level,"version":s.version,"reason":"expired","household_count":s.household_count}),now).await?;
+        let event=self.event(conn,None,mode,"reputation.level_changed",json!({"number_key":s.number_key,"scope":self.scope,"from":previous,"to":s.level,"version":s.version,"reason":reason,"household_count":s.household_count}),now).await?;
         self.audit(
             conn,
             id,
             &s,
             &event,
-            "expiry",
+            if expired {
+                "expiry"
+            } else {
+                "metadata_refresh"
+            },
             json!({"from":previous,"to":s.level}),
         )
         .await?;
@@ -755,6 +810,38 @@ pub fn current_protective_assessment(s: &Session) -> bool {
         serde_json::from_value::<Vec<crate::tools::EvidenceRef>>(a["evidence_refs"].clone());
     risky && evidence.is_ok_and(|evidence| s.evidence_valid(&evidence, true).is_ok())
 }
+fn taxonomy_identifier_kind() -> String {
+    "categorical_taxonomy_v1".into()
+}
+fn categorical_tactic_id(category: &str) -> String {
+    format!("firstring:tactic:v1:{category}")
+}
+fn current_tactic_category(session: &Session) -> Option<&'static str> {
+    if !current_protective_assessment(session) {
+        return None;
+    }
+    let assessment = session
+        .assessments
+        .iter()
+        .rev()
+        .find(|a| a["turn_version"].as_u64() == Some(session.turn_version))?;
+    use crate::tools::{RequestedObject, TacticKind};
+    let object = serde_json::from_value::<RequestedObject>(
+        assessment["observation"]["requested_object"].clone(),
+    )
+    .ok()?;
+    let tactic = match object {
+        RequestedObject::AuthenticationSecret => TacticKind::AuthenticationCodeExtraction,
+        RequestedObject::RemoteAccess => TacticKind::RemoteAccessRequest,
+        RequestedObject::PaymentDiversion => TacticKind::PaymentDiversion,
+        _ => return None,
+    };
+    Some(match tactic {
+        TacticKind::AuthenticationCodeExtraction => "authentication_code_extraction",
+        TacticKind::RemoteAccessRequest => "remote_access_request",
+        TacticKind::PaymentDiversion => "payment_diversion",
+    })
+}
 fn validate_protection(s: &Session, event: &Event) -> anyhow::Result<()> {
     let m = s
         .message
@@ -785,9 +872,28 @@ fn validate_protection(s: &Session, event: &Event) -> anyhow::Result<()> {
 pub async fn initialize(pool: &sqlx::SqlitePool) -> anyhow::Result<()> {
     sqlx::raw_sql("CREATE TABLE IF NOT EXISTS reputation_identities(session_id TEXT PRIMARY KEY,scope TEXT NOT NULL,mode TEXT NOT NULL,number_key TEXT,display_suffix TEXT);
 CREATE TABLE IF NOT EXISTS number_reputation(entry_id TEXT PRIMARY KEY,scope TEXT NOT NULL,mode TEXT NOT NULL,data TEXT NOT NULL,updated_at TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS reputation_reports(report_id TEXT PRIMARY KEY,entry_id TEXT NOT NULL,session_id TEXT UNIQUE NOT NULL,household_id TEXT NOT NULL,participation_group TEXT NOT NULL,source_event_id TEXT NOT NULL,source_event_sequence INTEGER NOT NULL,source_turn_version INTEGER NOT NULL,source_policy_epoch INTEGER NOT NULL,reported_at TEXT NOT NULL,expires_at TEXT NOT NULL,retracted INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS reputation_reports(report_id TEXT PRIMARY KEY,entry_id TEXT NOT NULL,session_id TEXT UNIQUE NOT NULL,household_id TEXT NOT NULL,participation_group TEXT NOT NULL,source_event_id TEXT NOT NULL,source_event_sequence INTEGER NOT NULL,source_turn_version INTEGER NOT NULL,source_policy_epoch INTEGER NOT NULL,reported_at TEXT NOT NULL,expires_at TEXT NOT NULL,retracted INTEGER NOT NULL DEFAULT 0,scam_category TEXT,tactic_id TEXT);
 CREATE INDEX IF NOT EXISTS reputation_report_active ON reputation_reports(entry_id,retracted,expires_at);
 CREATE TABLE IF NOT EXISTS reputation_audit(entry_id TEXT NOT NULL,version INTEGER NOT NULL,data TEXT NOT NULL,PRIMARY KEY(entry_id,version));
 CREATE TABLE IF NOT EXISTS reputation_lookups(receipt_id TEXT PRIMARY KEY,session_id TEXT NOT NULL,data TEXT NOT NULL);").execute(pool).await?;
+    let mut tx = pool.begin().await?;
+    let columns = sqlx::query("PRAGMA table_info(reputation_reports)")
+        .fetch_all(&mut *tx)
+        .await?;
+    // Fixed identifiers only; rerunning the migration never resets a ledger,
+    // version, correction or unknown legacy category.
+    for column in ["scam_category", "tactic_id"] {
+        if !columns
+            .iter()
+            .any(|row| row.get::<&str, _>("name") == column)
+        {
+            sqlx::query(&format!(
+                "ALTER TABLE reputation_reports ADD COLUMN {column} TEXT"
+            ))
+            .execute(&mut *tx)
+            .await?;
+        }
+    }
+    tx.commit().await?;
     Ok(())
 }

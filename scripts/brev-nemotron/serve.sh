@@ -33,6 +33,24 @@ with os.fdopen(fd, 'w') as out:
 PY
 fi
 
+
+parser_args=(--tool-call-parser qwen3_coder)
+extra_mounts=()
+if [[ "${FIRSTRING_COMPACT_TOOL_GRAMMAR:-0}" == "1" ]]; then
+  plugin_path="$task_root/firstring_compact_tools.py"
+  expected_plugin_sha="bbbaa7f5f9495f9ba338aeb86ef0d444a1fd760d04ebe9f5c810e473e9dd4389"
+  actual_plugin_sha="$(sha256sum "$plugin_path" | cut -d' ' -f1)"
+  [[ "$actual_plugin_sha" == "$expected_plugin_sha" ]] || { printf '%s\n' 'Compact parser hash mismatch' >&2; exit 1; }
+  parser_args=(--tool-parser-plugin /opt/firstring/firstring_compact_tools.py --tool-call-parser firstring_qwen3_compact)
+  extra_mounts+=(--mount "type=bind,source=$plugin_path,target=/opt/firstring/firstring_compact_tools.py,readonly")
+  for entry in 'vllm:/root/.cache/vllm' 'flashinfer:/root/.cache/flashinfer' 'triton:/root/.triton' 'nv:/root/.nv'; do
+    cache_name="${entry%%:*}"
+    cache_target="${entry#*:}"
+    mkdir -p "$task_root/runtime-cache/$cache_name"
+    extra_mounts+=(--mount "type=bind,source=$task_root/runtime-cache/$cache_name,target=$cache_target")
+  done
+fi
+
 # The registry digest and model revision are immutable pins verified before deployment.
 # Only this host's loopback is reachable; access from FirstRing uses authenticated SSH.
 docker run --detach --name firstring-nemotron --restart=no \
@@ -41,6 +59,7 @@ docker run --detach --name firstring-nemotron --restart=no \
   --env VLLM_NO_USAGE_STATS=1 --env VLLM_DO_NOT_TRACK=1 \
   --mount "type=bind,source=$task_root/huggingface,target=/root/.cache/huggingface" \
   --log-driver json-file --log-opt max-size=10m --log-opt max-file=2 \
+  "${extra_mounts[@]}" \
   vllm/vllm-openai@sha256:0a51ea5b4ae2dc5d81890e5173f54203d2a3ae0cfffe51b8fd2afd4391bfd967 \
   nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4 \
   --revision bee7596271d1495f6992ae224aefde4410e816b8 \
@@ -53,5 +72,5 @@ docker run --detach --name firstring-nemotron --restart=no \
   --mamba-ssu-algorithm horizontal --mamba-cache-mode align \
   --mamba-ssm-cache-dtype float16 --enable-mamba-cache-stochastic-rounding \
   --mamba-cache-philox-rounds 5 --reasoning-parser nemotron_v3 \
-  --tool-call-parser qwen3_coder --enable-auto-tool-choice
+  "${parser_args[@]}" --enable-auto-tool-choice
 printf '%s\n' 'Container requested. Readiness and native tool validation remain required.'

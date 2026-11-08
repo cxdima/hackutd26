@@ -8,19 +8,12 @@ import {
   RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
-import {
-  LucideLock,
-  LucideMonitorPlay,
-  LucidePanelRightOpen,
-  LucideWifiOff,
-  LucideX,
-} from '@lucide/angular';
+import { LucideMonitorPlay, LucidePanelRightOpen, LucideX } from '@lucide/angular';
 import { ConsoleStore } from '../core/console-store';
 import { formatTime } from '../core/format';
 import { Wordmark } from '../shared/wordmark';
 import { ConnectPanel } from './connect-panel';
 import { OperatorPanel } from './operator-panel';
-import { StatusBug } from './status-bug';
 
 @Component({
   selector: 'app-console-shell',
@@ -31,11 +24,8 @@ import { StatusBug } from './status-bug';
     Wordmark,
     ConnectPanel,
     OperatorPanel,
-    StatusBug,
-    LucideLock,
     LucideX,
     LucidePanelRightOpen,
-    LucideWifiOff,
     LucideMonitorPlay,
   ],
   template: `
@@ -70,7 +60,11 @@ import { StatusBug } from './status-bug';
             </nav>
           }
           <div class="ml-auto flex items-center gap-2 sm:gap-3">
-            <app-status-bug [connection]="store.connection()" />
+            @if (store.connection() === 'paused') {
+              <span class="text-[0.95rem] font-semibold text-paper/70" role="status"
+                >Reconnecting…</span
+              >
+            }
             @if (connected()) {
               <a
                 routerLink="/console/present"
@@ -81,22 +75,23 @@ import { StatusBug } from './status-bug';
               </a>
               <button
                 type="button"
-                class="btn btn-quiet hidden sm:inline-flex"
+                class="btn btn-quiet hidden whitespace-nowrap sm:inline-flex lg:max-xl:!px-3.5"
                 [attr.aria-expanded]="operatorOpen()"
                 aria-controls="operator-panel"
                 (click)="toggleOperator()"
               >
-                <svg lucidePanelRightOpen [size]="17" aria-hidden="true"></svg> Operator detail
+                <svg lucidePanelRightOpen [size]="17" aria-hidden="true"></svg>
+                <span class="lg:max-xl:sr-only">Operator detail</span>
               </button>
               @if (store.isDemo()) {
-                <button type="button" class="btn btn-quiet !px-3 sm:!px-4" (click)="exitDemo()">
+                <button
+                  type="button"
+                  class="btn btn-quiet whitespace-nowrap !px-3 sm:!px-4"
+                  (click)="exitDemo()"
+                >
                   <svg lucideX [size]="17" aria-hidden="true"></svg
                   ><span class="hidden sm:inline">Exit demo</span
                   ><span class="sm:hidden">Exit</span>
-                </button>
-              } @else {
-                <button type="button" class="btn btn-quiet !px-3 sm:!px-4" (click)="lock()">
-                  <svg lucideLock [size]="17" aria-hidden="true"></svg> Lock
                 </button>
               }
             }
@@ -140,45 +135,6 @@ import { StatusBug } from './status-bug';
         }
       </header>
 
-      @if (store.isDemo()) {
-        <div class="border-b-2 border-ink bg-paper-2">
-          <div class="mx-auto max-w-[90rem] px-4 py-3 sm:px-6 lg:px-8">
-            <p class="max-w-[64ch] text-[1.0625rem]">
-              <strong>Demo view.</strong> Curated, fictional calls replayed in your browser. No
-              phone line, model or server is involved, and nothing here is live.
-            </p>
-          </div>
-        </div>
-      }
-      @if (store.connection() === 'paused') {
-        <div class="border-b-2 border-amber-ink bg-amber-wash text-amber-ink" role="status">
-          <div class="mx-auto flex max-w-[90rem] items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-            <svg lucideWifiOff [size]="20" class="shrink-0" aria-hidden="true"></svg>
-            <p class="max-w-[64ch] text-[1.0625rem] font-semibold">
-              Updates paused. You’re seeing the last snapshot{{
-                lastReceipt() ? ' (last receipt ' + lastReceipt() + ')' : ''
-              }}. Reconnecting automatically.
-            </p>
-          </div>
-        </div>
-      }
-      @if (store.error()) {
-        <div class="border-b-2 border-magenta-ink bg-magenta-wash text-magenta-ink" role="alert">
-          <div class="mx-auto max-w-[90rem] px-4 py-3 sm:px-6 lg:px-8">
-            <p class="max-w-[64ch] text-[1.0625rem] font-semibold">{{ store.error() }}</p>
-          </div>
-        </div>
-      }
-      @if (store.notice()) {
-        <div class="border-b border-rule bg-lime-wash" role="status">
-          <div class="mx-auto max-w-[90rem] px-4 py-3 sm:px-6 lg:px-8">
-            <p class="max-w-[64ch] text-[1.0625rem] font-semibold text-lime-ink">
-              {{ store.notice() }}
-            </p>
-          </div>
-        </div>
-      }
-
       <main
         id="console-main"
         tabindex="-1"
@@ -194,15 +150,6 @@ import { StatusBug } from './status-bug';
       @if (operatorOpen() && connected()) {
         <app-operator-panel id="operator-panel" (closed)="closeOperator()" />
       }
-
-      <footer class="border-t border-rule">
-        <div class="mx-auto max-w-[90rem] px-4 py-6 sm:px-6 lg:px-8">
-          <p class="max-w-[64ch] text-[1rem] text-muted">
-            FirstRing console · fictional households · caller identity is never verified by caller
-            ID. Configured is not the same as tested; receipts are shown as received.
-          </p>
-        </div>
-      </footer>
     }
   `,
 })
@@ -235,12 +182,8 @@ export class ConsoleShell {
     });
     const query = this.route.snapshot.queryParamMap;
     if (query.get('view') === 'demo' && this.store.source() === 'none') this.store.enterDemo();
-    // On this computer the dev server may hold the operator token; try it once, quietly.
-    else if (
-      this.store.source() === 'none' &&
-      !(globalThis as { __FIRSTRING_NO_AUTOCONNECT__?: boolean }).__FIRSTRING_NO_AUTOCONNECT__
-    )
-      void this.store.connectLocal();
+    // The server trusts its own computer: no login, connect straight away.
+    else if (this.store.source() === 'none') void this.store.connectLocal();
     effect(() => {
       if (!this.connected()) this.operatorOpen.set(false);
     });
@@ -258,6 +201,7 @@ export class ConsoleShell {
 
   exitDemo() {
     this.store.lock();
+    void this.store.retryLocal();
     void this.router.navigate(['/console']);
   }
 

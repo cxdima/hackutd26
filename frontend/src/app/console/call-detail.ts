@@ -22,6 +22,7 @@ import { formatDateTime, formatDuration, formatMs, zoneLabel } from '../core/for
 import { describeObservation, humanize, PRETEXT_LABEL, ACTION_LABEL } from '../core/language';
 import type { Leg } from '../core/schemas';
 import { handoffView, personAction } from '../core/live';
+import { CallRecording } from './call-recording';
 import { DecisionSpine } from './decision-spine';
 import { HandoffTimeline } from './handoff-timeline';
 import { ModelEvidence } from './model-evidence';
@@ -33,6 +34,7 @@ import { ReputationPanel } from './reputation-panel';
   imports: [
     OutcomeChip,
     DecisionSpine,
+    CallRecording,
     HandoffTimeline,
     ModelEvidence,
     ReputationPanel,
@@ -47,94 +49,78 @@ import { ReputationPanel } from './reputation-panel';
     @let c = call();
     @let s = c.session;
     <article aria-labelledby="call-title">
-      <header class="border-b-2 border-ink pb-6">
-        <app-outcome-chip [outcome]="c.outcome" />
+      <header>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <app-outcome-chip [outcome]="c.outcome" />
+          <p class="text-[1rem] text-muted">
+            <time [attr.datetime]="c.startedAt">{{ when() }}</time> {{ zone() }} ·
+            <span class="tabular">{{ duration() }}</span> · for {{ c.name }} · {{ modeLabel() }}
+          </p>
+        </div>
         <h1
           id="call-title"
-          class="mt-4 max-w-[40ch] text-[clamp(1.6rem,1.3rem+1.2vw,2.35rem)] leading-[1.15] font-extrabold tracking-[-0.02em]"
+          class="mt-4 max-w-[34ch] text-[clamp(1.6rem,1.2rem+1.3vw,2.4rem)] leading-[1.12] font-extrabold tracking-[-0.02em] text-balance"
         >
           {{ c.headline }}
         </h1>
-        <dl class="mt-4 flex flex-wrap gap-x-7 gap-y-2 text-[1.0625rem]">
-          <div class="flex gap-1.5">
-            <dt class="text-muted">When</dt>
-            <dd class="font-semibold">
-              <time [attr.datetime]="c.startedAt">{{ when() }}</time> {{ zone() }}
-            </dd>
-          </div>
-          <div class="flex gap-1.5">
-            <dt class="text-muted">Length</dt>
-            <dd class="font-semibold tabular">{{ duration() }}</dd>
-          </div>
-          <div class="flex gap-1.5">
-            <dt class="text-muted">Answered for</dt>
-            <dd class="font-semibold">{{ c.name }}</dd>
-          </div>
-          <div class="flex gap-1.5">
-            <dt class="text-muted">Caller identity</dt>
-            <dd class="font-semibold">Unverified</dd>
-          </div>
-          <div class="flex gap-1.5">
-            <dt class="text-muted">Source</dt>
-            <dd class="font-semibold">{{ modeLabel() }}</dd>
-          </div>
-        </dl>
+        <p class="mt-2 text-[1rem] text-muted">
+          Caller identity is unverified. Caller ID is a clue, not proof.
+        </p>
       </header>
 
-      <section
-        class="grid gap-px overflow-hidden border-b border-paper-3 sm:grid-cols-2 2xl:grid-cols-3"
-        aria-label="At a glance"
-      >
-        <div class="py-5 sm:pr-6">
-          <h2 class="text-[0.9375rem] font-extrabold uppercase tracking-[0.08em] text-muted">
-            What the caller wanted
-          </h2>
-          <p class="mt-1.5 text-[1.1875rem] font-semibold leading-snug">{{ requestSentence() }}</p>
-          @if (understanding(); as u) {
-            @if (u.claimed_identity) {
-              <p class="mt-2 text-[1rem] text-ink-3">
-                Said they were: “{{ u.claimed_identity }}” (not verified)
+      <section class="mt-8 border-t-2 border-ink" aria-label="Summary">
+        <dl>
+          <div class="grid gap-x-8 gap-y-1 border-b border-paper-3 py-5 md:grid-cols-[13rem_1fr]">
+            <dt class="text-[1.0625rem] font-bold text-muted">The caller wanted</dt>
+            <dd>
+              <p class="max-w-[60ch] text-[1.1875rem] font-semibold leading-snug">
+                {{ requestSentence() }}
               </p>
-            }
-            @if (u.missing_information.length) {
-              <p class="mt-1 text-[1rem] text-ink-3">
-                Still missing: {{ u.missing_information.join('; ') }}
-              </p>
-            }
-          }
-        </div>
-        <div class="py-5 sm:border-l sm:border-paper-3 sm:pl-6">
-          <h2 class="text-[0.9375rem] font-extrabold uppercase tracking-[0.08em] text-muted">
-            What FirstRing did
-          </h2>
-          <p class="mt-1.5 text-[1.1875rem] font-semibold leading-snug">{{ didSentence() }}</p>
+              @if (understanding(); as u) {
+                @if (u.claimed_identity) {
+                  <p class="mt-1.5 text-[1rem] text-ink-3">
+                    Said they were “{{ u.claimed_identity }}”. Not verified.
+                  </p>
+                }
+                @if (u.missing_information.length && c.outcome !== 'blocked') {
+                  <p class="mt-1 text-[1rem] text-ink-3">
+                    Still unclear: {{ u.missing_information.join('; ') }}
+                  </p>
+                }
+              }
+            </dd>
+          </div>
+          <div class="grid gap-x-8 gap-y-1 border-b border-paper-3 py-5 md:grid-cols-[13rem_1fr]">
+            <dt class="text-[1.0625rem] font-bold text-muted">FirstRing</dt>
+            <dd class="max-w-[60ch] text-[1.1875rem] font-semibold leading-snug">
+              {{ didSentence() }}
+            </dd>
+          </div>
           @if (s.message; as message) {
-            <div class="mt-3 rounded-xl bg-paper-2 p-4">
-              <p class="text-[0.9375rem] font-bold text-muted">
-                Saved message, private to you{{
-                  earlierMessage() ? ' (from an earlier caller turn)' : ''
-                }}
-              </p>
-              <p class="mt-1 text-[1.125rem] font-semibold">{{ message.summary }}</p>
-              <p class="mt-1 text-[0.95rem] text-muted">
-                Saved for review. Not a delivery receipt.
-              </p>
+            <div class="grid gap-x-8 gap-y-1 border-b border-paper-3 py-5 md:grid-cols-[13rem_1fr]">
+              <dt class="text-[1.0625rem] font-bold text-muted">
+                Saved message{{ earlierMessage() ? ' (earlier turn)' : '' }}
+              </dt>
+              <dd>
+                <blockquote class="max-w-[60ch] text-[1.25rem] font-semibold leading-snug">
+                  “{{ message.summary }}”
+                </blockquote>
+                <p class="mt-1.5 text-[0.95rem] text-muted">
+                  Private to you. Saved for review; not a delivery receipt.
+                </p>
+              </dd>
             </div>
           }
-        </div>
-        <div
-          class="border-t border-paper-3 py-5 sm:col-span-2 2xl:col-span-1 2xl:border-l 2xl:border-t-0 2xl:pl-6"
-        >
-          <h2 class="text-[0.9375rem] font-extrabold uppercase tracking-[0.08em] text-muted">
-            Do you need to do anything?
-          </h2>
-          <p
-            class="mt-1.5 max-w-[60ch] text-[1.1875rem] font-semibold leading-snug"
-            [class.text-magenta-ink]="action().needed && c.outcome === 'in_progress'"
-          >
-            {{ action().text }}
-          </p>
-        </div>
+          <div class="grid gap-x-8 gap-y-1 border-b border-paper-3 py-5 md:grid-cols-[13rem_1fr]">
+            <dt class="text-[1.0625rem] font-bold text-muted">Do you need to act?</dt>
+            <dd
+              class="max-w-[60ch] text-[1.1875rem] font-semibold leading-snug"
+              [class.text-magenta-ink]="action().needed && c.outcome === 'in_progress'"
+            >
+              {{ action().text }}
+            </dd>
+          </div>
+        </dl>
       </section>
 
       @if (matches().length) {
@@ -184,9 +170,8 @@ import { ReputationPanel } from './reputation-panel';
             </li>
           }
         </ol>
-        <p class="mt-3 text-[1rem] text-muted">
-          No audio recording is available for this call in the dashboard.
-        </p>
+        <p class="mt-3 text-[1rem] text-muted">Recorded calls can be played back below.</p>
+        <app-call-recording [sessionId]="c.id" />
       </section>
 
       <section class="mt-12" aria-labelledby="spine-heading">

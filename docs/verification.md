@@ -1,3 +1,11 @@
+## Nov8 post-campaign checkpoint — 14:40UTC
+
+Fresh actual GPU native-cycle evidence: `production-compact-warm-attempt19.json` and `production-compact-consecutive.json`. These use real Nemotron with inert actor execution and the exact runtime request builder; they are not phone tests. Old512-token whitespace-loop failure now completes. Later broad candidate8/9mechanical passes still includes semantic shortcomings (pickup repetition/human handling/relationship attribution), and the quoted-report action intermittently times out. `production-quoted-stream-timing.json` measured393msfirstdelta and4438mstotal; separately labeled15sdiagnostic, not a production acceptance pass. Frozenheldoutsets unchanged.
+
+Focused RED→GREEN checks cover startup reputation activation, three stored scam categories/taxonomy IDs, migration and correction/expiry, actual Maya request context, capability-limited native schemas, quoted unknown-object scope, and old-webhook/new-arm rejection. Fresh workspace367tests pass,2explicit archivedignores; fmt/Clippy/build pass. Angular importedexactlyfrom900bc22 passes typecheck/lint/build,54unit tests and41mockedbrowser tests. Provider-disabled isolatedRustpreview renderedauthenticatedrealhistory with0pageerrors and200reputationAPI. This does not claim fresh phone audio or arming.
+
+Brev currentload/auth/GPUexecutionandguards are recorded under `scripts/brev-nemotron/experiments/20261108-132357`. No new automatedreservation:19used/26total. PhysicalPhoneB/family remain uncalled.
+
 # Verification
 
 ## Campaign closeout — 2026-11-08

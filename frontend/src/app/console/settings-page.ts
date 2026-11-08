@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { LucideCheck, LucideLoader, LucideRotateCw } from '@lucide/angular';
 import { ConsoleStore } from '../core/console-store';
 import type { Profile } from '../core/schemas';
+import { SelectMenu, type SelectOption } from '../shared/select-menu';
 import { HandoffSetup } from './setup/handoff-setup';
 import { VoiceEnrollment } from './setup/voice-enrollment';
 
@@ -14,12 +15,24 @@ export const VOICE_PRESETS = [
   { id: '21m00Tcm4TlvDq8ikWAM-v4', label: 'Janet · legacy voice' },
 ];
 export const TIMEZONES = [
-  { id: 'America/Chicago', label: 'Central · America/Chicago' },
-  { id: 'America/New_York', label: 'Eastern · America/New_York' },
-  { id: 'America/Denver', label: 'Mountain · America/Denver' },
-  { id: 'America/Los_Angeles', label: 'Pacific · America/Los_Angeles' },
+  { id: 'America/Chicago', label: 'Central time · America/Chicago' },
+  { id: 'America/New_York', label: 'Eastern time · America/New_York' },
+  { id: 'America/Denver', label: 'Mountain time · America/Denver' },
+  { id: 'America/Los_Angeles', label: 'Pacific time · America/Los_Angeles' },
   { id: 'UTC', label: 'UTC' },
 ];
+/** "Jessica · warm, conversational" becomes a name with a quieter second line. */
+function toOptions(items: { id: string; label: string }[]): SelectOption[] {
+  return items.map(({ id, label }) => {
+    const [name, ...rest] = label.split(' · ');
+    const detail = rest.join(' · ');
+    return {
+      value: id,
+      label: name,
+      detail: detail ? detail[0].toUpperCase() + detail.slice(1) : undefined,
+    };
+  });
+}
 const LINK_OR_NUMBER = /(https?:\/\/|www\.|\b\d{3}[\s.-]?\d{3}[\s.-]?\d{4}\b)/i;
 
 /**
@@ -29,7 +42,15 @@ const LINK_OR_NUMBER = /(https?:\/\/|www\.|\b\d{3}[\s.-]?\d{3}[\s.-]?\d{4}\b)/i;
  */
 @Component({
   selector: 'app-settings-page',
-  imports: [FormsModule, LucideCheck, LucideLoader, LucideRotateCw, HandoffSetup, VoiceEnrollment],
+  imports: [
+    FormsModule,
+    SelectMenu,
+    LucideCheck,
+    LucideLoader,
+    LucideRotateCw,
+    HandoffSetup,
+    VoiceEnrollment,
+  ],
   template: `
     @let state = store.state()!;
     <div class="grid gap-10 lg:grid-cols-12">
@@ -142,37 +163,35 @@ const LINK_OR_NUMBER = /(https?:\/\/|www\.|\b\d{3}[\s.-]?\d{3}[\s.-]?\d{4}\b)/i;
               </div>
               <div class="grid gap-6 sm:grid-cols-2">
                 <div>
-                  <label for="profile-voice" class="field-label">Assistant voice</label>
-                  <select
-                    id="profile-voice"
+                  <label for="profile-voice" id="profile-voice-label" class="field-label"
+                    >Assistant voice</label
+                  >
+                  <app-select-menu
+                    inputId="profile-voice"
+                    labelledBy="profile-voice-label"
+                    describedBy="voice-help"
                     name="voice_id"
-                    class="field"
+                    [options]="voiceOptions()"
                     [ngModel]="d.voice_id"
                     (ngModelChange)="patch({ voice_id: $event })"
-                    aria-describedby="voice-help"
-                  >
-                    @for (voice of voicesFor(d.voice_id); track voice.id) {
-                      <option [value]="voice.id">{{ voice.label }}</option>
-                    }
-                  </select>
+                  />
                   <p id="voice-help" class="field-help">
                     A preset synthetic voice. Previews aren’t available in this prototype.
                   </p>
                 </div>
                 <div>
-                  <label for="profile-timezone" class="field-label">Timezone</label>
-                  <select
-                    id="profile-timezone"
+                  <label for="profile-timezone" id="profile-timezone-label" class="field-label"
+                    >Timezone</label
+                  >
+                  <app-select-menu
+                    inputId="profile-timezone"
+                    labelledBy="profile-timezone-label"
+                    describedBy="tz-help"
                     name="timezone"
-                    class="field"
+                    [options]="zoneOptions()"
                     [ngModel]="d.timezone"
                     (ngModelChange)="patch({ timezone: $event })"
-                    aria-describedby="tz-help"
-                  >
-                    @for (zone of zonesFor(d.timezone); track zone.id) {
-                      <option [value]="zone.id">{{ zone.label }}</option>
-                    }
-                  </select>
+                  />
                   <p id="tz-help" class="field-help">
                     Used for times in summaries and this dashboard.
                   </p>
@@ -312,6 +331,9 @@ export class SettingsPage {
     });
     inject(DestroyRef).onDestroy(() => this.controller?.abort());
   }
+
+  readonly voiceOptions = computed(() => toOptions(this.voicesFor(this.draft()?.voice_id ?? '')));
+  readonly zoneOptions = computed(() => toOptions(this.zonesFor(this.draft()?.timezone ?? '')));
 
   voicesFor(current: string) {
     return VOICE_PRESETS.some((v) => v.id === current)
