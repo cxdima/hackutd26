@@ -32,9 +32,17 @@ async fn receipt(
             .iter()
             .all(|name| value["checks"][name] == true)
     {
+        let detail = if ["native_model_reply", "audible_reply", "clean_hangup"]
+            .iter()
+            .all(|name| value["checks"][name] == true)
+        {
+            "Live NVIDIA replies and automatic goodbye confirmed. Deliberate interruption and obsolete-response rejection still need phone proof."
+        } else {
+            "Signed Relay setup, caller transcription and audible greeting confirmed. A completed model reply, interruption and clean closing still need phone proof."
+        };
         return Ok(
             json!({"status":"pending","recorded_at":value["recorded_at"],"source":source,
-            "detail":"Signed Relay setup, caller transcription and audible greeting confirmed. A completed model reply, interruption and clean closing still need phone proof."}),
+            "detail":detail}),
         );
     }
     if key == "relay_phone"

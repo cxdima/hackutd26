@@ -106,6 +106,19 @@ export const stateSchema = z.object({
   transport: z.string(),
   phone_display: z.string(),
   selected_household: z.string(),
+  speech: z
+    .object({
+      source: z.literal("configured"),
+      transport: z.string(),
+      provider: z.string(),
+      voice: z.string(),
+      voice_label: z.string(),
+      closing_provider: z.string(),
+      closing_voice: z.string(),
+      transcription_provider: z.string().nullable(),
+      transcription_model: z.string().nullable(),
+    })
+    .optional(),
   evidence: z
     .object({
       model_protocol: proofSchema,

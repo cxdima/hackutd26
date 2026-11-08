@@ -87,6 +87,9 @@ impl Store {
                 "The single authorized smoke-test attempt is already reserved; reconcile it before requesting new authorization"
             );
         }
+        if leg.kind == "fixture_caller" && mode == ExecutionMode::Live {
+            crate::audio_fixture::check_budget(&mut tx).await?;
+        }
         let mode = if mode == ExecutionMode::Live {
             "live"
         } else {

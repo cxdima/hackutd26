@@ -1,3 +1,4 @@
+pub mod audio_fixture;
 pub mod calls;
 pub mod config;
 pub mod events;

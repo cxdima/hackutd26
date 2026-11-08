@@ -1,5 +1,35 @@
 # Verification
 
+## Automated originator and checkpoint — Nov7,22:58Central
+
+TrustHub API confirms the user's individual profile is now `twilio-approved`. Attempt1 remains a durable rejected KYC reservation. Attempt2 connected through the existing Photon outbound SIP route to the owned FirstRing number; both legs bound and completed. The exact clinic recording reached production Relay ASR. Two successful actual Nemotron requests took1472/1118ms; Rust accepted assessment and `take_message`, persisted the minimized note, and sent the closing control. Caller-side Gather recognized Sarah's greeting and goodbye. A21-second recording was retrieved; human audition and precise audible onset remain unverified. The route passed, but the intended clinic→login sequence **failed**: Sarah closed after saving an incomplete clinic announcement. The login clip did not reach defender ASR. [Actual batch receipts](evidence/automated-caller-batch-2026-11-07.json).
+
+The fix reinforces collecting essential missing information while retaining supplied facts; this remains general model guidance, not a keyword/action replacement. The runner now stops after a defender terminal receipt instead of requesting another clip. Attempt3 repeated the affected routine-message case and still saved an incomplete notice rather than asking for its time. Both legs completed; the runner correctly stopped after the terminal receipt. This conversational defect remains open. Total budget is six including failures, with atomic reservations, no overlap, no unknown-outcome retry, terminal checks on both legs and a stop on repeated infrastructure failure/loops. The original Sarah attempt remains unused.
+
+The latest pre-retry workspace check passed191Rust tests, fmt/Clippy/build. Two additional focused regressions for incomplete-message guidance and terminal caller sequencing pass; the fresh merged workspace check passed **193 tests**, with fmt/Clippy/build also passing. Frontend28unit/eightbrowser tests passed, plus lint/typecheck/build/format; later scenario-validator changes passed their targeted regression and rebuild. Frozen held-out hashes remain unchanged.36original recordings are unchanged; one deterministic15dBpink-noise derivative was prepared offline with provenance, no synthesis/API/ASR/listening claim.
+
+
+## Conversation diagnosis — Nov 7, 22:38 Central
+
+The latest running checkpoint is `0c7b92c`; no reset or outbound call has occurred. The database now contains nine ended live inbound sessions, including three newer calls discovered directly during this review. The 22:10 call remains the listener-confirmed baseline: eight real NVIDIA requests, contextual answers, accepted protective assessment, persisted minimized note, heard goodbye and automatic hangup; perceived delay 3–5 seconds. [Correlated receipt](evidence/nvidia-relay-call-2026-11-07.json).
+
+The 22:19 noisy-room call received a real Relay interrupt, rejected a stale-evidence assessment for “Yeah,” canceled its retry, accepted the explicit sign-in-secret request, then timed out on the separate next-tool request at **3503ms**. Later it saved a note and ended. Twilio readback confirms completed inbound, **51 seconds**. Six of seven measured model requests succeeded. This call has no recording or listener confirmation of reply/cutoff audio. [Noisy-call receipt](evidence/noisy-relay-call-2026-11-07.json).
+
+Specific defects found in actual conversations:
+
+- The assistant re-confirmed a supplied appointment time and an already-stated identity. The shared context contains conversation history, but its guidance insufficiently distinguishes missing information from supplied answers.
+- “Yes” after the redundant identity question produced four successful HTTP responses that all cited old evidence; Rust rejected them and the four-step budget expired. This was a model/evidence failure, not an authentication failure or a slow HTTP request.
+- The initial policy-state snapshot remained stale after a successful assessment tool result. The shared helper is being corrected to reconcile accepted current-turn state; rejected/read-only tools must not clear the speech/assessment hold.
+- A bank transaction-confirmation request was incorrectly classified as authentication extraction; its next-tool request also timed out at **3501ms**. A bank/urgency context alone does not establish secret extraction.
+- Generic failure speech after accepted risk asked for another message. The local fix retains the block and ends with an honest refusal, without claiming a message was saved. Signed Relay and Gather regression paths pass locally; live validation remains pending deployment.
+- Fixed closing speech referred to sign-in codes even after an SSN request. Closing wording needs to describe the completed action without inventing the requested category.
+
+The 3.5-second per-request / six-second whole-turn limits remain unchanged while redundant work is reduced. Per-request timing, final-transcript-to-output dispatch and listener-estimated audible delay remain separate. Last-partial-to-final gaps are observable; true speech-end/first-audio timestamps are not yet available. No elapsed time since call connection is used as reply latency.
+
+Documented `ignoreBackchannel=true` is prepared for the brief “Yeah” interruption, preserving partial prompts and genuine interruption handling. Its focused configuration regression passed after failing on the old setting. It is not foreground-speaker isolation and does not prove noisy-room reliability. Deepgram `nova-3-general`, 1000ms speech timeout and ElevenLabs Rachel-v4 remain the requested path. [Twilio settings](https://www.twilio.com/docs/voice/twiml/connect/conversationrelay).
+
+Automated caller authorization is at most six attempts including retries against FirstRing’s own number, one at a time, maximum 90 seconds each. The initial implementation deliberately exposes one canary before expanding the batch. Original Sarah/family/handoff flags remain false; no Sarah reservation exists. Current local checks and the eventual canary outcome will be recorded below once executed.
+
 ## Current continuation — Nov 7, 21:58 Central
 
 Working tree continues the reviewed `4e9f61d` checkpoint; no reset, database replacement or outbound call occurred. Current mode is **live / Relay**, all three outbound calling flags false, zero action reservations, Phone B unavailable and its one authorized smoke attempt unspent. Brev remains deferred.

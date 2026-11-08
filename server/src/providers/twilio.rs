@@ -13,7 +13,7 @@ pub struct Twilio {
 #[derive(Debug)]
 pub enum CreateOutcome {
     Accepted { sid: String, status: String },
-    Rejected { status: u16 },
+    Rejected { status: u16, code: Option<u32> },
     Unknown,
 }
 #[derive(Deserialize)]
@@ -62,7 +62,10 @@ impl Twilio {
     pub async fn create(&self, leg: &Leg, twiml_path: &str) -> CreateOutcome {
         let c = &self.config;
         if c.mode != ExecutionMode::Live || !c.outbound_configured() {
-            return CreateOutcome::Rejected { status: 503 };
+            return CreateOutcome::Rejected {
+                status: 503,
+                code: None,
+            };
         }
         let allowed = match leg.kind.as_str() {
             "probe" => leg.role == "sarah" && c.smoke_authorized,
@@ -71,11 +74,109 @@ impl Twilio {
             _ => false,
         };
         if !allowed {
-            return CreateOutcome::Rejected { status: 403 };
+            return CreateOutcome::Rejected {
+                status: 403,
+                code: None,
+            };
         }
         let Some(target) = c.contacts.get(&leg.role) else {
-            return CreateOutcome::Rejected { status: 403 };
+            return CreateOutcome::Rejected {
+                status: 403,
+                code: None,
+            };
         };
+        self.submit(self.call_form(leg, target, twiml_path)).await
+    }
+    /// Dedicated one-attempt test harness; it cannot select a contact or a number.
+    /// The harness persists its global reservation before calling this method.
+    pub(crate) async fn create_fixture(&self, leg: &Leg) -> CreateOutcome {
+        let c = &self.config;
+        if c.mode != ExecutionMode::Live || !c.outbound_configured() {
+            return CreateOutcome::Rejected {
+                status: 503,
+                code: None,
+            };
+        }
+        if leg.kind != "fixture_caller"
+            || leg.role != "fixture_caller"
+            || c.smoke_authorized
+            || c.handoff_enabled
+            || c.family_enabled
+        {
+            return CreateOutcome::Rejected {
+                status: 403,
+                code: None,
+            };
+        }
+        self.submit(self.fixture_call_form(leg)).await
+    }
+    pub(crate) fn fixture_call_form(&self, leg: &Leg) -> Vec<(String, String)> {
+        let c = &self.config;
+        let mut form = self.call_form(
+            leg,
+            &c.photon_number,
+            &format!("/voice/fixture/{}/0", leg.action_id),
+        );
+        for (key, value) in &mut form {
+            if key == "TimeLimit" {
+                *value = c.max_call_seconds.min(90).to_string();
+            }
+        }
+        form.extend([
+            ("Record".into(), "true".into()),
+            ("RecordingChannels".into(), "dual".into()),
+            ("RecordingTrack".into(), "both".into()),
+            (
+                "RecordingStatusCallback".into(),
+                c.external_url(&format!("/voice/fixture-recording/{}", leg.action_id)),
+            ),
+            ("RecordingStatusCallbackMethod".into(), "POST".into()),
+            ("RecordingStatusCallbackEvent".into(), "completed".into()),
+        ]);
+        form
+    }
+    pub(crate) async fn fixture_recording(&self, recording: &str) -> anyhow::Result<Vec<u8>> {
+        anyhow::ensure!(
+            self.config.mode == ExecutionMode::Live,
+            "Replay cannot retrieve provider media"
+        );
+        anyhow::ensure!(
+            recording.starts_with("RE")
+                && recording.len() == 34
+                && recording[2..].bytes().all(|b| b.is_ascii_hexdigit()),
+            "Invalid recording identity"
+        );
+        let mut response = self
+            .client
+            .get(format!(
+                "https://api.twilio.com/2010-04-01/Accounts/{}/Recordings/{recording}.mp3",
+                self.config.account_sid
+            ))
+            .basic_auth(&self.config.account_sid, Some(&self.config.auth_token))
+            .send()
+            .await
+            .map_err(|_| anyhow::anyhow!("Recording fetch failed"))?;
+        anyhow::ensure!(
+            response.status().is_success(),
+            "Recording unavailable ({})",
+            response.status().as_u16()
+        );
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|_| anyhow::anyhow!("Recording transfer failed"))?
+        {
+            anyhow::ensure!(
+                bytes.len() + chunk.len() <= 10_000_000,
+                "Recording exceeds bounded size"
+            );
+            bytes.extend_from_slice(&chunk);
+        }
+        Ok(bytes)
+    }
+    async fn submit(&self, form: Vec<(String, String)>) -> CreateOutcome {
+        let c = &self.config;
         let url = format!(
             "https://api.twilio.com/2010-04-01/Accounts/{}/Calls.json",
             c.account_sid
@@ -86,7 +187,7 @@ impl Twilio {
             .client
             .post(url)
             .basic_auth(&c.account_sid, Some(&c.auth_token))
-            .form(&self.call_form(leg, target, twiml_path))
+            .form(&form)
             .send()
             .await
         else {
@@ -94,8 +195,25 @@ impl Twilio {
         };
         let status = response.status();
         if status.is_client_error() {
+            #[derive(Deserialize)]
+            struct ErrorCode {
+                code: u32,
+            }
+            let code = response
+                .json::<ErrorCode>()
+                .await
+                .ok()
+                .map(|error| error.code);
+            if let Some(code) = code {
+                tracing::warn!(
+                    http_status = status.as_u16(),
+                    provider_error_code = code,
+                    "Twilio call request rejected"
+                );
+            }
             return CreateOutcome::Rejected {
                 status: status.as_u16(),
+                code,
             };
         }
         if !status.is_success() {

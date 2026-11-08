@@ -1,0 +1,37 @@
+{
+  "recorded_at": "2026-11-08T04:44:31.050988+00:00",
+  "execution_mode": "live",
+  "data_origin": "synthetic",
+  "test_kind": "automated_audio_caller",
+  "batch_attempt": 1,
+  "batch_limit_including_retries": 6,
+  "scenario": "clinic_to_login_george",
+  "route": "Twilio Calls API -> Photon outbound SIP -> owned FirstRing number",
+  "reservation_preserved": true,
+  "provider_status": "failed",
+  "outcome": "provider_rejected_401",
+  "twilio_error_code": 20003,
+  "provider_call_sid_returned": false,
+  "defender_bound": false,
+  "caller_audio_played": false,
+  "production_asr_reached": false,
+  "recording_available": false,
+  "calls_created_observed": 0,
+  "sarah_probe_reservations": 0,
+  "flags": {
+    "TEST_CALLS_AUTHORIZED": false,
+    "HANDOFF_CALLS_ENABLED": false,
+    "FAMILY_CALLS_ENABLED": false
+  },
+  "diagnosis": "Twilio requires an approved primary compliance profile before Calls creation. An intentionally non-dialing POST with no To/From/TwiML/URL returned the explicit KYC explanation. No credentials changed; Python and Rust authenticated GETs succeed.",
+  "non_dialing_diagnostic": {
+    "method": "POST",
+    "destination_present": false,
+    "twiml_or_url_present": false,
+    "call_sid_returned": false,
+    "http_status": 401,
+    "code": 20003,
+    "message": "Primary compliance profile is not approved. Please refer to documentation and complete the KYC process in Trust Hub to gain access."
+  },
+  "next_gate": "RESOLVED: TrustHub API returned twilio-approved after user completed individual profile; attempts2/3 subsequently connected. See automated-caller-batch receipt."
+}

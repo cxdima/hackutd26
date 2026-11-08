@@ -1,8 +1,14 @@
 # Provider preflight
 
-Current at **Nov 7, 21:54 Central**: `live` / `relay`, caller A only, all three outbound flags false and no Phone B. Signed Relay setup and the heard Rachel-v4 greeting now have limited live proof. Two final clinic transcripts arrived, but trailing partial speech cancelled both model jobs and left silence; no native completion or spoken reply was observed. Full Relay conversation remains unverified. Inbound greeting/keypad/terminal and the separate hosted model protocol passed earlier. The first Relay attempt returned 64105; two retries at 21:43 returned 11200 / HTTP 502 at an expired Quick Tunnel. The replacement HTTP/2 origin reached signed setup. [Inbound proof](evidence/inbound-probe-2026-11-07.json), [earlier Relay failures](evidence/relay-attempts-2026-11-07.json)
+**Latest update,22:54Central:** the user completed the individual profile; read-only TrustHub API confirms `twilio-approved`. Automated attempt2 then connected through Photon, delivered a real caller clip to production Relay ASR, completed two native NVIDIA requests, persisted a note and ended with a captured recording. The scripted conversation failed because it ended before collecting the missing appointment time. The prior KYC block below is resolved, not a current credential/setup request. [Batch evidence](evidence/automated-caller-batch-2026-11-07.json).
 
-Caller-only model development passed 3/3. Fresh frozen held-out behavior passed 7/12 and remains a failed gate, not an accuracy claim. Thirty-six development audio clips were synthesized successfully but have not been listened to or phone-tested. See [evaluation](evaluation.md) and [audio fixtures](audio-fixtures.md). Prior records remain intact.
+**Automated originator gate, Nov 7 22:47 Central:** the first reserved fixture attempt was rejected before a CallSid: HTTP401/error20003. A deliberately unroutable empty POST established the exact cause: unapproved primary compliance profile (Trust Hub KYC). Authenticated Rust/Python GETs succeed and the running signature validator matches the local token/account. No rotation is indicated. The failed fixture reservation is retained; Sarah's probe remains unused. No generated clip reached phone ASR and no recording exists for this attempt. [Receipt](evidence/audio-caller-canary-2026-11-07.json).
+
+**Verified live exchange, Nov 7 at 22:10 Central:** signed Relay → actual Nemotron tools/results → audible contextual replies and protective refusal → minimized incident note → complete goodbye and automatic hangup. Eight in-call responses returned `nvidia/nemotron-3.5-lightning-30b-a3b`; HTTP latency **1120–2892ms, median 1796ms**. Rust accepted four assessments, three questions and one `take_message`. The caller estimated 3–5 seconds per reply, not an instrumented audio measurement. [Live receipt](evidence/nvidia-relay-call-2026-11-07.json).
+
+Runtime remains `live` / `relay`, caller A only; all three outbound flags are false, no Phone B is enrolled and no outbound action occurred. Full Relay rehearsal remains pending for deliberate interruption/obsolete-response rejection and reliability in the noisy hackathon room. The successful baseline was useful, not a quiet-environment requirement. Earlier 64105 startup, expired-tunnel 11200/502 and orphan-partial failures remain in the [attempt history](evidence/relay-attempts-2026-11-07.json).
+
+Caller-only model development passed 3/3; frozen held-out behavior passed 7/12, a failed gate. Thirty-six existing synthesized clips remain unlistened/untested on the phone; none were regenerated. Six inert actor voice-kit tests pass, while continued interactive model evaluation remains pending implementation/results. See [evaluation](evaluation.md), [audio fixtures](audio-fixtures.md) and [kit reconciliation](voice-test-kit.md).
 
 ## Selected route and gates
 
@@ -10,11 +16,11 @@ Photon **Beta / 2.0** voice-eligible SMS number → authenticated TLS SIP → Tw
 
 | Capability | Current gate | Evidence required to pass |
 |---|---|---|
-| Public HTTPS/WSS | Old Quick Tunnel expired, causing two 502 attempts; replacement reached signed Relay upgrade/setup at 21:54 | Continued reachability; console SSE stays localhost |
+| Public HTTPS/WSS | Replacement HTTP/2 ingress carried the verified 22:10 exchange after the old tunnel expired | Continued reachability; console SSE stays localhost |
 | Photon inbound | **Passed Nov 7, 20:42 Central:** A heard disclosed greeting, pressed 1, completed inbound confirmed | Initial voice rated poor; `Polly.Joanna-Neural` / `en-US` selected for Say/Gather, listening comparison pending |
 | Photon outbound | MD5/TLS credentials and caller line configured; `SARAH_TEST_E164` missing; no reservations/submissions | Designated B rings, hears private test, presses 1, and reaches terminal status |
-| Relay | Signed setup, Rachel-v4 greeting heard, two final transcripts; trailing partials cancelled both model jobs | Complete model/audio loop after speech-finalization fix, interruption and goodbye; optional speaker subscription remains disabled |
-| Nemotron | Native protocol PASS; A-only development 3/3; fresh frozen v2 FAIL at 7/12 | Useful phone interaction and remaining held-out failures; protocol success is not semantic accuracy |
+| Relay | 22:10 native model/tool exchange, heard replies/refusal, saved note and heard goodbye/automatic hangup | Deliberate interruption, obsolete response rejection and noisy-room reliability; optional speaker subscription remains disabled |
+| Nemotron | Exact model returned in eight live-call requests; A-only development 3/3; frozen v2 FAIL at 7/12 | Redundant-question and premature code-classification repair; remaining held-out failures; no general accuracy claim |
 | Handoff / revocation | Pending three-phone rehearsal | B-only summary; current acceptance connects A+B; revoked acceptance fails; family leg stays separate |
 | Optional clone / text | Not established | Approved ready endpoint / functioning enrolled message channel; otherwise omit |
 
@@ -74,6 +80,14 @@ Current official TwiML docs name `agentSpeaking` and `clientSpeaking` but the me
 
 Validate `X-Twilio-Signature` on the initial WebSocket handshake. Official onboarding specifies the request URL but does not explicitly resolve `wss://` versus the HTTP upgrade's `https://` representation. Use the configured external Relay URL, keep validation mandatory, and establish exact scheme/port behavior with an actual signed handshake before passing the gate. Also bind the opaque setup token and expected call/account. [Relay onboarding](https://www.twilio.com/docs/voice/conversationrelay/onboarding)
 
+The current configured-origin signature check and setup binding have now accepted actual Twilio handshakes. Twilio accepted the requested Deepgram/nova-3-general, en-US, 1000ms speech timeout and ElevenLabs Rachel-v4 configuration for the 22:10 exchange; it did not report an internal ASR version. The 4s inactivity / 8s repeated-partial watchdog requests repetition while leaving uncertain speech uncommitted and consent held. That successful call had zero interrupt/recovery events, so those live paths remain pending.
+
+### Noisy-room options — researched, not applied
+
+The current-room call is the acceptance test; no quiet-location requirement applies. `interruptSensitivity="medium"` is a small candidate if false TTS cutoffs dominate. It changes TTS interruption sensitivity, not all partial-prompt delivery while the model is thinking. `ignoreBackchannel` affects brief feedback during agent speech; `echoPromptFiltering` targets the agent's own speech leaking into the microphone, not other people. Keep input reporting and consent holds intact. [Attribute contract](https://www.twilio.com/docs/voice/twiml/connect/conversationrelay#attributes), [echo filtering](https://www.twilio.com/docs/voice/conversationrelay/best-practices#preventing-false-interruptions).
+
+If turn finalization remains the main failure, `speechModel="flux"` is a documented Relay alternative combining transcription and turn detection. Its `speechTimeout` becomes a maximum silence duration; `eotThreshold` is 0.5–0.9, default 0.8. A separate noisy-call comparison is required before choosing it. Twilio's small vacuum/drill experiment is not proof of foreground-speaker separation in hackathon chatter. No documented noise-isolation toggle guarantees that unrelated speech will be excluded. [Twilio noise tutorial](https://www.twilio.com/en-us/blog/developers/tutorials/product/handle-background-noise-when-using-conversation-relay). No noise-control change has been deployed from this research.
+
 Current trials strip `ConversationRelay` and `Dial Sip`; a funded enabled account is a gate. [Trial restrictions](https://www.twilio.com/docs/usage/trials/try-out-voice). Gather DTMF should set `numDigits="1"`, explicit action, bounded timeout, and `actionOnEmptyResult="true"`. For speech fallback, don't pair explicit `speechModel` with `speechTimeout="auto"`. [Gather](https://www.twilio.com/docs/voice/twiml/gather)
 
 ## Nemotron and schedule
@@ -96,9 +110,9 @@ Default output contains environment variable **names** and presence only; presen
 
 Latest model measurements (21:13–21:18 Central): A-only development 3/3 in six HTTP requests; fresh frozen v2 7/12 in 23 requests, with one evidence rejection and zero API/deadline errors. V2 retains five behavioral failures. Its HTTP samples span 630–1760ms, median 998ms; these are not audible latency. Historical 20:05 protocol proof used four requests and two native round trips; the original 3/12 evaluation remains preserved. No phone/audio result follows from either run.
 
-The adapter and console distinguish model HTTP observations, native proposals, accepted/rejected tool results and actual phone outcomes. Request/connect/turn limits remain 3500/1500/6000ms. `NEMOTRON_PROBE_TIMEOUT_MS` changes only the explicit protocol diagnostic (maximum 15 seconds/request), not runtime or evaluation. Model traces, Relay output telemetry and `audio.requested` do not prove playback. Saved-message closing via signed Connect action → TwiML `Say` then `Hangup` is locally verified; phone goodbye delivery remains pending. Relay uses the Rachel-v4 preset; Say/Gather keeps `Polly.Joanna-Neural`. Neither is a clone.
+The adapter and console distinguish model HTTP observations, native proposals, accepted/rejected tool results and actual phone outcomes. Request/connect/turn limits remain 3500/1500/6000ms. `NEMOTRON_PROBE_TIMEOUT_MS` changes only the explicit protocol diagnostic (maximum 15 seconds/request), not runtime or evaluation. Traces and `audio.requested` alone do not prove playback; the 22:10 caller confirmation establishes heard replies and the full goodbye for that call. Closing uses signed Connect action → Joanna `Say` → `Hangup`. Relay Rachel-v4 and Joanna are presets, not clones.
 
-`/health/ready` reports configuration separately from recorded evidence; HTTP 200 describes selected-transport configuration, not current public availability. Inbound/model verification comes from their historical receipts, while Relay/outbound remain unverified. Credential presence never upgrades a proof badge. Actual outbound actions still require enrolled destinations, enabled flags, authorization and the durable attempt budget.
+`/health/ready` reports configuration separately from recorded evidence; HTTP 200 describes selected-transport configuration, not public availability. The live exchange receipt establishes a specific conversation/closing pass; full Relay rehearsal and outbound remain pending. Credential presence never upgrades a proof badge. Outbound still requires enrolled destinations, enabled flags, authorization and the durable attempt budget.
 
 No architectural change to the master guide is necessary. Clarifications above cover SIP caller ID, Relay's string `handoffData`, and unresolved speaker/WSS capture gates. Skills' generic SDK/Host-header examples do not override the project contract.
 
@@ -106,7 +120,7 @@ The [official event schedule](https://zeroday.hackutd.co/#schedule) currently co
 
 Current runtime is `VOICE_TRANSPORT=relay`, `DEMO_EXECUTION_MODE=live`, with `TEST_CALLS_AUTHORIZED=false`, `HANDOFF_CALLS_ENABLED=false`, and `FAMILY_CALLS_ENABLED=false`. Keep all three false for caller-only testing. Phone B is unavailable; its single historical smoke-attempt budget is unspent. The console must leave that action unavailable. No family endpoint or later outbound scope is established.
 
-Next live gate: verify the speech-finalization and orphan-partial recovery changes, then capture actual model results and human-heard replies during a deliberate manual call. Preserve public health and signature checks. B is not a prerequisite. Whole M1, Relay voice, private consent and independent contact remain unverified; Brev remains deferred. Keep existing credentials and ledgers intact. See the [current caller-only runbook](demo-runbook.md).
+Next live gate: the requested deliberate interruption in the current noisy room, with actual interrupt/cancellation, current-generation model result, audible response and clean ending correlated. Preserve public health and signature checks. B is not a prerequisite. Full two-phone M1, private consent and independent contact remain unverified; Brev stays deferred. Keep credentials and ledgers intact. See the [caller-only runbook](demo-runbook.md).
 
 ## Account setup history — 2026-11-07 20:28 Central
 

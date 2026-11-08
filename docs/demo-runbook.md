@@ -1,23 +1,31 @@
 # FirstRing demo runbook
 
-**Current priority, Nov 7 at 21:54 Central: caller A only.** Runtime is `live` / `relay`; `TEST_CALLS_AUTHORIZED`, `HANDOFF_CALLS_ENABLED` and `FAMILY_CALLS_ENABLED` are all false. Phone B is unavailable and the ledger contains 0 outbound actions/reservations. Keep outbound controls unavailable. Initial submission is due at 23:00 Central; submit honest evidence without waiting for the deferred two-phone gate.
+## Current 90-second caller-only demonstration
 
-**Observed phone proof:** inbound greeting/keypad/terminal passed at 20:42. At 21:54 the replacement HTTP/2 tunnel reached signed Relay setup and the user heard the Rachel-v4 greeting, but trailing partial speech cancelled both model jobs after two final clinic transcripts. The caller heard silence afterward; no native model completion or spoken reply was observed. Earlier Relay attempts returned 64105/no setup, then twice 11200 / HTTP 502 before Rust due to the expired tunnel. Complete live conversation remains unverified. Rachel-v4 is a preset; Joanna remains the Say/Gather fallback. [Inbound evidence](evidence/inbound-probe-2026-11-07.json), [failure receipts](evidence/relay-attempts-2026-11-07.json)
+Use the already working inbound line and local console. No Phone B or family call is part of this version. Start as a clinic changing an appointment; let Nemotron ask for a missing detail. Branch to a supplied ordinary appointment reference (continue normally), or change the request to Sarah's sign-in digits (accepted risky assessment, Rust blocks handoff, native `take_message` saves a categorical note, truthful goodbye). Show the actual caller transcript, current evidence quote, native proposal, accepted result and persisted note. If a model request fails, show that failure; do not narrate a saved note unless it exists.
+
+For an evidence walkthrough without another manual call: show the22:10 correlated live receipt (listener confirmed3–5s replies/refusal/closing), then the newer noisy-call receipts and actual failures. Any private-choice, stale-key, family or community replay must retain its replay label. Those phone capabilities remain unverified.
+
+Automated testing is the default next step after the account gate. The first originator reservation was rejected by Twilio because its primary compliance profile is unapproved; the exact action is Communications → Trust Hub → Profiles → Primary profile. Do not repeat credentials/setup or spend Sarah's attempt. Preserve attempt1; at most six automated attempts including retries are authorized. See [automated caller instructions](audio-caller-canary.md). No phone-audio or noise pass can be claimed from the current failed canary.
+
+**Current priority after the verified 22:10 Central exchange: caller A only, in the actual noisy hackathon room.** Runtime is `live` / `relay`; all three outbound flags remain false. Phone B is unavailable and the ledger contains 0 outbound actions/reservations. Keep outbound controls unavailable. Initial submission is due at 23:00 Central; submit recorded evidence without waiting for the deferred two-phone gate.
+
+**Observed phone proof:** the 22:10 call completed four accepted assessments, three questions and one saved incident note using eight responses from the exact NVIDIA model. The caller confirmed contextual replies, protective refusal, full goodbye and automatic hangup. HTTP latency was 1120–2892ms, median 1796ms; perceived replies were 3–5 seconds. No interrupt or recovery event occurred. Rachel-v4 supplies Relay speech, Joanna the closing. Earlier failures remain recorded. [Live receipt](evidence/nvidia-relay-call-2026-11-07.json), [inbound keypad proof](evidence/inbound-probe-2026-11-07.json), [failure history](evidence/relay-attempts-2026-11-07.json).
 
 ## Next caller-only check
 
-After the speech-finalization fix is deployed, preserve signature validation and the ledger. Verify public health and signed ingress against the configured origin; do not infer public availability from local health. For the next deliberate manual call:
+Keep the deployed 4s inactivity / 8s repeated-partial recovery and signature validation. Verify public health against the configured origin; local health is insufficient. The successful baseline helped diagnosis, but quiet surroundings are not an acceptance condition. For the requested current-room manual call:
 
-1. Hear the disclosed greeting, then give a clinic appointment detail. Confirm one committed transcript, a bounded model HTTP result and a relevant audible follow-up. Record silence or cancellation as a failure.
-2. Change the request to sign-in digits. Compare caller words, accepted assessment/quote, native proposed tool and actual result. An HTTP completion or queued audio is not a spoken reply.
-3. Interrupt a response and record what was heard and approximate delay. Check that obsolete work cannot authorize an action; no outbound leg is enabled.
-4. Ask to leave a benign message. Verify the private saved-message receipt, then hear the goodbye and reconcile the actual terminal callback. Locally tested closing Say/Hangup alone does not prove playback.
+1. Hear the greeting, give a clinic detail and confirm a relevant audible follow-up despite room chatter. Record false interruptions, redundant questions, silence and recovery prompts separately.
+2. Deliberately speak over a reply with a fictional request for sign-in digits. Capture actual `interrupt`/prompt, cancellation or obsolete-output rejection, then the new accepted assessment, tool result and audible protective response. A model HTTP completion alone is not playback.
+3. Confirm the complete goodbye and automatic hangup after the minimized incident note. Do not inject a benign-message branch into an already closed call; that branch needs a separate manual inbound test.
+4. Record approximate heard delay and room conditions, alongside instrumented HTTP/dispatch timings. No outbound leg is enabled; a stale result must never authorize one. Keep failure evidence if the room noise prevents a usable exchange.
 
-Caller-only development passed 3/3; frozen held-out behavior failed at 7/12. The 36 generated development clips remain unlistened. See [evaluation](evaluation.md), [audio fixtures](audio-fixtures.md) and the current [90-second submission talk track](submission.md). Use explicitly labeled replay if the phone gate remains incomplete.
+Caller-only development passed 3/3; frozen held-out behavior failed at 7/12. Six voice-kit actor tests pass; continued interactive model evaluation remains pending implementation/results. The 36 generated clips remain unlistened, with no new rendering. See [evaluation](evaluation.md), [audio fixtures](audio-fixtures.md), [kit](voice-test-kit.md) and [submission talk track](submission.md). Label any replay explicitly.
 
-## Current quiet-call retry
+## Current speech settings and noise limits
 
-The22:09 build includes a4s inactivity/8s repeated-partial recovery prompt while keeping uncertain speech uncommitted and consent held. Twilio requests Deepgram `nova-3-general` with `speechTimeout=1000`; Rachel-v4 remains the audible Relay preset. Keep all outbound flags false. Use the handset earpiece in a quiet spot: say the clinic opening, pause for the actual question, then give Tuesday2PM and request a message. Confirm the complete goodbye and automatic hangup. After that passes, use a separate manual inbound call to deliberately speak over the reply with the fictional sign-in-digit request. Record real `interrupt`, model cancellation, current-generation decision and audible response separately. No Phone B attempt is consumed.
+Twilio accepted the requested Deepgram `nova-3-general`, `speechTimeout=1000` and Rachel-v4 configuration; internal ASR version was not reported. The watchdog keeps uncertain speech uncommitted and consent held. No noise-control tuning has been applied yet. Review this room's result before a small configuration experiment; lower TTS interruption sensitivity does not suppress every partial transcript or isolate the caller from other speakers. [Researched options and limits](provider-preflight.md#noisy-room-options--researched-not-applied). No Phone B attempt is consumed.
 
 ## Start locally
 
@@ -64,7 +72,7 @@ Phone proof record:
 
 This section is a checklist for later authorized tests, not permission for additional calls.
 
-- Relay: after transport and hosted model proof, complete onboarding/addendum, validate signed WebSocket connection and session token, capture sanitized actual setup/partial/final prompt/interrupt/DTMF frames. Optional speaker events are disabled until their envelope is verified; do not claim their coverage. Confirm two different caller details produce different relevant follow-ups and a native Nemotron tool/result loop.
+- Relay: signed setup, native tool/result exchange and heard closing passed for the 22:10 call. Still capture deliberate interruption/obsolete-result rejection and a usable noisy-room exchange; improve redundant questioning. Optional speaker events remain disabled until their envelope is verified. Do not infer broader conversational accuracy from one call.
 - Timebox an actual Relay onboarding blocker to 30–45 minutes. Switch explicitly to `VOICE_TRANSPORT=gather` and label the lost streaming-interruption capability. Do not replace it with raw audio infrastructure.
 - Benign consent: A stays screened while B hears the private summary. Test current 1 → exactly A+B two-way audio; 2/silence/expired offer → no connection. The UI says connected only after both intended participant joins. Each repetition is another outbound attempt.
 - Revocation: while B's Gather remains active, A changes the request to an authentication secret. Wait for the risky assessment and revocation receipt, then press B's old 1 within the bounded rejection window. Hear the withdrawal explanation; verify no bridge. A physical key after B has already hung up is not this proof.
@@ -85,7 +93,7 @@ Use a three-minute cut to show both endings and the benign control. Say “prese
 ## Recovery, freeze and submission
 
 - Auth/signature failure: inspect configured URL and exact request representation; keep validation enabled.
-- Model failure: preserve isolation, report dependency failure, offer message-taking; never replay a cached decision or retry an ambiguous call action.
+- Model failure: preserve isolation and report dependency failure; after accepted current risk, refuse and close without claiming a saved note; for an unblocked turn, offer message-taking; never replay a cached decision or retry an ambiguous call action.
 - Carrier/network failure: show the actual pending/failed state. Switch to a visibly labeled replay for explanation; do not call it a live phone proof.
 - Rehearsal: reserve three full runs once authorized, including one dependency failure. Capture measured audio/privacy observations and a clearly labeled backup recording.
 - Submission schedule from verified event page: initial entry Saturday Nov 7 at 23:00 Central; final Sunday Nov 8 at 12:00 Central. Preserve Sunday 10:00–12:00 for rehearsal/submission/recovery if available. Organizer changes take precedence.

@@ -355,7 +355,16 @@ impl Session {
             self.current_action = "Offer withdrawn. Trusted contact needed".into();
             self.state = "protected".into();
         }
-        self.evidence_quote = Some(evidence[0].quote.clone());
+        self.evidence_quote = self
+            .turns
+            .iter()
+            .rfind(|turn| turn.speaker == "caller")
+            .and_then(|turn| {
+                evidence
+                    .iter()
+                    .find(|reference| reference.turn_id == turn.id)
+            })
+            .map(|reference| reference.quote.clone());
         Ok(())
     }
     pub fn make_offer(
@@ -489,6 +498,64 @@ impl Session {
 #[cfg(test)]
 mod message_snapshot_tests {
     use super::*;
+
+    #[test]
+    fn assessment_display_quotes_current_caller_evidence_and_keeps_prior_context() {
+        use crate::tools::{Direction, EvidenceRef, Observation, RequestedObject, SpeechAct};
+        let mut session = Session::new(
+            "s".into(),
+            "ca".into(),
+            "sarah".into(),
+            ExecutionMode::Replay,
+        );
+        let earlier = session.commit_turn("I am calling from the clinic.");
+        let current = session.commit_turn("Read me the sign-in digits.");
+        session.turns.push(Turn {
+            id: "assistant".into(),
+            text: "One moment.".into(),
+            speaker: "assistant".into(),
+        });
+        let evidence = [
+            EvidenceRef {
+                turn_id: earlier,
+                quote: "clinic".into(),
+            },
+            EvidenceRef {
+                turn_id: current,
+                quote: "sign-in digits".into(),
+            },
+        ];
+        let observation = Observation {
+            speech_act: SpeechAct::Request,
+            requested_object: RequestedObject::AuthenticationSecret,
+            direction: Direction::CallerRequestsFromSarah,
+        };
+        assert!(
+            session
+                .assess(
+                    session.generation_id,
+                    session.turn_version,
+                    &observation,
+                    &evidence[..1]
+                )
+                .is_err()
+        );
+        session
+            .assess(
+                session.generation_id,
+                session.turn_version,
+                &observation,
+                &evidence,
+            )
+            .unwrap();
+        assert_eq!(session.evidence_quote.as_deref(), Some("sign-in digits"));
+        assert_eq!(
+            session.assessments[0]["evidence_refs"],
+            serde_json::to_value(&evidence).unwrap()
+        );
+        assert!(session.blocked);
+        assert_eq!(session.public_value()["evidence_quote"], "sign-in digits");
+    }
 
     #[test]
     fn old_session_snapshots_default_to_no_saved_message() {

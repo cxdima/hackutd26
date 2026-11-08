@@ -214,8 +214,17 @@ export function ConsoleView({
     lookup_trusted_contact: "Look up an enrolled contact",
     start_trusted_callback: "Request an independent contact",
   };
-  const supportingQuote =
-    decision?.assessment?.evidence_refs[0]?.quote ?? active?.evidence_quote;
+  const currentCallerTurn = active?.turns.findLast(
+    (turn) => turn.speaker === "caller",
+  );
+  const supportingQuote = decision?.assessment
+    ? decision.assessment.evidence_refs.find(
+        (reference) =>
+          reference.turn_id === currentCallerTurn?.id &&
+          reference.quote.length > 0 &&
+          currentCallerTurn.text.includes(reference.quote),
+      )?.quote
+    : active?.evidence_quote;
   const applied =
     state.community.find((h) => h.household_id === active?.household_id)
       ?.last_applied_version ?? 0;
@@ -291,7 +300,7 @@ export function ConsoleView({
           [
             ["model_protocol", "Model protocol"],
             ["inbound_phone", "Real inbound phone"],
-            ["relay_phone", "Live Relay conversation"],
+            ["relay_phone", "Full Relay rehearsal"],
           ] as const
         ).map(([key, label]) => {
           const proof = state.evidence?.[key];
@@ -315,6 +324,31 @@ export function ConsoleView({
           );
         })}
       </section>
+      {state.speech && (
+        <div
+          className="speech-configuration"
+          role="group"
+          aria-label="Current speech configuration"
+        >
+          <strong>Current speech setup · {state.speech.transport}</strong>
+          <span>
+            Voice: {state.speech.provider} · {state.speech.voice_label}
+          </span>
+          {state.speech.transcription_provider && (
+            <span>
+              Transcription: {state.speech.transcription_provider} ·{" "}
+              {state.speech.transcription_model ?? "Model not reported"}
+            </span>
+          )}
+          <span>
+            Goodbye: {state.speech.closing_provider} ·{" "}
+            {state.speech.closing_voice}
+          </span>
+          <small>
+            Configuration only; measured model and phone results are separate.
+          </small>
+        </div>
+      )}
       {stale && (
         <div className="notice warning" role="status">
           <Clock3 size={17} /> Updates paused. Showing the last received state;
@@ -501,6 +535,16 @@ export function ConsoleView({
                       ? (toolNames[decision.proposal.name] ??
                         readable(decision.proposal.name))
                       : "No model proposal received for this turn."}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Action acceptance</dt>
+                  <dd>
+                    {decision?.acceptance === "accepted"
+                      ? "Accepted by Rust; successful tool result received."
+                      : decision?.acceptance === "failed"
+                        ? "Rust reported a failed result; acceptance is not confirmed."
+                        : "Awaiting a successful Rust result."}
                   </dd>
                 </div>
                 <div>

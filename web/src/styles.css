@@ -2140,6 +2140,30 @@ summary::-webkit-details-marker {
   display: grid;
   gap: 15px;
 }
+.speech-configuration {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  padding: 12px 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #64756d;
+}
+.speech-configuration strong,
+.speech-configuration small {
+  flex-basis: 100%;
+  font-size: inherit;
+}
+.audio-fixture-status .operator-bar {
+  margin-bottom: 0;
+}
+.fixture-status-detail {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #64756d;
+}
 .decision-trace dt {
   font-size: 11px;
   color: #64756d;

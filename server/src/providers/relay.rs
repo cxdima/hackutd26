@@ -9,6 +9,20 @@ use url::Url;
 // https://www.twilio.com/docs/voice/conversationrelay/voice-configuration
 const TTS_PROVIDER: &str = "ElevenLabs";
 const TTS_VOICE: &str = "21m00Tcm4TlvDq8ikWAM-v4";
+const TRANSCRIPTION_PROVIDER: &str = "Deepgram";
+const TRANSCRIPTION_MODEL: &str = "nova-3-general";
+
+/// Current requested settings, separate from observed provider or playback proof.
+pub fn speech_configuration(transport: &str) -> Value {
+    let is_relay = transport == "relay";
+    json!({"source":"configured", "transport":transport,
+        "provider":if is_relay {TTS_PROVIDER} else {"Amazon Polly"},
+        "voice":if is_relay {TTS_VOICE} else {"Polly.Joanna-Neural"},
+        "voice_label":if is_relay {"Rachel v4"} else {"Joanna Neural"},
+        "closing_provider":"Amazon Polly", "closing_voice":"Joanna-Neural",
+        "transcription_provider":if is_relay {Some(TRANSCRIPTION_PROVIDER)} else {None},
+        "transcription_model":if is_relay {Some(TRANSCRIPTION_MODEL)} else {None}})
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RelayInput {
@@ -180,7 +194,7 @@ pub fn connect_twiml(base_url: &str, session_token: &str, display_name: &str) ->
     after.set_path("/voice/after-relay");
     let greeting = format!("I'm {display_name}'s automated assistant. What is the call about?");
     format!(
-        "<Response><Connect action=\"{}\" method=\"POST\"><ConversationRelay url=\"{}\" welcomeGreeting=\"{}\" interruptible=\"any\" reportInputDuringAgentSpeech=\"any\" dtmfDetection=\"true\" partialPrompts=\"true\" speechTimeout=\"1000\" language=\"en-US\" transcriptionProvider=\"Deepgram\" speechModel=\"nova-3-general\" ttsProvider=\"{TTS_PROVIDER}\" voice=\"{TTS_VOICE}\"><Parameter name=\"session_token\" value=\"{}\"/></ConversationRelay></Connect></Response>",
+        "<Response><Connect action=\"{}\" method=\"POST\"><ConversationRelay url=\"{}\" welcomeGreeting=\"{}\" interruptible=\"any\" reportInputDuringAgentSpeech=\"any\" ignoreBackchannel=\"true\" dtmfDetection=\"true\" partialPrompts=\"true\" speechTimeout=\"1000\" language=\"en-US\" transcriptionProvider=\"{TRANSCRIPTION_PROVIDER}\" speechModel=\"{TRANSCRIPTION_MODEL}\" ttsProvider=\"{TTS_PROVIDER}\" voice=\"{TTS_VOICE}\"><Parameter name=\"session_token\" value=\"{}\"/></ConversationRelay></Connect></Response>",
         escape(after.as_str()),
         escape(ws.as_str()),
         escape(&greeting),
@@ -355,6 +369,7 @@ mod tests {
         assert!(xml.contains("url=\"wss://firstring.example/voice/relay\""));
         assert!(xml.contains("reportInputDuringAgentSpeech=\"any\""));
         assert!(xml.contains("partialPrompts=\"true\""));
+        assert!(xml.contains("ignoreBackchannel=\"true\""));
         assert!(xml.contains("speechTimeout=\"1000\""));
         assert!(xml.contains("transcriptionProvider=\"Deepgram\""));
         assert!(xml.contains("speechModel=\"nova-3-general\""));

@@ -89,6 +89,7 @@ it("keeps accepted assessment, current proposal and actual tool outcome separate
   );
   expect(pending.proposal?.name).toBe("start_trusted_callback");
   expect(pending.outcome).toBe("No execution result received.");
+  expect(pending.acceptance).toBe("pending");
   const closing = sessionSchema.parse({
     ...session,
     generation_id: 5,
@@ -120,6 +121,9 @@ it("keeps accepted assessment, current proposal and actual tool outcome separate
     "Private message saved for review.",
   );
   expect(
+    decisionEvidence(closing, [savedProposal, savedResult]).acceptance,
+  ).toBe("accepted");
+  expect(
     decisionEvidence(closing, [savedProposal, savedResult]).assessment,
   ).toBeDefined();
   const denied = {
@@ -134,6 +138,9 @@ it("keeps accepted assessment, current proposal and actual tool outcome separate
   };
   expect(decisionEvidence(session, [proposal, wrong, denied]).outcome).toBe(
     "Rust reported a failure; check the action receipts.",
+  );
+  expect(decisionEvidence(session, [proposal, wrong, denied]).acceptance).toBe(
+    "failed",
   );
   expect(
     decisionEvidence({ ...session, speech_pending: true, generation_id: 5 }, [

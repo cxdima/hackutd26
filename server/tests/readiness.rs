@@ -12,6 +12,25 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 #[tokio::test]
+async fn completed_exchange_remains_partial_until_interruption_is_observed() {
+    let app = App::new(inbound_config()).await.unwrap();
+    app.store.set_metadata("verification.relay_phone", &serde_json::json!({
+        "status":"partial", "source":"manual_relay_rehearsal", "recorded_at":"2026-11-08T04:11:18Z",
+        "checks":{"signed_setup":true,"caller_transcript":true,"audible_greeting":true,
+            "native_model_reply":true,"audible_reply":true,"clean_hangup":true,"interrupt":false}
+    }).to_string()).await.unwrap();
+    let (_, body) = get(app, "/health/ready").await;
+    assert_eq!(body["evidence"]["relay_phone"]["status"], "pending");
+    assert!(
+        body["evidence"]["relay_phone"]["detail"]
+            .as_str()
+            .unwrap()
+            .contains("Live NVIDIA replies")
+    );
+    assert_eq!(body["capabilities"]["relay"]["live_verified"], false);
+}
+
+#[tokio::test]
 async fn partial_relay_proof_explains_observations_without_passing_the_gate() {
     let app = App::new(inbound_config()).await.unwrap();
     app.store

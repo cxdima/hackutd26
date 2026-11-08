@@ -8,6 +8,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { ConsoleView } from "./ConsoleView";
+import { AudioFixtureStatus } from "./AudioFixtureStatus";
 import { consumeEvents } from "./events";
 import { mergeEvents } from "./model";
 import { stateSchema } from "./types";
@@ -231,13 +232,18 @@ export default function App() {
         </div>
       )}
       {state && token ? (
-        <ConsoleView
-          state={state}
-          events={events}
-          stale={stale}
-          busy={busy}
-          onAction={action}
-        />
+        <>
+          <ConsoleView
+            state={state}
+            events={events}
+            stale={stale}
+            busy={busy}
+            onAction={action}
+          />
+          {state.execution_mode === "live" && (
+            <AudioFixtureStatus token={token} />
+          )}
+        </>
       ) : (
         <main id="main" className="welcome">
           <section className="welcome-story">

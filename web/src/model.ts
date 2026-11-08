@@ -164,7 +164,13 @@ export function decisionEvidence(session: Session, events: CallEvent[]) {
       outcome = "Tactic lookup completed; matches require their own receipt.";
     else outcome = "Tool completed; no phone outcome implied.";
   }
-  return { assessment, proposal, outcome };
+  const acceptance =
+    receipt?.payload.ok === true
+      ? "accepted"
+      : receipt?.payload.ok === false
+        ? "failed"
+        : "pending";
+  return { assessment, proposal, outcome, acceptance };
 }
 
 export function legStatus(leg: Leg): string {

@@ -25,6 +25,7 @@ pub struct Handle {
 pub enum AudioPurpose {
     Response,
     MessageClosing,
+    ModelFailureClosing,
     PendingSpeechRecovery,
 }
 #[derive(Clone, Debug)]
@@ -48,6 +49,10 @@ impl AudioFrame {
             AudioPurpose::Response => !session.speech_pending && session.closing_reason.is_none(),
             AudioPurpose::MessageClosing => {
                 session.closing_reason.as_deref() == Some("message_saved")
+                    && self.payload["type"] == "end"
+            }
+            AudioPurpose::ModelFailureClosing => {
+                session.closing_reason.as_deref() == Some("model_failure")
                     && self.payload["type"] == "end"
             }
             AudioPurpose::PendingSpeechRecovery => {
@@ -459,7 +464,7 @@ impl Actor {
                 CreateOutcome::Accepted { sid, status } => {
                     self.status(&action_id, &sid, &status).await?;
                 }
-                CreateOutcome::Rejected { status } => {
+                CreateOutcome::Rejected { status, code } => {
                     let l = self.leg_mut(&action_id)?;
                     if !terminal(&l.status) && l.call_sid.is_none() {
                         l.status = "failed".into();
@@ -467,7 +472,7 @@ impl Actor {
                     self.emit(
                         "system",
                         "dependency.failed",
-                        json!({"action_id":action_id,"provider":"twilio","http_status":status}),
+                        json!({"action_id":action_id,"provider":"twilio","http_status":status,"provider_error_code":code}),
                     )
                     .await?;
                 }

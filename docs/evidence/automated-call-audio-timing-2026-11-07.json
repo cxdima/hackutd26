@@ -1,0 +1,100 @@
+{
+  "recording_path": ".tools/automated-caller-canary/attempt-2.mp3",
+  "recording_sha256": "2b37b7851fdb7459f9367edf3b6846753cead0a370266ad0749e3860645d0e09",
+  "recording_duration_seconds": 20.11425,
+  "channels": [
+    {
+      "channel_zero_indexed": 0,
+      "rms": 0.0700326554810523,
+      "peak": 0.8215610980987549,
+      "rms_dbfs": -23.09398811736317,
+      "active_threshold_linear": 0.008070020217326857,
+      "activity_intervals_seconds": [
+        [
+          0.04,
+          1.96
+        ],
+        [
+          2.21,
+          3.4
+        ],
+        [
+          15.66,
+          16.92
+        ],
+        [
+          17.55,
+          18.89
+        ],
+        [
+          19.53,
+          20.1
+        ]
+      ],
+      "cached_clinic_envelope_best_correlation": 0.46193353583807417,
+      "cached_clinic_start_offset_seconds": 2.72,
+      "cached_clinic_template_duration_seconds": 3.5295
+    },
+    {
+      "channel_zero_indexed": 1,
+      "rms": 0.051555442743042114,
+      "peak": 0.9674906730651855,
+      "rms_dbfs": -25.754509583945392,
+      "active_threshold_linear": 0.00880003993115775,
+      "activity_intervals_seconds": [
+        [
+          6.84,
+          10.01
+        ]
+      ],
+      "cached_clinic_envelope_best_correlation": 0.9820991958011989,
+      "cached_clinic_start_offset_seconds": 6.78,
+      "cached_clinic_template_duration_seconds": 3.5295
+    }
+  ],
+  "template_path": ".tools/audio-fixtures/20261108T035107Z-f7c2c209-a79e-4ae9-bc1a-e8e3b27812c4/clinic_opening_caller_brisk.mp3",
+  "template_sha256": "003ee739433076ec124e2b68353c6c93b37163e32c6424073f95b4b52978a58f",
+  "method": "Decode each recording channel and cached clip to 8kHz float PCM; correlate 10ms RMS envelopes after subtracting each window mean. Activity threshold is max(0.003 linear, 2.5% of channel peak frame RMS); bridge gaps up to150ms. Envelope correlation does not identify spoken words.",
+  "asr_performed": false,
+  "human_audition": false,
+  "response_latency_seconds": 5.351,
+  "response_latency_status": "estimated_from_separated_recording_channels",
+  "response_timing": {
+    "status": "estimated_from_separated_recording_channels",
+    "cached_caller_channel_zero_indexed": 1,
+    "opposite_response_channel_zero_indexed": 0,
+    "caller_identity_basis": "Cached clinic audio RMS-envelope correlation0.9821 versus0.4619 in opposite channel; no transcript generated.",
+    "cached_clip_start_seconds": 6.78,
+    "full_cached_clip_end_seconds": 10.3095,
+    "caller_last_detected_speech_energy_seconds": 10.01,
+    "opposite_channel_response_onset_seconds": 15.66,
+    "full_clip_end_to_response_onset_seconds": 5.351,
+    "speech_energy_end_to_response_onset_seconds": 5.65,
+    "envelope_frame_seconds": 0.01,
+    "response_onset_threshold_sensitivity": [
+      {
+        "threshold_rms_linear": 0.003,
+        "response_onset_seconds": 15.66
+      },
+      {
+        "threshold_rms_linear": 0.005,
+        "response_onset_seconds": 15.66
+      },
+      {
+        "threshold_rms_linear": 0.008070020217326857,
+        "response_onset_seconds": 15.66
+      },
+      {
+        "threshold_rms_linear": 0.012,
+        "response_onset_seconds": 15.66
+      },
+      {
+        "threshold_rms_linear": 0.016,
+        "response_onset_seconds": 15.66
+      }
+    ],
+    "uncertainty": "Approximate10ms-grid alignment and energy thresholds; codec/resampling and source tail padding affect the boundary. Do not report as model HTTP, ASR, first-token or human-heard latency.",
+    "semantic_content_identified": false,
+    "human_audition": false
+  }
+}

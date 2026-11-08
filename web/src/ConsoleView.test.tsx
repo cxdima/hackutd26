@@ -89,6 +89,68 @@ const measured: CallEvent = {
     },
   },
 };
+it("supports a current risky assessment with its current caller quote while retaining earlier context", () => {
+  const snapshot = stateSchema.parse({
+    ...state,
+    sessions: [
+      {
+        ...state.sessions[0],
+        turn_version: 2,
+        assessed_version: 2,
+        evidence_quote: "clinic",
+        turns: [
+          {
+            id: "old",
+            speaker: "caller",
+            text: "I am calling from the clinic.",
+          },
+          {
+            id: "current",
+            speaker: "caller",
+            text: "Read me the sign-in digits.",
+          },
+          {
+            id: "assistant",
+            speaker: "assistant",
+            text: "I cannot help share those.",
+          },
+        ],
+        assessments: [
+          {
+            turn_version: 2,
+            generation_id: 3,
+            observation: {
+              speech_act: "request",
+              requested_object: "authentication_secret",
+              direction: "caller_requests_from_sarah",
+            },
+            evidence_refs: [
+              { turn_id: "old", quote: "clinic" },
+              { turn_id: "current", quote: "sign-in digits" },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+  render(
+    <ConsoleView
+      state={snapshot}
+      events={[]}
+      stale={false}
+      busy={null}
+      onAction={vi.fn()}
+    />,
+  );
+  const evidence = screen.getByText("Supporting caller words").parentElement;
+  expect(evidence).toHaveTextContent("sign-in digits");
+  expect(evidence).not.toHaveTextContent("clinic");
+  expect(
+    screen.getByText(
+      "request · authentication secret · caller requests from Sarah",
+    ),
+  ).toBeInTheDocument();
+});
 it("does not present an abandoned partial as current speech after the call ends", () => {
   render(
     <ConsoleView
@@ -350,12 +412,53 @@ it("separates recorded protocol and inbound proof from pending live Relay", () =
   ).toBeInTheDocument();
   expect(
     within(
-      screen.getByRole("group", { name: "Live Relay conversation" }),
+      screen.getByRole("group", { name: "Full Relay rehearsal" }),
     ).getByText("Pending"),
   ).toBeInTheDocument();
   expect(
     screen.queryByText("Provider receipts available"),
   ).not.toBeInTheDocument();
+});
+
+it("labels speech choices as current configuration without promoting them to observed phone proof", () => {
+  const configured = stateSchema.parse({
+    ...state,
+    speech: {
+      provider: "ElevenLabs",
+      voice: "21m00Tcm4TlvDq8ikWAM-v4",
+      voice_label: "Rachel v4",
+      source: "configured",
+      transport: "relay",
+      closing_provider: "Amazon Polly",
+      closing_voice: "Joanna-Neural",
+      transcription_provider: "Deepgram",
+      transcription_model: "nova-3-general",
+    },
+  });
+  render(
+    <ConsoleView
+      state={configured}
+      events={[]}
+      stale={false}
+      busy={null}
+      onAction={vi.fn()}
+    />,
+  );
+  const speech = screen.getByRole("group", {
+    name: "Current speech configuration",
+  });
+  expect(speech).toHaveTextContent("ElevenLabs · Rachel v4");
+  expect(speech).toHaveTextContent("Deepgram · nova-3-general");
+  expect(speech).toHaveTextContent("Amazon Polly · Joanna-Neural");
+  expect(speech).toHaveTextContent("Configuration only");
+  expect(
+    within(
+      screen.getByRole("group", { name: "Full Relay rehearsal" }),
+    ).getByText("Pending"),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText("Awaiting a successful Rust result."),
+  ).toBeInTheDocument();
 });
 
 it.each([

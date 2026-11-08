@@ -15,6 +15,9 @@ use chrono::Utc;
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
 
+const MODEL_FAILURE_CLOSING: &str =
+    "I can't help with that request. This call won't be connected. Goodbye.";
+
 impl Actor {
     pub(crate) async fn conversation(&mut self, input: Input) -> anyhow::Result<Value> {
         match input {
@@ -27,14 +30,15 @@ impl Actor {
                 self.emit("caller", "relay.telemetry", json!({"event":event,"elapsed_ms":elapsed_ms,"characters":characters,"heard":false})).await?;
             }
             Input::ClosingResponse => {
-                anyhow::ensure!(
-                    self.session.closing_reason.as_deref() == Some("message_saved"),
-                    "No committed closing response"
-                );
+                let text = match self.session.closing_reason.as_deref() {
+                    Some("message_saved") => self.saved_message_closing(),
+                    Some("model_failure") => MODEL_FAILURE_CLOSING,
+                    _ => anyhow::bail!("No committed closing response"),
+                };
                 if self.session.inbound_ended || self.session.end_requested {
                     return Ok(json!({"twiml":"<Response><Hangup/></Response>"}));
                 }
-                return Ok(json!({"twiml":twilio::say_end(self.saved_message_closing())}));
+                return Ok(json!({"twiml":twilio::say_end(text)}));
             }
             Input::PostCallTool { tool } => {
                 anyhow::ensure!(
@@ -186,6 +190,7 @@ impl Actor {
                 if generation == self.session.generation_id
                     && !self.session.bridge_committed
                     && !self.session.inbound_ended
+                    && !self.session.end_requested
                     && self.session.closing_reason.is_none()
                 {
                     self.emit(
@@ -194,6 +199,33 @@ impl Actor {
                         json!({"provider":"nemotron","detail":detail}),
                     )
                     .await?;
+                    if self.session.blocked
+                        && self.session.turn_version > 0
+                        && self.session.assessed_version == self.session.turn_version
+                        && !self.session.speech_pending
+                    {
+                        // A committed policy assessment already rejected the request.
+                        // Do not invent a model action/message when its next request fails.
+                        let mut candidate = self.session.clone();
+                        candidate.closing_reason = Some("model_failure".into());
+                        candidate.state = "closing".into();
+                        candidate.current_action =
+                            "Risky request blocked; closing after model failure".into();
+                        candidate.speech_pending = true;
+                        candidate.generation_id += 1;
+                        self.app.store.save(&candidate).await?;
+                        self.session = candidate;
+                        self.clear_speech_recovery();
+                        self.cancel_model();
+                        self.emit("system", "audio.requested", json!({"text":MODEL_FAILURE_CLOSING,"voice":"preset","transport":"twiml_closing","heard":false})).await?;
+                        let _ = self.handle.audio.send(AudioFrame {
+                            generation: self.session.generation_id,
+                            epoch: self.session.policy_epoch,
+                            payload: crate::providers::relay::end("model_failure"),
+                            purpose: AudioPurpose::ModelFailureClosing,
+                        });
+                        return Ok(json!({"closing":true,"reason":"model_failure"}));
+                    }
                     self.session.current_action =
                         if self.session.legs.iter().any(|l| !terminal(&l.status)) {
                             "Connection pending; tracking the existing action".into()
@@ -935,41 +967,10 @@ impl Actor {
     }
 
     fn saved_message_closing(&self) -> &'static str {
-        use crate::tools::{Direction, Observation, RequestedObject, SpeechAct};
-        if !self.session.blocked {
-            return "Your message has been noted. No connection has been made. Goodbye.";
-        }
-        // Blocking is sticky for the session. Use the most recent accepted
-        // assessment that caused protection, never raw caller/model wording.
-        let risk = self
-            .session
-            .assessments
-            .iter()
-            .rev()
-            .filter_map(|assessment| {
-                serde_json::from_value::<Observation>(assessment["observation"].clone()).ok()
-            })
-            .find(|observation| {
-                observation.speech_act == SpeechAct::Request
-                    && observation.direction == Direction::CallerRequestsFromSarah
-                    && matches!(
-                        observation.requested_object,
-                        RequestedObject::AuthenticationSecret
-                            | RequestedObject::PaymentDiversion
-                            | RequestedObject::RemoteAccess
-                    )
-            });
-        match risk.map(|observation| observation.requested_object) {
-            Some(RequestedObject::AuthenticationSecret) => {
-                "I can't help obtain sign-in codes. This call won't be connected. I've saved a brief incident note. Goodbye."
-            }
-            Some(RequestedObject::PaymentDiversion) => {
-                "I can't help redirect payments. This call won't be connected. I've saved a brief incident note. Goodbye."
-            }
-            Some(RequestedObject::RemoteAccess) => {
-                "I can't help provide remote access. This call won't be connected. I've saved a brief incident note. Goodbye."
-            }
-            _ => "This call won't be connected. I've saved a brief incident note. Goodbye.",
+        if self.session.blocked {
+            "I can't help with that request. This call won't be connected. I've saved a brief incident note. Goodbye."
+        } else {
+            "Your message has been noted. No connection has been made. Goodbye."
         }
     }
 }
@@ -1067,6 +1068,32 @@ mod message_tests {
     }
 
     #[tokio::test]
+    async fn written_out_appointment_time_survives_actual_durable_message_storage() {
+        let (app, handle, _) = prepared_message().await;
+        let text = "The clinic visit is Friday at three PM.";
+        let turn = handle
+            .send(Input::FinalPrompt { text: text.into() })
+            .await
+            .unwrap();
+        let evidence = json!([{"turn_id":turn["turn_id"],"quote":text}]);
+        let assessment=send_tool(&handle,"record_assessment",json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":evidence})).await.unwrap();
+        assert_eq!(assessment["ok"], true);
+        let summary = "Caller reports the clinic visit is Friday at three PM.";
+        let result = send_tool(
+            &handle,
+            "take_message",
+            json!({"summary":summary,"evidence_refs":evidence}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(result["result"]["message_recorded"], true);
+        let stored = app.store.sessions().await.unwrap().pop().unwrap();
+        assert_eq!(stored.message.as_ref().unwrap().summary, summary);
+        assert_eq!(stored.closing_reason.as_deref(), Some("message_saved"));
+        assert!(app.store.actions(&handle.id).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
     async fn take_message_minimizes_contact_literals() {
         let (app, handle, evidence) = prepared_message().await;
         let result = send_tool(&handle, "take_message", json!({"summary":"Caller asks for a reply at person@example.test or +15550123456.","evidence_refs":evidence})).await.unwrap();
@@ -1085,17 +1112,17 @@ mod message_tests {
             (
                 "authentication_secret",
                 "request",
-                "I can't help obtain sign-in codes. This call won't be connected. I've saved a brief incident note. Goodbye.",
+                "I can't help with that request. This call won't be connected. I've saved a brief incident note. Goodbye.",
             ),
             (
                 "payment_diversion",
                 "request",
-                "I can't help redirect payments. This call won't be connected. I've saved a brief incident note. Goodbye.",
+                "I can't help with that request. This call won't be connected. I've saved a brief incident note. Goodbye.",
             ),
             (
                 "remote_access",
                 "request",
-                "I can't help provide remote access. This call won't be connected. I've saved a brief incident note. Goodbye.",
+                "I can't help with that request. This call won't be connected. I've saved a brief incident note. Goodbye.",
             ),
             (
                 "authentication_secret",

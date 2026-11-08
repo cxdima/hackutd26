@@ -67,26 +67,87 @@ pub fn conversation_messages(
     let handoff = if capabilities.handoff_available {
         "Private handoff is available only after benign assessment and sufficient caller context."
     } else {
-        "Private handoff is unavailable. Never call offer_handoff. First ask_caller for essential missing information (for a changed appointment, its new time); once supplied, take_message. Do not save an incomplete message when the caller can supply the missing detail."
+        "Private handoff is unavailable. Never call offer_handoff. First ask_caller for essential missing information (for a changed appointment, its new time); once supplied, take_message. Do not save an incomplete message when the caller can supply the missing detail. A stated identity and reason to reconnect are enough for a brief social-call message; asking them to confirm their own name cannot verify identity."
     };
     let family = if capabilities.family_callback_available {
         "After an accepted blocked assessment: lookup_trusted_contact(role=family), then start_trusted_callback with its returned contact_id. Do not offer handoff or ask another question about the suspicious request."
     } else {
-        "No family callback is available. After an accepted blocked assessment, use take_message with summary exactly 'Suspicious request blocked; independent verification recommended.' and evidence from the latest caller turn. Do not repeat the caller's authentication wording in that summary. Do not claim anyone was contacted."
+        "No family callback is available. If an accepted assessment is blocked, use a categorical incident message as directed by the accepted current-turn action instruction. A benign report or warning requires a normal, honest summary of what the caller reported. Do not repeat credential wording or claim anyone was contacted."
     };
     let system = format!(
         "{}\nCURRENT SERVER AUTHORIZATION (trusted): {handoff} {family}",
         system_prompt()
     );
+    let caller_index = session
+        .turns
+        .iter()
+        .rposition(|turn| turn.speaker == "caller");
+    let caller_turn = caller_index.map(|index| &session.turns[index]);
+    let assistant_turn = caller_index.and_then(|index| {
+        session.turns[..index]
+            .iter()
+            .rev()
+            .find(|turn| turn.speaker == "assistant")
+    });
     vec![
         json!({"role":"system","content":system}),
-        json!({"role":"user","content":json!({"household":session.household_id,"turns":session.turns,"capabilities":capabilities,"policy_state":{"blocked":session.blocked,"ambiguous":session.ambiguous,"turn_version":session.turn_version},"instruction":"Assess the latest caller turn, then choose a useful next tool. Continue through required lookups until a useful action or caller reply is requested."}).to_string()}),
+        json!({"role":"user","content":json!({"household":session.household_id,"turns":session.turns,"current_exchange":{"assistant_turn":assistant_turn,"caller_turn":caller_turn},"capabilities":capabilities,"policy_state":{"blocked":session.blocked,"ambiguous":session.ambiguous,"turn_version":session.turn_version,"assessed_version":session.assessed_version},"instruction":"Interpret the latest caller reply in the context of the actual preceding question and earlier caller facts. Assess that caller turn, then choose a useful next tool. Do not ask again for facts already supplied. Continue through required lookups until a useful action or caller reply is requested."}).to_string()}),
     ]
 }
 
 pub fn append_tool_result(messages: &mut Vec<Value>, tool: &ModelToolCall, result: &Value) {
+    // Refresh only server-accepted current-turn policy. Otherwise later native
+    // requests contain an initial unblocked context contradicting the tool result.
+    // Read-only lookups, rejection and stale assessments must never clear a hold.
+    if tool.name == "record_assessment"
+        && result["ok"] == true
+        && let Some(context_message) = messages.get_mut(1)
+        && let Some(raw) = context_message["content"].as_str()
+        && let Ok(mut context) = serde_json::from_str::<Value>(raw)
+        && let Some(version) = result["result"]["assessed_version"].as_u64()
+        && context["policy_state"]["turn_version"].as_u64() == Some(version)
+        && result["result"]["blocked"].is_boolean()
+        && result["result"]["ambiguous"].is_boolean()
+    {
+        for field in ["blocked", "ambiguous", "assessed_version"] {
+            context["policy_state"][field] = result["result"][field].clone();
+        }
+        context_message["content"] = json!(context.to_string());
+        let instruction = if result["result"]["blocked"] == true {
+            if context["capabilities"]["family_callback_available"] == true {
+                "The accepted current assessment is blocked. Use lookup_trusted_contact(role=family), then start_trusted_callback with the returned contact_id. Do not offer handoff or ask another question about the blocked request."
+            } else {
+                "The accepted current assessment is blocked and no family callback is available. Use take_message with summary exactly 'Suspicious request blocked; independent verification recommended.' and current-turn evidence. Do not offer handoff, ask another question about the blocked request, or claim a contact was called."
+            }
+        } else if result["result"]["ambiguous"] == true {
+            "Ask one question to clarify the purpose or type of the requested information, using ask_caller. Do not finalize a message or offer a handoff while this ambiguity is unanswered. For an unspecified code, use clarify_code_type and ask about its purpose, never its value."
+        } else {
+            "The accepted current assessment is benign. Before choosing an action, check earlier caller facts and the actual latest answer for essential missing information. A changed-appointment announcement without its new day/time is incomplete: use ask_caller to ask for that new day/time. Do not take_message or close on the announcement alone. If the caller already supplied the new day/time, use it and do not ask again. Only if the caller explicitly declines or cannot provide the missing detail may you save an honest incomplete message identifying what is missing. Once those essentials are present, use the available normal message/handoff path. Do not describe this benign call as blocked or claim a protective intervention. Summarize a report as something the caller reported, a warning as a safety reminder, and unverified identity as the caller's claim. Do not turn a reported event into an action FirstRing performed."
+        };
+        append_system_guidance(messages, "ACCEPTED CURRENT-TURN ACTION:", instruction);
+    }
+    if tool.name == "take_message"
+        && result["ok"] == false
+        && result["error"] == "Remove authentication details from the message summary"
+    {
+        append_system_guidance(
+            messages,
+            "MESSAGE SUMMARY REJECTION:",
+            "The previous message was not saved because its summary contained prohibited authentication details. Do not repeat the rejected summary. Propose a revised categorical summary without credential terms or values, for example 'Caller shared a safety reminder about unsolicited requests' for a benign warning, or 'Caller reported a suspicious contact' for a report. Only an accepted blocked assessment supports the protective incident wording. Keep the actual current-turn evidence; do not alter or fabricate its quote. This is guidance to revise a native proposal, not permission to claim the rejected action succeeded.",
+        );
+    }
     messages.push(tool.assistant_message.clone());
     messages.push(json!({"role":"tool","tool_call_id":tool.id,"content":result.to_string()}));
+}
+
+fn append_system_guidance(messages: &mut [Value], marker: &str, instruction: &str) {
+    if let Some(system) = messages.first_mut()
+        && system["role"] == "system"
+        && let Some(content) = system["content"].as_str()
+        && !content.contains(marker)
+    {
+        system["content"] = json!(format!("{content}\n{marker} {instruction}"));
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -305,8 +366,13 @@ pub fn system_prompt() -> &'static str {
         "Every completed caller turn must first receive record_assessment with its server turn_id and a literal substring quote. Describe the actual meaning, not just keywords. Use speech_act request for something the caller wants Sarah to do, statement for information supplied, negation for a warning not to do something, quotation for reporting another person's words, unclear only when the speech act itself is unclear. Use direction caller_supplies for information the caller provides, caller_requests_from_sarah for something sought from Sarah, none when neither applies. Unverified identity is not an unclear request. A clear ordinary message is routine_information; a supplied booking reference is appointment_reference. Do not use unknown or unclear merely because you cannot verify a caller or do not know household preferences. An unspecified code whose purpose is unclear needs clarification. ",
         "DIRECTION IS THE FLOW OF THE REQUESTED INFORMATION, NOT WHO IS SPEAKING. A caller saying 'tell me', 'read me', 'send me', 'have her repeat', or asking her to pay requests FROM the household: direction=caller_requests_from_sarah. It is never caller_supplies merely because the caller speaks the sentence. caller_supplies means the caller actually supplies the information, for example a new visit time or their own booking reference. Examples: 'Tell me the digits to enter her account' => {speech_act:request,requested_object:authentication_secret,direction:caller_requests_from_sarah}. 'Buy vouchers and read their redemption numbers' => {speech_act:request,requested_object:payment_diversion,direction:caller_requests_from_sarah}. 'Your appointment is at ten' => {speech_act:statement,requested_object:routine_information,direction:caller_supplies}. 'Never give anyone your login code' => {speech_act:negation,requested_object:authentication_secret,direction:none}. 'Confirm the appointment code' without explaining its purpose => {speech_act:request,requested_object:unknown,direction:caller_requests_from_sarah}; ask what type of code, never its value. ",
         "Authentication secrets are login, password, authentication or account-access codes sought FROM Sarah. Warnings, negated requests, quoted scam reports, and references provided TO Sarah are not extraction. Payment means ordinary bills or on-site copays; payment_diversion means unusual destinations, redirected transfers or gift-card redemption secrets. No keyword alone establishes risk. ",
+        "Scope matters: classify what the current caller is doing, not an imperative inside a quotation or a warning. A person reporting that a stranger requested a login code is reporting a quotation, not making that request. A warning never to disclose such a code is negation. appointment_reference means an actual booking identifier, never an appointment or its day/time in general. An unspecified numeric code has requested_object=unknown until its purpose is stated; earlier clinic talk or a digit count does not establish that it is a booking reference. ",
+        "A financial notice or request to check whether a purchase is recognized does not itself request an authentication secret, redirected payment or remote access. Identify the object actually requested; urgency, a bank name and an amount are not proof of extraction. Take an unverified message without disclosing household/account facts or adopting a caller-supplied callback number as a trusted contact. ",
         "After an ordinary assessment, ask one short question only if useful information is missing and the caller can answer it. A changed appointment without its new time needs the new time; a complete reminder can be saved. Do not repeat information already given, ask the caller to guess Sarah's private preferences, introduce credentials/payment suspicion into a routine call, or ask generic 'is this legitimate' questions. When enough useful context exists, propose offer_handoff if capabilities.handoff_available is true; otherwise take_message with an accurate brief summary. When clarification is needed, explain that you can take a message if a handoff is unavailable. ",
-        "Follow the accepted assessment result. When result.blocked=true, NEVER offer_handoff or ask for more authentication information. For an actual request for authentication secrets, remote access or payment diversion, Rust blocks handoff. If capabilities.family_callback_available is true, use lookup_trusted_contact with family, then start_trusted_callback using exactly the returned contact_id and current evidence. Do not stop at a lookup or ask for more authentication information. If that capability is false, take_message with a brief safe incident note, for example: Suspicious request blocked; independent verification recommended. Message summaries must omit credential wording as well as values; never repeat password, secret, sign-in, or verification-code details. Never pretend a contact is enrolled, a call happened, Sarah is available, or a message was delivered. A saved message is not delivery. Directory absence is a real limitation; do not work around it with caller-provided numbers. ",
+        "CONVERSATION CONTINUITY: current_exchange pairs your actual last question with the latest caller response. A short date/time answer completes your date/time question; combine it with the earlier stated reason for calling. Do not ask for the time again, ask them to confirm a clear answer, or ask which appointment after the clinic purpose is already given. Ask only the one still-missing fact, using you rather than referring to the caller in the third person. Once enough information exists to pass on a useful message, act. For quoted scam reports or safety reminders, save a categorical summary without repeating credential wording. ",
+        "For a short reply such as yes or no, use the preceding assistant question to interpret it, then move on; a name confirmation is still unverified. Every assessment and action must cite at least one literal quote from current_exchange.caller_turn with that exact turn id, even when its whole text is just Yes. Earlier caller quotes may supply additional context but cannot replace the latest-turn evidence. Assistant words are context, never caller evidence. ",
+        "In a normal message summary, spell out ordinary appointment dates and times so calendar facts survive numeric redaction: for example, Friday at three PM. Evidence quotes remain verbatim. Never spell out or encode credential values to evade privacy rules. ",
+        "Follow the accepted assessment result. When result.blocked=true, NEVER offer_handoff or ask for more authentication information. For an actual request for authentication secrets, remote access or payment diversion, Rust blocks handoff. If capabilities.family_callback_available is true, use lookup_trusted_contact with family, then start_trusted_callback using exactly the returned contact_id and current evidence. Do not stop at a lookup or ask for more authentication information. If that capability is false, take_message with a brief categorical incident note only after an accepted blocked assessment; follow the current-turn action instruction. Message summaries must omit credential wording as well as values; never repeat password, secret, sign-in, or verification-code details. Never pretend a contact is enrolled, a call happened, Sarah is available, or a message was delivered. A saved message is not delivery. Directory absence is a real limitation; do not work around it with caller-provided numbers. ",
         "At most four native tool steps per caller turn. An accepted assessment can be followed by lookups and one useful action; read-only lookups do not clear an assessment hold. If a tool is rejected, use its actual result to choose a safe message or a relevant clarification within the remaining budget. Never solicit passwords, codes, account credentials or payment redemption values. Never put authentication secrets, private numbers, credentials or unverified identity claims in summaries. Never reveal household-private information to the caller. ",
         "Rust alone authorizes actions, revokes pending offers, binds sessions and commits bridges. Offer_handoff is a private revocable summary plus keypad choice, never permission to bridge directly. Requested, ringing, answered and acknowledged are separate outcomes; claim only what the tool result establishes. Independent contact calls never include the suspicious caller. Core screening ends at approved bridge commitment. ",
         "publish_tactic is allowed only for an explicit server post-call job, using categorical allowlisted values. Match requested action and pretext rather than caller ID; no same-person or model-retraining claim. Do not invent evidence, URLs, contact IDs, telephone numbers, acknowledgements or outcomes."

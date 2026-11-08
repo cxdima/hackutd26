@@ -3,7 +3,7 @@ use crate::{
         actor::{App, Input},
         state::Session,
     },
-    providers::{signature, twilio},
+    providers::{relay, signature, twilio},
 };
 use axum::{
     Extension, Json, Router,
@@ -65,6 +65,15 @@ pub fn router(app: App) -> Router {
         .route("/voice/whisper/{id}", post(whisper))
         .route("/voice/choice/{id}", post(choice))
         .route("/voice/conference-status", post(conference_status))
+        .route("/voice/fixture/{action}/{step}", post(fixture_turn))
+        .route(
+            "/voice/fixture-partial/{action}/{step}",
+            post(fixture_partial),
+        )
+        .route(
+            "/voice/fixture-recording/{action}",
+            post(fixture_recording_receipt),
+        )
         .route_layer(middleware::from_fn_with_state(app.clone(), signed));
     let api = Router::new()
         .route("/api/state", get(state))
@@ -75,10 +84,17 @@ pub fn router(app: App) -> Router {
         .route("/api/demo/household", post(household))
         .route("/api/demo/end-call", post(end_call))
         .route("/api/demo/reset", post(reset))
+        .route(
+            "/api/demo/audio-fixture",
+            get(fixture_state).post(fixture_start),
+        )
+        .route("/api/demo/audio-fixture/recording", get(fixture_recording))
+        .route("/api/demo/audio-fixture/stop", post(fixture_stop))
         .route_layer(middleware::from_fn_with_state(app.clone(), admin));
     Router::new()
         .route("/health/live", get(|| async { Json(json!({"ok":true})) }))
         .route("/health/ready", get(ready))
+        .route("/media/fixture/{capability}/{clip}", get(fixture_audio))
         .merge(voice)
         .merge(api)
         .fallback_service(
@@ -171,7 +187,21 @@ fn xml(text: String) -> Response {
         .into_response()
 }
 async fn incoming(State(app): State<App>, Extension(form): Extension<FormData>) -> ApiResult {
+    let binding =
+        crate::audio_fixture::bind_inbound(&app, form.field("CallSid"), form.field("From")).await?;
+    if binding == 2 {
+        let cleanup = app.clone();
+        tokio::spawn(async move {
+            let _ = crate::audio_fixture::stop(&cleanup, None).await;
+        });
+        return Ok(xml(twilio::say_end(
+            "The automated test detected an unexpected second connection. Goodbye.",
+        )));
+    }
     let (_, snapshot) = app.incoming(form.field("CallSid")).await?;
+    if binding == 1 {
+        crate::audio_fixture::watch_inbound(app.clone(), form.field("CallSid").into());
+    }
     if snapshot["inbound_ended"] == true {
         return Ok(xml(twilio::say_end(
             "This test session has ended. Please call again.",
@@ -248,6 +278,11 @@ async fn status(
     Extension(f): Extension<FormData>,
 ) -> ApiResult {
     if let Some(action) = q.get("action_id") {
+        if crate::audio_fixture::status(&app, action, f.field("CallSid"), f.field("CallStatus"))
+            .await?
+        {
+            return Ok(StatusCode::NO_CONTENT.into_response());
+        }
         app.by_action(action)
             .await?
             .send(Input::Status {
@@ -257,12 +292,123 @@ async fn status(
             })
             .await?;
     } else if crate::calls::state::terminal(f.field("CallStatus")) {
+        if crate::audio_fixture::inbound_status(&app, f.field("CallSid"), f.field("CallStatus"))
+            .await
+            .is_err()
+        {
+            tracing::warn!("Fixture terminal receipt persistence failed; batch remains blocked");
+        }
         app.by_sid(f.field("CallSid"))
             .await?
             .send(Input::InboundEnded)
             .await?;
     }
     Ok(StatusCode::NO_CONTENT.into_response())
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureRequest {
+    scenario_id: String,
+    #[serde(default)]
+    request_id: Option<String>,
+}
+async fn fixture_start(State(app): State<App>, Json(request): Json<FixtureRequest>) -> ApiResult {
+    Ok(Json(
+        crate::audio_fixture::start_request(
+            &app,
+            &request.scenario_id,
+            request.request_id.as_deref(),
+        )
+        .await?,
+    )
+    .into_response())
+}
+async fn fixture_state(State(app): State<App>) -> ApiResult {
+    Ok(Json(crate::audio_fixture::view(&app).await?).into_response())
+}
+async fn fixture_turn(
+    State(app): State<App>,
+    Path((action, step)): Path<(String, u8)>,
+    Extension(form): Extension<FormData>,
+) -> ApiResult {
+    Ok(xml(crate::audio_fixture::respond(
+        &app,
+        &action,
+        step,
+        form.field("CallSid"),
+        form.field("SpeechResult"),
+        form.field("Confidence"),
+    )
+    .await?))
+}
+async fn fixture_audio(
+    State(app): State<App>,
+    Path((capability, clip)): Path<(String, usize)>,
+) -> Response {
+    match crate::audio_fixture::audio(&app, &capability, clip).await {
+        Ok(bytes) => (
+            [
+                (header::CONTENT_TYPE, "audio/mpeg"),
+                (header::CACHE_CONTROL, "private, no-store"),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+async fn fixture_partial(
+    State(app): State<App>,
+    Path((action, step)): Path<(String, u8)>,
+    Extension(form): Extension<FormData>,
+) -> ApiResult {
+    crate::audio_fixture::partial(
+        &app,
+        &action,
+        form.field("CallSid"),
+        step,
+        form.field("UnstableSpeechResult"),
+    )
+    .await?;
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+async fn fixture_recording_receipt(
+    State(app): State<App>,
+    Path(action): Path<String>,
+    Extension(form): Extension<FormData>,
+) -> ApiResult {
+    crate::audio_fixture::recording_receipt(
+        &app,
+        &action,
+        form.field("CallSid"),
+        form.field("RecordingSid"),
+        form.field("RecordingStatus"),
+        form.field("RecordingDuration"),
+    )
+    .await?;
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+async fn fixture_recording(
+    State(app): State<App>,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult {
+    Ok((
+        [
+            (header::CONTENT_TYPE, "audio/mpeg"),
+            (header::CACHE_CONTROL, "private, no-store"),
+        ],
+        crate::audio_fixture::recording(&app, q.get("action_id").map(String::as_str)).await?,
+    )
+        .into_response())
+}
+async fn fixture_stop(
+    State(app): State<App>,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult {
+    Ok(
+        Json(crate::audio_fixture::stop(&app, q.get("action_id").map(String::as_str)).await?)
+            .into_response(),
+    )
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -335,7 +481,7 @@ async fn state(State(app): State<App>) -> ApiResult {
     {"id":"family","status":if c.family_enabled{"configured"}else{"disabled"},"detail":"Family calls require separate enrollment and authorization"},
     {"id":"voice_clone","status":"disabled","detail":"Preset assistant voice; no clone endpoint verified"}
     ]);
-    Ok(Json(json!({"execution_mode":c.mode,"data_origin":"synthetic","transport":c.transport,"phone_display":if c.photon_number.is_empty(){"Not configured"}else{&c.photon_number},"selected_household":app.store.metadata("selected_household").await?.unwrap_or_else(||"sarah".into()),"capabilities":capabilities,"evidence":evidence,"phone_b":phone_b,"sessions":snapshots,"community":community,"tactics":tactics})).into_response())
+    Ok(Json(json!({"execution_mode":c.mode,"data_origin":"synthetic","transport":c.transport,"phone_display":if c.photon_number.is_empty(){"Not configured"}else{&c.photon_number},"selected_household":app.store.metadata("selected_household").await?.unwrap_or_else(||"sarah".into()),"capabilities":capabilities,"evidence":evidence,"phone_b":phone_b,"speech":relay::speech_configuration(&c.transport),"sessions":snapshots,"community":community,"tactics":tactics})).into_response())
 }
 async fn ready(State(app): State<App>) -> Response {
     let c = &app.config;
@@ -465,7 +611,10 @@ async fn after_relay(State(app): State<App>, Extension(f): Extension<FormData>) 
         _ => "unknown",
     };
     app.store.append(Some(&session), "system", "relay.ended", json!({"error_code":code,"status":status,"duration_seconds":f.field("SessionDuration").parse::<u64>().ok()}),session.execution_mode).await?;
-    if s["closing_reason"].as_str() == Some("message_saved") {
+    if matches!(
+        s["closing_reason"].as_str(),
+        Some("message_saved" | "model_failure")
+    ) {
         let closing = h.send(Input::ClosingResponse).await?;
         return Ok(xml(closing["twiml"]
             .as_str()
@@ -534,7 +683,10 @@ async fn turn(
             "The assistant is temporarily unavailable. No connection has been made.".into()
         });
     let s = h.send(Input::Snapshot).await?;
-    let twiml = if s["closing_reason"].as_str() == Some("message_saved") {
+    let twiml = if matches!(
+        s["closing_reason"].as_str(),
+        Some("message_saved" | "model_failure")
+    ) {
         h.send(Input::ClosingResponse).await?["twiml"]
             .as_str()
             .unwrap_or("<Response><Hangup/></Response>")
@@ -706,7 +858,7 @@ async fn relay_socket(app: App, mut socket: WebSocket) {
           if frame.permitted_for(&session) {
             if socket.send(Message::Text(frame.payload.to_string().into())).await.is_err(){break;}
             let event=match frame.purpose {
-              crate::calls::actor::AudioPurpose::MessageClosing=>"output.end",
+              crate::calls::actor::AudioPurpose::MessageClosing | crate::calls::actor::AudioPurpose::ModelFailureClosing=>"output.end",
               crate::calls::actor::AudioPurpose::PendingSpeechRecovery=>"output.recovery",
               crate::calls::actor::AudioPurpose::Response=>"output.text",
             };

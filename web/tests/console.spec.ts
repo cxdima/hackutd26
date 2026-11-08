@@ -1,5 +1,16 @@
 import { expect, test } from "@playwright/test";
 import type { CallEvent, ConsoleState } from "../src/types";
+const speech: NonNullable<ConsoleState["speech"]> = {
+  source: "configured",
+  transport: "relay",
+  provider: "ElevenLabs",
+  voice: "21m00Tcm4TlvDq8ikWAM-v4",
+  voice_label: "Rachel v4",
+  closing_provider: "Amazon Polly",
+  closing_voice: "Joanna-Neural",
+  transcription_provider: "Deepgram",
+  transcription_model: "nova-3-general",
+};
 const empty: ConsoleState = {
   execution_mode: "replay",
   data_origin: "synthetic",
@@ -167,7 +178,7 @@ test("model HTTP receipt remains distinct from a current assessment and audible 
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("group", { name: "Live Relay conversation" }),
+    page.getByRole("group", { name: "Full Relay rehearsal" }),
   ).toContainText("Pending");
   await page.screenshot({
     path: info.outputPath("fixture-model-http-desktop.png"),
@@ -186,12 +197,97 @@ test("model HTTP receipt remains distinct from a current assessment and audible 
   });
 });
 
+test("reads automated caller receipts without initiating or retrying a call", async ({
+  page,
+}, info) => {
+  await page.route("**/api/state", (route) =>
+    route.fulfill({
+      json: { ...empty, execution_mode: "live", transport: "relay", speech },
+    }),
+  );
+  await page.route("**/api/events", () => new Promise(() => {}));
+  const methods: string[] = [];
+  await page.route("**/api/demo/audio-fixture", (route) => {
+    expect(route.request().headers().authorization).toBe(
+      "Bearer fixture-operator-token",
+    );
+    methods.push(route.request().method());
+    return route.fulfill({
+      json: {
+        scenario_id: "negated_warning_george",
+        execution_mode: "live",
+        data_origin: "synthetic",
+        test_kind: "automated_audio_caller",
+        destination: "owned_firstring_number_only",
+        voice: "George",
+        clip_count: 2,
+        time_limit_seconds: 90,
+        provider_status: "completed",
+        outcome: "audio_exchange_captured_ungraded",
+        remaining_attempts: 0,
+        human_audition: false,
+        noise_tested: false,
+        verdict: "ungraded",
+        observations: [
+          {
+            step: 1,
+            speech_result: "I cannot share sign-in details.",
+            confidence: 0.9,
+            received_at: "2026-11-08T04:30:00Z",
+            origin: "twilio_gather_audio_asr",
+          },
+        ],
+        partial_observations: {},
+      },
+    });
+  });
+  await page.goto("/");
+  await page.getByLabel("Operator token").fill("fixture-operator-token");
+  await page.getByRole("button", { name: "Connect console" }).click();
+  expect(methods).toEqual([]);
+  await expect(
+    page.getByRole("group", { name: "Current speech configuration" }),
+  ).toContainText("ElevenLabs · Rachel v4");
+  const refresh = page.getByRole("button", {
+    name: "Refresh caller test status",
+  });
+  await expect(refresh).toBeVisible({ timeout: 1000 });
+  await refresh.click();
+  const status = page.getByRole("region", { name: "Automated caller status" });
+  await expect(status).toContainText("completed");
+  await expect(status).toContainText("Ungraded");
+  await expect(status).toContainText("Negated warning");
+  await expect(status).toContainText("1 final ASR observation");
+  await expect(status).toContainText("Attempts remaining: 0");
+  await expect(status).toContainText(
+    "Human listening and noise testing unverified",
+  );
+  await expect(status.getByRole("button")).toHaveCount(1);
+  expect(methods).toEqual(["GET"]);
+  await page.screenshot({
+    path: info.outputPath("fixture-audio-status-desktop.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await status.scrollIntoViewIfNeeded();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: info.outputPath("fixture-audio-status-mobile.png"),
+    fullPage: true,
+  });
+});
+
 test("recorded inbound and model proof do not enable Relay or an unenrolled Phone B", async ({
   page,
 }, info) => {
   const snapshot: ConsoleState = {
     ...empty,
     execution_mode: "live",
+    speech,
     transport: "probe",
     capabilities: [
       {
@@ -232,11 +328,16 @@ test("recorded inbound and model proof do not enable Relay or an unenrolled Phon
         inbound_ended: false,
         offer: null,
         legs: [],
-        turn_version: 1,
-        assessed_version: 1,
+        turn_version: 2,
+        assessed_version: 2,
         generation_id: 2,
-        evidence_quote: "reschedule the clinic visit",
+        evidence_quote: "clinic",
         turns: [
+          {
+            id: "earlier",
+            speaker: "caller",
+            text: "I am calling from the clinic.",
+          },
           {
             id: "t1",
             speaker: "caller",
@@ -245,7 +346,7 @@ test("recorded inbound and model proof do not enable Relay or an unenrolled Phon
         ],
         assessments: [
           {
-            turn_version: 1,
+            turn_version: 2,
             generation_id: 2,
             observation: {
               speech_act: "request",
@@ -253,6 +354,7 @@ test("recorded inbound and model proof do not enable Relay or an unenrolled Phon
               direction: "caller_requests_from_sarah",
             },
             evidence_refs: [
+              { turn_id: "earlier", quote: "clinic" },
               { turn_id: "t1", quote: "reschedule the clinic visit" },
             ],
           },
@@ -279,7 +381,7 @@ test("recorded inbound and model proof do not enable Relay or an unenrolled Phon
     page.getByRole("group", { name: "Real inbound phone" }),
   ).toContainText("Recorded pass");
   await expect(
-    page.getByRole("group", { name: "Live Relay conversation" }),
+    page.getByRole("group", { name: "Full Relay rehearsal" }),
   ).toContainText("Pending");
   await expect(
     page.getByRole("button", { name: "Call Phone B" }),
@@ -296,6 +398,9 @@ test("recorded inbound and model proof do not enable Relay or an unenrolled Phon
   await expect(
     page.getByText("No execution result received.", { exact: true }),
   ).toBeVisible();
+  await expect(page.locator(".evidence-quote blockquote")).toHaveText(
+    "“reschedule the clinic visit”",
+  );
   await page.screenshot({
     path: info.outputPath("fixture-evidence-desktop.png"),
     fullPage: true,
