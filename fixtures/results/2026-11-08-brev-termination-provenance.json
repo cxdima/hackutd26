@@ -1,0 +1,27 @@
+{
+  "source": {
+    "case_id": "general-dev-son-update",
+    "contract_fingerprint_matches_baseline": true,
+    "phone_calls": 0,
+    "prefix_kind": "reused_actual_accepted_synthetic_assessment",
+    "prefix_source": "fixtures/results/2026-11-08-brev-campaign-sixcase-baseline.json",
+    "reconstruction": "Original tool ID, accepted argument object and result retained. Argument JSON reserialized; raw original assistant message was not archived. Not byte-identical baseline request evidence.",
+    "request_capture": "Actual current Rust Nemotron adapter HTTP body captured by loopback Axum; no provider inference in export",
+    "request_sha256": "2722b649103920ad3c6a80b0c0bc9501e333b4ded3f96f376dea664f2ccbdef0",
+    "tool_call_id": "chatcmpl-tool-afb03cce3bd84a0f"
+  },
+  "differing_request_fields": [
+    "tool_choice"
+  ],
+  "same_tools": true,
+  "same_messages": true,
+  "same_sampling_settings": true,
+  "return_token_ids_both": true,
+  "request_timeout_ms_both": 10000,
+  "max_tokens_both": 512,
+  "required_request_sha256": "25b00271ffe239b4f7adef5bcfd9dc12303d69a792e0e2b37164c7ac172b0466",
+  "named_request_sha256": "aafc44867e9532d6b7a35a4ad187f8aebb06bba5b0474c822b0f7c3e922ccf0c",
+  "retained_token_information": "Only count, occurrences of IDs2/11/14/15 and final3IDs. Full generated IDs and hidden reasoning were discarded.",
+  "hidden_reasoning_retained": false,
+  "phone_calls": 0
+}

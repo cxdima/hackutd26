@@ -296,6 +296,52 @@ async fn operator_end_cancels_the_inflight_native_loop_before_any_stale_tool_or_
 }
 
 #[tokio::test]
+async fn ordinary_model_failure_retains_captured_words_without_security_lecture_or_save_claim() {
+    let (app, handle) = app("http://127.0.0.1:9/unused", ExecutionMode::Replay).await;
+    let text = "Sarah has an appointment tomorrow at 4.";
+    handle
+        .send(Input::FinalPrompt { text: text.into() })
+        .await
+        .unwrap();
+    let before = handle.send(Input::Snapshot).await.unwrap();
+    let mut audio = handle.audio.subscribe();
+    handle
+        .send(Input::ModelFailed {
+            generation: before["generation_id"].as_u64().unwrap(),
+            detail: "Synthetic upstream timeout".into(),
+        })
+        .await
+        .unwrap();
+    let frame = audio.recv().await.unwrap();
+    let spoken = frame.payload["token"].as_str().unwrap();
+    assert_eq!(
+        spoken,
+        "I heard you. I couldn't save the message yet. Is there anything else to add?"
+    );
+    for unsolicited in [
+        "password",
+        "code",
+        "won't connect",
+        "leave a brief message",
+        "I've saved",
+    ] {
+        assert!(!spoken.contains(unsolicited));
+    }
+    let stored = app.store.sessions().await.unwrap().pop().unwrap();
+    assert_eq!(stored.turns[0].text, text);
+    assert!(stored.message.is_none());
+    assert!(stored.assessments.is_empty());
+    assert!(
+        app.store
+            .events_after(0)
+            .await
+            .unwrap()
+            .iter()
+            .any(|event| event.kind == "dependency.failed")
+    );
+}
+
+#[tokio::test]
 async fn native_risky_assessment_then_real_http_timeout_closes_without_saving_a_message() {
     let count = Arc::new(AtomicUsize::new(0));
     let captured = count.clone();

@@ -1,0 +1,95 @@
+{
+  "name": "firstring-nemotron-20261108-070043",
+  "observed_at_utc": "2026-11-08T07:39:27.499868+00:00",
+  "state": "RUNNING",
+  "provider_health": "HEALTHY",
+  "instance_id_persisted": true,
+  "local_guard_enabled": true,
+  "remote_guard_verified": true,
+  "native_probe_passed": false,
+  "inference_endpoint_available": true,
+  "phone_backend_changed": false,
+  "warmup_deadline_utc": "2026-11-08T07:30:43+00:00",
+  "hard_deadline_utc": "2026-11-08T09:39:50+00:00",
+  "runtime_start_requested": true,
+  "gpu": {
+    "name": "NVIDIA H100 PCIe",
+    "memory_mib": 81559,
+    "driver": "570.195.03"
+  },
+  "remote_control_read_http_status": 200,
+  "remote_control_identity_matches": true,
+  "stage": "authenticated_inference_ready_native_gate_pending",
+  "readiness": {
+    "observed_at_utc": "2026-11-08T07:13:05.425713+00:00",
+    "health_status": 200,
+    "authenticated_models_status": 200,
+    "model_ids": [
+      "nvidia/nemotron-3.5-lightning-30b-a3b"
+    ],
+    "wrong_key_status": 401
+  },
+  "effective_config": {
+    "packages": {
+      "vllm": "0.27.1",
+      "xgrammar": "0.2.3",
+      "transformers": "5.15.0",
+      "torch": "2.13.0+cu130"
+    },
+    "snapshot_exists": true,
+    "generation_config.json": {
+      "eos_token_id": [
+        2,
+        11
+      ],
+      "bos_token_id": 1,
+      "pad_token_id": 0
+    },
+    "config.json": {
+      "eos_token_id": 2,
+      "bos_token_id": 1,
+      "model_type": "nemotron_h"
+    },
+    "tokenizer_config.json": {
+      "eos_token": "<|im_end|>",
+      "pad_token": "<|im_end|>"
+    }
+  },
+  "default_sampling": {
+    "generation_config": "auto",
+    "stop_token_ids": [
+      11
+    ],
+    "all_stop_token_ids": [
+      2,
+      11
+    ],
+    "ignore_eos": false,
+    "min_tokens": 0,
+    "verification": "reconstructed using loaded container classes and cached generation config; no request override"
+  },
+  "work_stop_utc": "2026-11-08T09:09:50+00:00",
+  "native_gate_status": "pending_timeout_diagnosis",
+  "native_partial_cycle": {
+    "source": "root controlled preflight report",
+    "assessment_ms": 1751,
+    "assessment_tokens": 202,
+    "clarification_ms": 2392,
+    "clarification_tokens": 138,
+    "finish_reason": "stop",
+    "second_context_next_step": "3504ms timeout; overall full probe failed"
+  },
+  "connection_supervisor": {
+    "max_restart_reservations": 2,
+    "requires_remote_health_and_idle": true,
+    "model_restart_allowed": false,
+    "cleanup_deadline_utc": "2026-11-08T09:39:50+00:00",
+    "mocked_tests_passed": 3
+  },
+  "cleanup_guard_tests_passed": 24,
+  "connection_guard_tests_passed": 3,
+  "campaign_guard_receipt": "campaign-guard-update.json",
+  "resource_warmup_ready": true,
+  "failed_warmup_cutoff_applies": false,
+  "resource_warmup_proof": "resource-warmup-ready.json"
+}

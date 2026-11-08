@@ -166,6 +166,27 @@ async fn acknowledgement_listens_for_speech_before_clean_hangup() {
 }
 
 #[tokio::test]
+async fn static_closing_replay_fallback_is_explicit_and_never_claims_playback() {
+    let (app, h, _) = closing(false).await;
+    let response = h.send(Input::ClosingResponse).await.unwrap();
+    assert!(
+        response["twiml"]
+            .as_str()
+            .unwrap()
+            .contains("Polly.Joanna-Neural")
+    );
+    let events = app.store.events_after(0).await.unwrap();
+    let fallback = events
+        .iter()
+        .find(|event| event.kind == "audio.fallback")
+        .expect("Fallback provider must be visible");
+    assert_eq!(fallback.payload["reason"], "replay_no_synthesis");
+    assert_eq!(fallback.payload["heard"], false);
+    assert!(!events.iter().any(|event| event.kind == "audio.played"));
+    assert!(app.store.actions(&h.id).await.unwrap().is_empty());
+}
+
+#[tokio::test]
 async fn gather_closing_correction_uses_existing_turn_and_retry_path_without_relay() {
     let (app, h, _) = closing_with_transport(false, "gather").await;
     let before = h.send(Input::Snapshot).await.unwrap();

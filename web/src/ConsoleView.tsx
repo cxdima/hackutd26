@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import {
   ArrowDownLeft,
   Check,
@@ -38,6 +39,7 @@ export interface ViewProps {
   stale: boolean;
   busy: string | null;
   onAction: (path: string, body: Record<string, unknown>) => Promise<void>;
+  profileEditor?: ReactNode;
 }
 
 const readable = (value: string) => value.replaceAll("_", " ");
@@ -147,6 +149,7 @@ export function ConsoleView({
   stale,
   busy,
   onAction,
+  profileEditor,
 }: ViewProps) {
   const [selectedId, setSelectedId] = useState("");
   const [now, setNow] = useState(() => Date.now());
@@ -163,7 +166,9 @@ export function ConsoleView({
   const replay = state.execution_mode === "replay";
   const sessionReplay = active?.execution_mode === "replay";
   const withdrawn = active?.offer?.status === "revoked";
-  const name = displayName(active?.household_id ?? state.selected_household);
+  const name =
+    active?.profile?.display_name ??
+    displayName(active?.household_id ?? state.selected_household);
   const configured = state.capabilities.filter(
     (cap) =>
       ["inbound", "outbound", "nemotron", "relay"].includes(cap.id) &&
@@ -193,6 +198,10 @@ export function ConsoleView({
         : active.legs.some((leg) => leg.kind === "probe")
           ? "This session already has a reserved probe."
           : state.phone_b.reason;
+  const householdConnectionUnavailable =
+    !sessionReplay &&
+    state.phone_b !== undefined &&
+    (!state.phone_b.enrolled || !state.phone_b.enabled);
   const allEnded =
     active?.inbound_ended &&
     active.legs.every((leg) => terminal.includes(leg.status));
@@ -295,6 +304,7 @@ export function ConsoleView({
             <option value="sarah">Sarah</option>
             <option value="maya">Maya</option>
           </select>
+          {profileEditor}
         </div>
       </section>
       <section
@@ -353,7 +363,7 @@ export function ConsoleView({
           </span>
           <span>
             Configuration:{" "}
-            {state.model_backend.configured ? "Ready" : "Incomplete"}
+            {state.model_backend.configured ? "Configured" : "Incomplete"}
           </span>
           <span>
             Native protocol:{" "}
@@ -399,6 +409,14 @@ export function ConsoleView({
         <div>
           <h1>{name}’s call space</h1>
           <p>A calm first conversation. A private choice.</p>
+          {active?.profile && (
+            <p className="profile-snapshot">
+              Captured profile v{active.profile.version} ·{" "}
+              {active.profile.tts_provider} · {active.profile.voice_id} ·{" "}
+              {active.profile.locale}. Settings for this call; listening proof
+              is separate.
+            </p>
+          )}
         </div>
         {state.sessions.length > 1 && (
           <div className="history-select">
@@ -547,10 +565,14 @@ export function ConsoleView({
                           : active.state === "bridged" ||
                               active.state === "connected"
                             ? "The approved human conversation has begun. Screening has ended."
-                            : "A private handoff requires a current choice from the intended recipient."
+                            : householdConnectionUnavailable
+                              ? "Screening and private message-taking; household connection unavailable."
+                              : "A private handoff requires a current choice from the intended recipient."
                 : replay
                   ? "Explore the private handoff, then the moment a new request withdraws it."
-                  : `FirstRing will ask what the caller needs before offering ${name} a private choice.`}
+                  : householdConnectionUnavailable
+                    ? "FirstRing will ask what the caller needs and can take a private message."
+                    : `FirstRing will ask what the caller needs before offering ${name} a private choice.`}
             </p>
             {understanding && acceptedUnderstanding && (
               <div

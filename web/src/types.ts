@@ -3,6 +3,16 @@ import { z } from "zod";
 const mode = z.enum(["live", "replay"]);
 export const modelBackendSchema = z.enum(["nvidia_hosted", "brev_hosted"]);
 export type ExecutionMode = z.infer<typeof mode>;
+export const profileSchema = z.object({
+  household_id: z.enum(["sarah", "maya"]),
+  version: z.number().int().nonnegative(),
+  display_name: z.string(),
+  greeting: z.string(),
+  tts_provider: z.literal("ElevenLabs"),
+  voice_id: z.string(),
+  locale: z.literal("en-US"),
+  timezone: z.string(),
+});
 export const legSchema = z.object({
   action_id: z.string(),
   kind: z.string().optional(),
@@ -86,6 +96,7 @@ const acceptedUnderstandingSchema = z.object({
 export const sessionSchema = z.object({
   id: z.string(),
   household_id: z.string(),
+  profile: profileSchema.nullable().optional(),
   state: z.string(),
   policy_epoch: z.number(),
   generation_id: z.number(),

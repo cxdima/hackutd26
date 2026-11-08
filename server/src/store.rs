@@ -169,4 +169,117 @@ impl Store {
             .fetch_optional(&self.pool)
             .await?)
     }
+
+    /// Local operator ledger entry; never exposed to model tools or HTTP callers.
+    pub async fn record_fixture_authorization(
+        &self,
+        grant: &crate::audio_fixture::AuthorizationGrant,
+    ) -> anyhow::Result<bool> {
+        grant.validate()?;
+        let mut tx = self.pool.begin().await?;
+        let fresh = immutable_metadata(
+            &mut tx,
+            &format!(
+                "{}{}",
+                crate::audio_fixture::AUTHORIZATION_PREFIX,
+                grant.grant_id
+            ),
+            &serde_json::to_value(grant)?,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(fresh)
+    }
+
+    pub async fn record_fixture_failure(
+        &self,
+        review: &crate::audio_fixture::FailureReview,
+    ) -> anyhow::Result<bool> {
+        review.validate()?;
+        let mut tx = self.pool.begin().await?;
+        let raw: Option<String> = sqlx::query_scalar(
+            "SELECT data FROM actions WHERE id=? AND kind='fixture_caller' AND mode='live'",
+        )
+        .bind(&review.action_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let leg: Leg = serde_json::from_str(
+            &raw.ok_or_else(|| anyhow::anyhow!("Unknown live fixture action"))?,
+        )?;
+        anyhow::ensure!(
+            crate::calls::state::terminal(&leg.status),
+            "Review requires a terminal fixture action"
+        );
+        let fresh = immutable_metadata(
+            &mut tx,
+            &format!(
+                "{}{}",
+                crate::audio_fixture::FAILURE_PREFIX,
+                review.action_id
+            ),
+            &serde_json::to_value(review)?,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(fresh)
+    }
+
+    pub async fn record_fixture_fix(
+        &self,
+        receipt: &crate::audio_fixture::FixReceipt,
+    ) -> anyhow::Result<bool> {
+        receipt.validate()?;
+        let mut tx = self.pool.begin().await?;
+        let raw: Option<String> = sqlx::query_scalar("SELECT value FROM metadata WHERE key=?")
+            .bind(format!(
+                "{}{}",
+                crate::audio_fixture::FAILURE_PREFIX,
+                receipt.through_action_id
+            ))
+            .fetch_optional(&mut *tx)
+            .await?;
+        let review: crate::audio_fixture::FailureReview = serde_json::from_str(
+            &raw.ok_or_else(|| anyhow::anyhow!("Fix requires an existing failure review"))?,
+        )?;
+        review.validate()?;
+        anyhow::ensure!(
+            review.action_id == receipt.through_action_id
+                && review.failure_signature == receipt.failure_signature
+                && chrono::DateTime::parse_from_rfc3339(&receipt.recorded_at)?
+                    >= chrono::DateTime::parse_from_rfc3339(&review.recorded_at)?,
+            "Fix receipt must match the reviewed failure and follow it"
+        );
+        let fresh = immutable_metadata(
+            &mut tx,
+            &crate::audio_fixture::fix_key(&receipt.through_action_id, &receipt.failure_signature),
+            &serde_json::to_value(receipt)?,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(fresh)
+    }
+}
+
+async fn immutable_metadata(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    key: &str,
+    value: &serde_json::Value,
+) -> anyhow::Result<bool> {
+    let old: Option<String> = sqlx::query_scalar("SELECT value FROM metadata WHERE key=?")
+        .bind(key)
+        .fetch_optional(&mut **tx)
+        .await?;
+    if let Some(old) = old {
+        anyhow::ensure!(
+            serde_json::from_str::<serde_json::Value>(&old)? == *value,
+            "Conflicting immutable fixture ledger entry"
+        );
+        return Ok(false);
+    }
+    sqlx::query("INSERT INTO metadata(key,value) VALUES(?,?)")
+        .bind(key)
+        .bind(value.to_string())
+        .execute(&mut **tx)
+        .await?;
+    Ok(true)
 }

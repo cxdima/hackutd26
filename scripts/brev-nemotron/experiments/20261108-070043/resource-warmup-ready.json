@@ -1,0 +1,6 @@
+{
+  "resource_warmup_ready": true,
+  "native_protocol_passed": false,
+  "verified_cycle_source": "fixtures/results/2026-11-08-brev-campaign-fresh-native.json context0",
+  "observed_at_utc": "2026-11-08T07:24:47.396418+00:00"
+}

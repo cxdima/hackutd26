@@ -412,7 +412,7 @@ fn accepted_readiness_controls_native_phase_without_overriding_protection_or_new
         assert_eq!(next_step_phase(&session), expected);
     }
     session.blocked = true;
-    assert_eq!(next_step_phase(&session), ToolPhase::NextStep);
+    assert_eq!(next_step_phase(&session), ToolPhase::Protection);
     session.blocked = false;
     session.policy_epoch += 1;
     assert_eq!(next_step_phase(&session), ToolPhase::Clarification);

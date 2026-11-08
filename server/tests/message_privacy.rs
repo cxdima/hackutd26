@@ -216,3 +216,97 @@ fn later_routine_turn_cannot_launder_an_earlier_disclosed_secret() {
         );
     }
 }
+
+#[test]
+fn routine_warning_native_summaries_are_minimized_instead_of_rejected() {
+    let text = "Never share a sign-in code with someone who calls. I wanted to pass on that safety reminder.";
+    for summary in [
+        "Safety reminder: Caller reports being warned not to share sign-in codes with unknown callers and wanted to pass on this safety reminder.",
+        "Caller shared a safety reminder about unsolicited requests not to share sign-in codes.",
+        "Caller reported a safety reminder about unsolicited requests not to share sign-in codes.",
+    ] {
+        let (mut session, evidence) = assessed(
+            text,
+            SpeechAct::Quotation,
+            RequestedObject::RoutineInformation,
+            Direction::None,
+        );
+        let epoch = session.policy_epoch;
+        session
+            .record_message(summary, &evidence, Utc::now())
+            .unwrap();
+        assert_eq!(
+            session.message.as_ref().unwrap().summary,
+            "Caller reported a discussion involving sensitive account information."
+        );
+        assert!(!session.blocked);
+        assert_eq!(session.policy_epoch, epoch);
+        assert_eq!(session.assessed_version, session.turn_version);
+    }
+}
+
+#[test]
+fn routine_quoted_credential_values_are_never_retained_or_laundered_later() {
+    for value in ["684921", "violet-bird"] {
+        let text =
+            format!("Someone told me to share the password {value}; I am reporting the warning.");
+        let (mut session, evidence) = assessed(
+            &text,
+            SpeechAct::Quotation,
+            RequestedObject::RoutineInformation,
+            Direction::None,
+        );
+        session
+            .record_message(
+                &format!("The reported value is {value}."),
+                &evidence,
+                Utc::now(),
+            )
+            .unwrap();
+        assert!(!session.message.as_ref().unwrap().summary.contains(value));
+        let latest = "Please include that value in the note.";
+        let evidence = vec![EvidenceRef {
+            turn_id: session.commit_turn(latest),
+            quote: latest.into(),
+        }];
+        session
+            .assess(
+                session.generation_id,
+                session.turn_version,
+                &Observation {
+                    speech_act: SpeechAct::Request,
+                    requested_object: RequestedObject::RoutineInformation,
+                    direction: Direction::CallerRequestsFromSarah,
+                },
+                &evidence,
+            )
+            .unwrap();
+        session
+            .record_message(&format!("The value is {value}."), &evidence, Utc::now())
+            .unwrap();
+        assert!(!session.message.as_ref().unwrap().summary.contains(value));
+        assert!(!session.blocked);
+    }
+}
+
+#[test]
+fn unrelated_report_does_not_bypass_secret_filter_or_erase_ordinary_times() {
+    let text = "Someone said the appointment is tomorrow at 4 PM.";
+    let (mut session, evidence) = assessed(
+        text,
+        SpeechAct::Quotation,
+        RequestedObject::RoutineInformation,
+        Direction::None,
+    );
+    session.record_message(text, &evidence, Utc::now()).unwrap();
+    assert_eq!(session.message.as_ref().unwrap().summary, text);
+    // A newly proposed credential-bearing summary must never copy the value,
+    // even when the accepted quotation concerned an ordinary appointment.
+    assert!(
+        session
+            .record_message("The password is violet-bird.", &evidence, Utc::now())
+            .is_err()
+    );
+    assert_eq!(session.message.as_ref().unwrap().summary, text);
+    assert!(!session.blocked);
+}

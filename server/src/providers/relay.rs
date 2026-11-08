@@ -8,20 +8,31 @@ use url::Url;
 // Twilio-managed preset TTS, not a voice clone or a separate reasoning agent.
 // https://www.twilio.com/docs/voice/conversationrelay/voice-configuration
 const TTS_PROVIDER: &str = "ElevenLabs";
-const TTS_VOICE: &str = "21m00Tcm4TlvDq8ikWAM-v4";
 const TRANSCRIPTION_PROVIDER: &str = "Deepgram";
-const TRANSCRIPTION_MODEL: &str = "nova-3-general";
 
 /// Current requested settings, separate from observed provider or playback proof.
 pub fn speech_configuration(transport: &str) -> Value {
+    speech_configuration_for(
+        transport,
+        &crate::profile::Profile::default_for("sarah").expect("default profile"),
+    )
+}
+pub fn speech_configuration_for(transport: &str, profile: &crate::profile::Profile) -> Value {
+    speech_configuration_for_model(transport, profile, crate::config::relay_speech_model())
+}
+fn speech_configuration_for_model(
+    transport: &str,
+    profile: &crate::profile::Profile,
+    model: crate::config::RelaySpeechModel,
+) -> Value {
     let is_relay = transport == "relay";
     json!({"source":"configured", "transport":transport,
         "provider":if is_relay {TTS_PROVIDER} else {"Amazon Polly"},
-        "voice":if is_relay {TTS_VOICE} else {"Polly.Joanna-Neural"},
-        "voice_label":if is_relay {"Rachel v4"} else {"Joanna Neural"},
-        "closing_provider":"Amazon Polly", "closing_voice":"Joanna-Neural",
+        "voice":if is_relay {profile.voice_id.as_str()} else {"Polly.Joanna-Neural"},
+        "voice_label":if is_relay {match profile.voice_id.as_str() { crate::profile::JESSICA => "Jessica v4", crate::profile::GEORGE => "George v4", _ => "Janet (legacy ID) v4"}} else {"Joanna Neural"},
+        "closing_provider":"ElevenLabs", "closing_voice":profile.voice_id, "emergency_fallback_provider":"Amazon Polly", "emergency_fallback_voice":"Joanna-Neural",
         "transcription_provider":if is_relay {Some(TRANSCRIPTION_PROVIDER)} else {None},
-        "transcription_model":if is_relay {Some(TRANSCRIPTION_MODEL)} else {None}})
+        "transcription_model":if is_relay {Some(model.as_str())} else {None}})
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -180,19 +191,44 @@ fn valid_sid(value: &str, prefix: &str) -> bool {
         && value[2..].chars().all(|c| c.is_ascii_hexdigit())
 }
 
-pub fn connect_twiml(base_url: &str, session_token: &str, display_name: &str) -> String {
-    connect_with_greeting(base_url, session_token, Some(display_name))
+pub fn connect_twiml(base_url: &str, session_token: &str, _display_name: &str) -> String {
+    connect_twiml_for(
+        base_url,
+        session_token,
+        &crate::profile::Profile::default_for("sarah").expect("default profile"),
+        true,
+    )
 }
 
-/// Same call, new authenticated socket; do not repeat the initial disclosure.
 pub fn reconnect_twiml(base_url: &str, session_token: &str) -> String {
-    connect_with_greeting(base_url, session_token, None)
+    connect_twiml_for(
+        base_url,
+        session_token,
+        &crate::profile::Profile::default_for("sarah").expect("default profile"),
+        false,
+    )
 }
 
-fn connect_with_greeting(
+pub fn connect_twiml_for(
     base_url: &str,
     session_token: &str,
-    display_name: Option<&str>,
+    profile: &crate::profile::Profile,
+    greet: bool,
+) -> String {
+    connect_twiml_for_model(
+        base_url,
+        session_token,
+        profile,
+        greet,
+        crate::config::relay_speech_model(),
+    )
+}
+fn connect_twiml_for_model(
+    base_url: &str,
+    session_token: &str,
+    profile: &crate::profile::Profile,
+    greet: bool,
+    model: crate::config::RelaySpeechModel,
 ) -> String {
     let Ok(base) = public_origin(base_url) else {
         return super::twilio::say_end("The assistant is temporarily unavailable.");
@@ -208,18 +244,17 @@ fn connect_with_greeting(
     after
         .query_pairs_mut()
         .append_pair("relay_token", session_token);
-    let greeting = display_name
-        .map(|name| {
-            format!(
-                " welcomeGreeting=\"{}\"",
-                escape(&format!(
-                    "I'm {name}'s automated assistant. What is the call about?"
-                ))
-            )
-        })
-        .unwrap_or_default();
+    let greeting = if greet {
+        format!(" welcomeGreeting=\"{}\"", escape(&profile.greeting))
+    } else {
+        String::new()
+    };
+    let voice = escape(&profile.voice_id);
+    let provider = escape(&profile.tts_provider);
+    let locale = escape(&profile.locale);
+    let transcription_model = model.as_str();
     format!(
-        "<Response><Connect action=\"{}\" method=\"POST\"><ConversationRelay url=\"{}\"{greeting} interruptible=\"any\" reportInputDuringAgentSpeech=\"any\" ignoreBackchannel=\"true\" dtmfDetection=\"true\" partialPrompts=\"true\" speechTimeout=\"1000\" language=\"en-US\" transcriptionProvider=\"{TRANSCRIPTION_PROVIDER}\" speechModel=\"{TRANSCRIPTION_MODEL}\" ttsProvider=\"{TTS_PROVIDER}\" voice=\"{TTS_VOICE}\"><Parameter name=\"session_token\" value=\"{}\"/></ConversationRelay></Connect></Response>",
+        "<Response><Connect action=\"{}\" method=\"POST\"><ConversationRelay url=\"{}\"{greeting} interruptible=\"any\" reportInputDuringAgentSpeech=\"any\" ignoreBackchannel=\"true\" dtmfDetection=\"true\" partialPrompts=\"true\" speechTimeout=\"1000\" language=\"{locale}\" transcriptionProvider=\"{TRANSCRIPTION_PROVIDER}\" speechModel=\"{transcription_model}\" ttsProvider=\"{provider}\" voice=\"{voice}\"><Parameter name=\"session_token\" value=\"{}\"/></ConversationRelay></Connect></Response>",
         escape(after.as_str()),
         escape(ws.as_str()),
         escape(session_token)
@@ -299,6 +334,43 @@ fn escape(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn selectable_asr_agrees_with_diagnostics_without_changing_turn_or_voice_controls() {
+        let profile = crate::profile::Profile::default_for("sarah").unwrap();
+        for model in [
+            crate::config::RelaySpeechModel::Nova3,
+            crate::config::RelaySpeechModel::Flux,
+        ] {
+            let xml = connect_twiml_for_model(
+                "https://firstring.example",
+                "token",
+                &profile,
+                true,
+                model,
+            );
+            let configuration = speech_configuration_for_model("relay", &profile, model);
+            assert!(xml.contains(&format!("speechModel=\"{}\"", model.as_str())));
+            assert_eq!(configuration["transcription_model"], model.as_str());
+            for setting in [
+                "speechTimeout=\"1000\"",
+                "transcriptionProvider=\"Deepgram\"",
+                "partialPrompts=\"true\"",
+                "interruptible=\"any\"",
+                "reportInputDuringAgentSpeech=\"any\"",
+                "ignoreBackchannel=\"true\"",
+                "ttsProvider=\"ElevenLabs\"",
+            ] {
+                assert!(xml.contains(setting));
+            }
+            assert!(!xml.contains("eotThreshold"));
+            assert!(!xml.contains("speaker-events"));
+            assert!(
+                speech_configuration_for_model("gather", &profile, model)["transcription_model"]
+                    .is_null()
+            );
+        }
+    }
 
     fn setup() -> Value {
         json!({"type":"setup","sessionId":"VX00000000000000000000000000000001","accountSid":"AC00000000000000000000000000000002","callSid":"CA00000000000000000000000000000003","parentCallSid":"","from":"sip:unknown@example.test","to":"sip:firstring@example.test","direction":"inbound","callStatus":"RINGING","customParameters":{"session_token":"opaque-token-for-registered-call"}})
@@ -398,10 +470,10 @@ mod tests {
         assert!(xml.contains("transcriptionProvider=\"Deepgram\""));
         assert!(xml.contains("speechModel=\"nova-3-general\""));
         assert!(xml.contains("ttsProvider=\"ElevenLabs\""));
-        assert!(xml.contains("voice=\"21m00Tcm4TlvDq8ikWAM-v4\""));
+        assert!(xml.contains(crate::profile::JESSICA));
         assert!(!xml.contains("speaker-events"));
         assert!(xml.contains("name=\"session_token\" value=\"opaque&lt;&amp;&quot;token\""));
-        assert!(xml.contains("Sarah &amp; Maya"));
+        assert!(xml.contains("Hi, thanks for calling."));
         assert!(!xml.contains("<Stream"));
         assert!(!xml.contains("opaque<&\"token"));
     }

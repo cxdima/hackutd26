@@ -1,0 +1,66 @@
+{
+  "observed_at_utc": "2026-11-08T07:57:18.085319+00:00",
+  "mode": "read_only_reconciliation",
+  "account": {
+    "resources_http_status": 200,
+    "active_instance_count": 1,
+    "exact_instance_http_status": 200,
+    "exact_bound_identity_matches": true,
+    "instance_status": "RUNNING",
+    "provider_health": "HEALTHY",
+    "billing_http_status": 202,
+    "remaining_credit_usd": 56.17,
+    "auto_recharge_enabled": false,
+    "usage_http_status": 202
+  },
+  "quote": {
+    "type": "hyperstack_H100",
+    "current_resource_rate_usd_per_hour": 3.0,
+    "fixed_disk_gib": 850,
+    "fixed_storage_included_in_quote": true,
+    "basis": "Current exact resource instanceTypeInfo.base_price plus original fixed-storage quote/CLI pricing interpretation; final provider billing remains authoritative."
+  },
+  "reported_billing": {
+    "prior_compute_usd": 2.6,
+    "current_compute_usd": 1.23,
+    "total_reported_compute_usd": 3.83,
+    "storage_or_deployment_rows_present": false,
+    "current_reported_instance_price": "1.50",
+    "current_reported_total_time_seconds": 2960,
+    "prior_reported_total_time_seconds": 6224,
+    "limitation": "Usage unit price/time differ from the catalog and elapsed wall time. Current accrued-but-unposted cost and exact billing lag are not verified; no discounted rate is assumed."
+  },
+  "budget_projection": {
+    "original_total_limit_usd": 60,
+    "prior_experiment_observed_cost_usd": 2.6,
+    "current_created_at_utc": "2026-11-08T07:00:43+00:00",
+    "work_stop_utc": "2026-11-08T09:09:50+00:00",
+    "hard_delete_utc": "2026-11-08T09:39:50+00:00",
+    "current_full_lifetime_seconds": 9547,
+    "current_full_lifetime_at_quote_usd": 7.9558,
+    "cleanup_buffer_usd": 2,
+    "estimated_total_with_prior_and_buffer_usd": 12.5558,
+    "current_reported_balance_covers_entire_current_lifetime_plus_buffer": true,
+    "provider_enforced_spending_cap": false,
+    "additional_allocations_planned": 0
+  },
+  "guard_readback": {
+    "observed_at_utc": "2026-11-08T07:58:24.416270+00:00",
+    "remote": {
+      "deadline": 1794130790,
+      "campaign_work_deadline": 1794128990,
+      "ready": true,
+      "timer_active": true
+    },
+    "local_processes_alive": {
+      "watchdog_pid": true,
+      "caffeinate_pid": true,
+      "ssh_forward_pid": true,
+      "connection_supervisor_pid": true,
+      "gpu_sampler_pid": true
+    },
+    "local_deadline": 1794130790,
+    "local_ready": true
+  },
+  "historical_cleanup_limitation": "Prior experiment deletion deadline overrun cause/time uncertainty remains unresolved; this active timer readback is not final deletion proof."
+}

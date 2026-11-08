@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { ConsoleView } from "./ConsoleView";
 import { AudioFixtureStatus } from "./AudioFixtureStatus";
+import { ProfileEditor } from "./ProfileEditor";
 import { consumeEvents } from "./events";
 import { mergeEvents } from "./model";
 import { stateSchema } from "./types";
@@ -239,6 +240,14 @@ export default function App() {
             stale={stale}
             busy={busy}
             onAction={action}
+            profileEditor={
+              <ProfileEditor
+                key={state.selected_household}
+                token={token}
+                household={state.selected_household}
+                disabled={Boolean(busy)}
+              />
+            }
           />
           {state.execution_mode === "live" && (
             <AudioFixtureStatus token={token} />

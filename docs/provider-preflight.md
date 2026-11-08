@@ -63,6 +63,10 @@ Twilio's [SDK catalogue](https://www.twilio.com/docs/libraries) lists maintained
 
 ## Relay and Gather protocol
 
+`RELAY_SPEECH_MODEL` now selects `nova-3-general` (default) or `flux`; invalid values fail startup. The selection stays fixed until process restart. TwiML, API speech diagnostics and each call's requested speech telemetry use that same setting. `speechTimeout="1000"`, partial prompts, interruption controls, and closing Gather remain unchanged. Flux's documented default `eotThreshold=0.8` is retained by omitting the attribute. This configuration capability is not a completed Flux phone comparison.
+
+For a controlled comparison, replay the same cached appointment clip with Flux and record caller-audio end → final prompt → model completion → first response audio. Nova uses the timeout as a final-prompt delay; Flux uses it as a maximum silence duration and may end a turn earlier based on confidence. Check complete fact transcription, orphan partials and interruptions as well as latency; revert on regression. No speculative action runs on partial prompts. [Current Twilio attributes](https://www.twilio.com/docs/voice/twiml/connect/conversationrelay#attributes). The `speaker-events`/`tokens-played` subscription names do not establish a documented completion-acknowledgment envelope in the [message reference](https://www.twilio.com/docs/voice/conversationrelay/websocket-messages); they remain disabled.
+
 [Relay message reference](https://www.twilio.com/docs/voice/conversationrelay/websocket-messages):
 
 | Direction/type | Required handling |

@@ -89,6 +89,37 @@ const measured: CallEvent = {
     },
   },
 };
+it("shows the captured call profile separately from settings for the next household", () => {
+  const captured = {
+    household_id: "sarah" as const,
+    version: 2,
+    display_name: "Jamie",
+    greeting: "Hi, what is the call about?",
+    tts_provider: "ElevenLabs" as const,
+    voice_id: "cgSgspJ2msm6clMCkdW9-v4",
+    locale: "en-US" as const,
+    timezone: "America/Chicago",
+  };
+  render(
+    <ConsoleView
+      state={{
+        ...state,
+        selected_household: "maya",
+        sessions: [{ ...state.sessions[0], profile: captured }],
+      }}
+      events={[]}
+      stale={false}
+      busy={null}
+      onAction={vi.fn()}
+    />,
+  );
+  expect(
+    screen.getByRole("heading", { name: "Jamie’s call space" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText(/Captured profile v2/)).toHaveTextContent(
+    "listening proof is separate",
+  );
+});
 it.each([false, true])(
   "keeps selected Brev protocol proof separate from historical NVIDIA proof: %s",
   (verified) => {
@@ -126,7 +157,7 @@ it.each([false, true])(
     });
     expect(selected).toHaveTextContent("Brev-hosted Nemotron");
     expect(selected).toHaveTextContent("nvidia/Nemotron-3-Nano-30B-A3B-FP8");
-    expect(selected).toHaveTextContent("Configuration: Ready");
+    expect(selected).toHaveTextContent("Configuration: Configured");
     expect(selected).toHaveTextContent(
       verified
         ? "Native protocol: Verified for this backend"
@@ -137,6 +168,44 @@ it.each([false, true])(
     ).toHaveTextContent("Recorded pass");
   },
 );
+it("explains message-taking when the live household endpoint is unavailable", () => {
+  const snapshot: ConsoleState = {
+    ...state,
+    execution_mode: "live",
+    phone_b: {
+      enrolled: false,
+      enabled: false,
+      authorized: false,
+      remaining_attempts: 1,
+      can_request: false,
+      reason: "Household endpoint is not enrolled.",
+    },
+    sessions: [
+      {
+        ...state.sessions[0],
+        execution_mode: "live",
+        current_action: "Screening caller",
+        offer: null,
+        legs: [],
+      },
+    ],
+  };
+  render(
+    <ConsoleView
+      state={snapshot}
+      events={[]}
+      stale={false}
+      busy={null}
+      onAction={vi.fn()}
+    />,
+  );
+  expect(
+    screen.getByRole("region", { name: "Screening caller" }),
+  ).toHaveTextContent(
+    "Screening and private message-taking; household connection unavailable.",
+  );
+  expect(screen.getByRole("button", { name: /Phone B/i })).toBeDisabled();
+});
 it.each([undefined, "nvidia_hosted", "brev_hosted"])(
   "attributes HTTP evidence only to its own recorded backend: %s",
   (backend) => {

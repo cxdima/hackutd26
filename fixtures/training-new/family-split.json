@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "authored_at": "2026-11-08T07:10:28.282063+00:00",
+  "stage": "family_assignment_before_any_scenario_text_or_paraphrase",
+  "data_origin": "synthetic",
+  "families": [
+    {
+      "family_id": "archive_box_return",
+      "split": "train",
+      "purpose": "Community archive photo-box return"
+    },
+    {
+      "family_id": "pet_walk_swap",
+      "split": "train",
+      "purpose": "Dog walking schedule exchange"
+    },
+    {
+      "family_id": "pottery_kiln_pickup",
+      "split": "train",
+      "purpose": "Pottery firing pickup notice"
+    },
+    {
+      "family_id": "electronics_recycling_warning",
+      "split": "train",
+      "purpose": "Electronics recycling safety advice"
+    },
+    {
+      "family_id": "garden_volunteer_shift",
+      "split": "train",
+      "purpose": "Garden volunteer coordination and changed request"
+    },
+    {
+      "family_id": "theater_rehearsal_correction",
+      "split": "dev",
+      "purpose": "Theater rehearsal correction"
+    },
+    {
+      "family_id": "aquatic_club_misdial",
+      "split": "dev",
+      "purpose": "Aquatic club wrong destination"
+    }
+  ],
+  "provenance": "Manually authored fresh family assignments; no existing comparison or held-out cases used."
+}

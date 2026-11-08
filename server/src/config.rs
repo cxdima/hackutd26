@@ -1,5 +1,47 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::sync::OnceLock;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RelaySpeechModel {
+    Nova3,
+    Flux,
+}
+impl RelaySpeechModel {
+    pub fn parse(value: Option<&str>) -> anyhow::Result<Self> {
+        match value.unwrap_or("nova-3-general") {
+            "nova-3-general" => Ok(Self::Nova3),
+            "flux" => Ok(Self::Flux),
+            _ => anyhow::bail!("RELAY_SPEECH_MODEL must be nova-3-general or flux"),
+        }
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Nova3 => "nova-3-general",
+            Self::Flux => "flux",
+        }
+    }
+}
+
+// One startup snapshot for this single-process demo. Configuration is immutable
+// during a call; a different ASR experiment requires an explicit process restart.
+static RELAY_SPEECH_MODEL: OnceLock<RelaySpeechModel> = OnceLock::new();
+fn install_relay_speech_model(
+    slot: &OnceLock<RelaySpeechModel>,
+    selected: RelaySpeechModel,
+) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        *slot.get_or_init(|| selected) == selected,
+        "RELAY_SPEECH_MODEL changed after startup; restart the process"
+    );
+    Ok(())
+}
+pub fn relay_speech_model() -> RelaySpeechModel {
+    RELAY_SPEECH_MODEL
+        .get()
+        .copied()
+        .unwrap_or(RelaySpeechModel::Nova3)
+}
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -110,6 +152,8 @@ pub struct Config {
 impl Config {
     pub fn from_env() -> anyhow::Result<Self> {
         let model_settings = ModelSettings::from_env()?;
+        let relay_model =
+            RelaySpeechModel::parse(std::env::var("RELAY_SPEECH_MODEL").ok().as_deref())?;
         let get = |k: &str, default: &str| std::env::var(k).unwrap_or_else(|_| default.into());
         let mode = match get("DEMO_EXECUTION_MODE", "replay").as_str() {
             "live" => ExecutionMode::Live,
@@ -184,6 +228,7 @@ impl Config {
             (15..=600).contains(&max_call_seconds),
             "MAX_CALL_SECONDS outside 15..600"
         );
+        install_relay_speech_model(&RELAY_SPEECH_MODEL, relay_model)?;
         Ok(Self {
             public_base_url,
             port: get("PORT", "8080").parse()?,
@@ -259,6 +304,35 @@ pub fn endpoint_fingerprint(url: &str) -> String {
 #[cfg(test)]
 mod model_settings_tests {
     use super::*;
+    #[test]
+    fn relay_speech_model_default_selection_and_invalid_values_are_bounded() {
+        assert_eq!(
+            RelaySpeechModel::parse(None).unwrap(),
+            RelaySpeechModel::Nova3
+        );
+        assert_eq!(
+            RelaySpeechModel::parse(Some("nova-3-general"))
+                .unwrap()
+                .as_str(),
+            "nova-3-general"
+        );
+        assert_eq!(
+            RelaySpeechModel::parse(Some("flux")).unwrap().as_str(),
+            "flux"
+        );
+        for invalid in ["", "Flux", "nova-2", "flux\" voice=\"other", " flux"] {
+            assert!(RelaySpeechModel::parse(Some(invalid)).is_err());
+        }
+    }
+
+    #[test]
+    fn startup_speech_selection_is_immutable_until_process_restart() {
+        let slot = std::sync::OnceLock::new();
+        install_relay_speech_model(&slot, RelaySpeechModel::Flux).unwrap();
+        install_relay_speech_model(&slot, RelaySpeechModel::Flux).unwrap();
+        assert!(install_relay_speech_model(&slot, RelaySpeechModel::Nova3).is_err());
+        assert_eq!(slot.get(), Some(&RelaySpeechModel::Flux));
+    }
     fn settings(values: &[(&str, &str)]) -> anyhow::Result<ModelSettings> {
         ModelSettings::from_lookup(|key| {
             values

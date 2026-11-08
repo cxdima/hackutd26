@@ -1,0 +1,148 @@
+{
+  "assessment_only": false,
+  "backend": "brev_hosted",
+  "backend_evidence": "Configured adapter selection; this label alone does not prove GPU execution",
+  "data_origin": "synthetic",
+  "error": "Nemotron request timed out",
+  "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+  "max_output_tokens": 512,
+  "native_result_roundtrips": 1,
+  "native_tool_choice": "named_assessment_then_readiness_gated_next_step",
+  "observed_assessments": [
+    {
+      "arguments": {
+        "evidence_refs": [
+          {
+            "quote": "The clinic appointment time has changed, and I need to give her the new time.",
+            "turn_id": "turn-1"
+          }
+        ],
+        "observation": {
+          "direction": "caller_supplies",
+          "requested_object": "routine_information",
+          "speech_act": "statement"
+        },
+        "understanding": {
+          "claimed_identity": null,
+          "missing_information": [
+            "new appointment time"
+          ],
+          "purpose": "inform Sarah of new clinic appointment time",
+          "readiness": "needs_information",
+          "requested_action": "provide new appointment time",
+          "supplied_facts": [
+            {
+              "quote": "The clinic appointment time has changed, and I need to give her the new time.",
+              "turn_id": "turn-1"
+            }
+          ],
+          "version": 1
+        }
+      },
+      "context_index": 0,
+      "name": "record_assessment",
+      "tool_call_id": "chatcmpl-tool-b21846520ae2e79f"
+    },
+    {
+      "arguments": {
+        "evidence_refs": [
+          {
+            "quote": "I have a grocery delivery and need to know which entrance she wants the bags left at.",
+            "turn_id": "turn-1"
+          }
+        ],
+        "observation": {
+          "direction": "caller_supplies",
+          "requested_object": "routine_information",
+          "speech_act": "statement"
+        },
+        "understanding": {
+          "claimed_identity": null,
+          "missing_information": [],
+          "purpose": "determine grocery delivery entrance for Sarah",
+          "readiness": "ready",
+          "requested_action": "inform entrance preference",
+          "supplied_facts": [
+            {
+              "quote": "I have a grocery delivery and need to know which entrance she wants the bags left at.",
+              "turn_id": "turn-1"
+            }
+          ],
+          "version": 1
+        }
+      },
+      "context_index": 1,
+      "name": "record_assessment",
+      "tool_call_id": "chatcmpl-tool-bed70f5b75d028e8"
+    }
+  ],
+  "observed_followups": [
+    "What is the new appointment time?"
+  ],
+  "phone_tested": false,
+  "prefix_provenance": null,
+  "recorded_at": "2026-11-08T07:14:35.105036+00:00",
+  "relevance_check": "prewritten lexical anchors; human review still required",
+  "request_observations": [
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 202,
+      "content_chars": 0,
+      "elapsed_ms": 1751,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 138,
+      "content_chars": 0,
+      "elapsed_ms": 2392,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": 195,
+      "content_chars": 0,
+      "elapsed_ms": 909,
+      "error": null,
+      "finish_reason": "stop",
+      "outcome": "success",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "backend": "brev_hosted",
+      "completion_tokens": null,
+      "content_chars": null,
+      "elapsed_ms": 3504,
+      "error": "Nemotron request timed out",
+      "finish_reason": null,
+      "outcome": "timeout",
+      "reasoning_chars": null,
+      "reasoning_tokens": null,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "response_model": null
+    }
+  ],
+  "request_timeout_ms": 3500,
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "requests_submitted": 4,
+  "retained_arguments_scope": "Synthetic native assessment arguments only; no assistant content or hidden reasoning",
+  "reused_prefix": false,
+  "reused_prefix_source": null,
+  "selected_context_index": null,
+  "status": "model_probe_failed"
+}

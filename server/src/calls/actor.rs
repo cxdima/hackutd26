@@ -13,6 +13,7 @@ pub struct App {
     pub config: Arc<Config>,
     pub store: Store,
     pub twilio: Twilio,
+    pub speech: Option<Arc<crate::providers::speech::SpeechCache>>,
     pub sessions: Arc<Mutex<HashMap<String, Handle>>>,
 }
 #[derive(Clone)]
@@ -205,7 +206,17 @@ impl App {
         let config = Arc::new(config);
         let store = Store::open(&config.database_url).await?;
         let twilio = Twilio::new(config.clone())?;
+        let speech = if config.mode == ExecutionMode::Live {
+            Some(Arc::new(crate::providers::speech::SpeechCache::new(
+                ".tools/speech-cache".into(),
+                &config.public_base_url,
+                std::env::var("ELEVENLABS_API_KEY").ok(),
+            )?))
+        } else {
+            None
+        };
         let app = Self {
+            speech,
             config,
             store,
             twilio,
@@ -275,19 +286,20 @@ impl App {
             .metadata("selected_household")
             .await?
             .unwrap_or_else(|| "sarah".into());
-        let s = Session::new(
+        let mut s = Session::new(
             uuid::Uuid::new_v4().to_string(),
             sid.into(),
             household,
             self.config.mode,
         );
+        s.profile = Some(crate::profile::Profile::load(&self.store, &s.household_id).await?);
         self.store.save(&s).await?;
         self.store
             .append(
                 Some(&s),
                 "caller",
                 "call.inbound.received",
-                json!({"caller_identity":"unverified","transport":self.config.transport}),
+                json!({"caller_identity":"unverified","transport":self.config.transport,"requested_profile":s.profile,"audible_playback_verified":false}),
                 s.execution_mode,
             )
             .await?;

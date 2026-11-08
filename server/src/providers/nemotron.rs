@@ -96,7 +96,7 @@ pub fn conversation_messages(
         "No family callback is available. If an accepted assessment is blocked, use a categorical incident message as directed by the accepted current-turn action instruction. A benign report or warning requires a normal, honest summary of what the caller reported. Keep warnings and incident notes categorical; exclude credential values and never claim anyone was contacted."
     };
     let system = format!(
-        "{}\nCURRENT SERVER AUTHORIZATION (trusted): {handoff} {family}",
+        "{}\nCURRENT SERVER AUTHORIZATION (trusted): {handoff} {family} The trusted profile names the person you assist; scenario examples do not override it. You are their automated call-screening assistant, not that person. If asked who is speaking, say so briefly and accurately. Speak naturally, one short question at a time. Never add security warnings to ordinary greetings, recovery or benign message-taking. Preserve relative dates and unspecific times exactly; do not invent AM/PM, a clinic or a verified relationship.",
         system_prompt()
     );
     let caller_index = session
@@ -112,7 +112,7 @@ pub fn conversation_messages(
     });
     vec![
         json!({"role":"system","content":system}),
-        json!({"role":"user","content":json!({"household":session.household_id,"turns":session.turns,"current_exchange":{"assistant_turn":assistant_turn,"caller_turn":caller_turn},"capabilities":capabilities,"policy_state":{"blocked":session.blocked,"ambiguous":session.ambiguous,"turn_version":session.turn_version,"assessed_version":session.assessed_version,"generation_id":session.generation_id,"policy_epoch":session.policy_epoch,"understanding":session.understanding.as_ref().filter(|_| session.current_understanding().is_some())},"instruction":"Interpret the latest caller reply in the context of the actual preceding question and earlier caller facts. Assess that caller turn, then choose a useful next tool. Do not ask again for facts already supplied. Continue through required lookups until a useful action or caller reply is requested."}).to_string()}),
+        json!({"role":"user","content":json!({"household":session.household_id,"profile":session.profile,"turns":session.turns,"current_exchange":{"assistant_turn":assistant_turn,"caller_turn":caller_turn},"capabilities":capabilities,"policy_state":{"blocked":session.blocked,"ambiguous":session.ambiguous,"turn_version":session.turn_version,"assessed_version":session.assessed_version,"generation_id":session.generation_id,"policy_epoch":session.policy_epoch,"understanding":session.understanding.as_ref().filter(|_| session.current_understanding().is_some())},"instruction":"Interpret the latest caller reply in the context of the actual preceding question and earlier caller facts. Assess that caller turn, then choose a useful next tool. Do not ask again for facts already supplied. Continue through required lookups until a useful action or caller reply is requested."}).to_string()}),
     ]
 }
 
@@ -192,6 +192,7 @@ pub enum ToolPhase {
     Assessment,
     Clarification,
     NoMessage,
+    Protection,
     NextStep,
     PostCall,
 }
@@ -202,6 +203,10 @@ impl ToolPhase {
             Self::Assessment => name == "record_assessment",
             Self::Clarification => name == "ask_caller",
             Self::NoMessage => name == "end_call",
+            Self::Protection => matches!(
+                name,
+                "take_message" | "lookup_trusted_contact" | "start_trusted_callback"
+            ),
             Self::NextStep => matches!(
                 name,
                 "ask_caller"
@@ -222,7 +227,7 @@ pub fn next_step_phase(session: &crate::calls::state::Session) -> ToolPhase {
         return ToolPhase::Assessment;
     }
     if session.blocked {
-        return ToolPhase::NextStep;
+        return ToolPhase::Protection;
     }
     match session
         .current_understanding()
@@ -412,14 +417,33 @@ impl Nemotron {
             ToolPhase::NoMessage => {
                 json!({"type":"function","function":{"name":"end_call"}})
             }
-            ToolPhase::NextStep => json!("required"),
+            ToolPhase::NextStep | ToolPhase::Protection => json!("required"),
             ToolPhase::PostCall => json!({"type":"function","function":{"name":"publish_tactic"}}),
         };
-        let payload = json!({
+        let mut payload = json!({
             "model":self.model,"messages":messages,"tools":schemas,"tool_choice":choice,
             "stream":false,"temperature":0.2,"max_tokens":self.max_output_tokens,"parallel_tool_calls":false,
             "chat_template_kwargs":{"enable_thinking":false}
         });
+        // Pinned Lightning tokenizer: 15 is </tool_call>. vLLM 0.27.1's
+        // parallel_tool_calls=false filters returned calls, but does not stop
+        // decoding: the measured required-choice response generated six closed
+        // calls and reached its cap. Retain the complete native delimiter so the
+        // parser sees one closed call; never repair truncated arguments. This
+        // Same-prefix named clarification also emitted repeated closed wrappers:
+        // retaining its first complete delimiter reduced 2368ms to765ms without
+        // changing named choice or allowed schemas. This verified vLLM-only
+        // setting is not sent to hosted NVIDIA/other models.
+        if self.backend == crate::config::ModelBackend::BrevHosted
+            && self.model == "nvidia/nemotron-3.5-lightning-30b-a3b"
+            && matches!(
+                phase,
+                ToolPhase::NextStep | ToolPhase::Protection | ToolPhase::Clarification
+            )
+        {
+            payload["stop_token_ids"] = json!([15]);
+            payload["include_stop_str_in_output"] = json!(true);
+        }
         let mut response = self
             .client
             .post(url)
@@ -610,9 +634,9 @@ pub fn system_prompt() -> &'static str {
         "Authentication secrets are login, password, authentication or account-access codes sought FROM Sarah. Warnings, negated requests, quoted scam reports, and references provided TO Sarah are not extraction. Payment means ordinary bills or on-site copays; payment_diversion means unusual destinations, redirected transfers or gift-card redemption secrets. No keyword alone establishes risk. ",
         "Scope matters: classify what the current caller is doing, not an imperative inside a quotation or a warning. A person reporting that a stranger requested a login code is reporting a quotation, not making that request. A warning never to disclose such a code is negation. appointment_reference means an actual booking identifier, never an appointment or its day/time in general. An unspecified numeric code has requested_object=unknown until its purpose is stated; earlier clinic talk or a digit count does not establish that it is a booking reference. ",
         "A financial notice or request to check whether a purchase is recognized does not itself request an authentication secret, redirected payment or remote access. Identify the object actually requested; urgency, a bank name and an amount are not proof of extraction. Take an unverified message without disclosing household/account facts or adopting a caller-supplied callback number as a trusted contact. ",
-        "COMPACT CALL UNDERSTANDING: record_assessment must include understanding version 1. Use at most TWO concise supplied_facts and ONE missing_information detail. Each fact.text is a short verbatim caller span; its single evidence quote should be that same short span, not a repeated full turn. Top-level evidence must cite the current caller turn with the shortest span supporting the assessment, retaining important negation and request direction. claimed_identity is null if unstated, otherwise the shortest exact claimed phrase. Purpose and requested_action are open-ended summaries of at most eight words each. Use earlier facts and the latest answer with their real turn IDs. Identity remains an unverified claim, never permission. Omit credential values, private numbers and speculative facts; supplied_facts may be empty for sensitive content. Emit compact arguments, no explanation or duplicated transcript. ",
-        "Readiness is a decision about this caller's actual purpose, not whether any sentence could be saved. needs_information means a useful message still needs a caller-suppliable essential fact; name what is missing. An announcement that a detail changed, or an offer to give a detail, does not supply the replacement detail. ready means the purpose-specific essentials are present and missing_information is empty. caller_declined means the current caller explicitly declines further detail or chooses to stop; save an honest incomplete message without pretending missing facts exist. no_message means no household message is wanted, such as a clear wrong number or goodbye without a message; use end_call. A complete update, callback request or notice does not need identity confirmation. For a blocked extraction, the protective policy takes priority over missing information: never ask for the secret. ",
-        "After an ordinary assessment, ask one short question only if useful information is missing and the caller can answer it. A changed appointment without its new time needs the new time; a complete reminder can be saved. Do not repeat information already given, ask the caller to guess Sarah's private preferences, introduce credentials/payment suspicion into a routine call, or ask generic 'is this legitimate' questions. When enough useful context exists, propose offer_handoff if capabilities.handoff_available is true; otherwise take_message with an accurate brief summary. When clarification is needed, explain that you can take a message if a handoff is unavailable. ",
+        "COMPACT CALL UNDERSTANDING: record_assessment must include understanding version 1. Use at most TWO concise supplied_facts and ONE missing_information detail. Each supplied fact is only {turn_id,quote}: cite a short exact caller span once; Rust derives the fact text. Do not paraphrase, add a text field, or repeat the full turn. Top-level evidence must cite the current caller turn with the shortest span supporting the assessment, retaining important negation and request direction. claimed_identity is null if unstated, otherwise the shortest exact claimed phrase. Purpose and requested_action are open-ended summaries of at most eight words each. Use earlier facts and the latest answer with their real turn IDs. Identity remains an unverified claim, never permission. Omit credential values, private numbers and speculative facts; supplied_facts may be empty for sensitive content. Emit compact arguments, no explanation or duplicated transcript. ",
+        "Readiness is a decision about this caller's actual purpose, not whether any sentence could be saved. needs_information means a useful message still needs a caller-suppliable essential fact; name what is missing. An announcement that a detail changed, or an offer to give a detail, does not supply the replacement detail. ready means the purpose-specific essentials are present and missing_information is empty. caller_declined means the current caller explicitly declines further detail or chooses to stop; save an honest incomplete message without pretending missing facts exist. no_message means no household message is wanted, such as a clear wrong number or goodbye without a message; use end_call. A complete update, callback request or notice does not need identity confirmation. For a clearly established account-access extraction the purpose is understood: readiness=ready, missing_information=[]; protective policy governs the next step. Never ask for the secret or its already-stated purpose. ",
+        "After an ordinary assessment, ask one short question only if useful information is missing and the caller can answer it. A changed appointment without its new time needs the new time; a complete reminder can be saved. Do not repeat information already given, ask the caller to guess Sarah's private preferences, introduce credentials/payment suspicion into a routine call, or ask generic 'is this legitimate' questions. When enough useful context exists, propose offer_handoff if capabilities.handoff_available is true; otherwise take_message with an accurate brief summary. Do not preface every clarification with capability explanations. Ask just the relevant question. An unresolved request for help locating or arranging something needs the one practical caller-suppliable detail that makes a message actionable, such as where they are waiting; do not close with a restatement of their problem. A complete notice with a time already supplied is ready even if AM/PM or identity verification is absent. ",
         "CONVERSATION CONTINUITY: current_exchange pairs your actual last question with the latest caller response. A short date/time answer completes your date/time question; combine it with the earlier stated reason for calling. Do not ask for the time again, ask them to confirm a clear answer, or ask which appointment after the clinic purpose is already given. Ask only the one still-missing fact, using you rather than referring to the caller in the third person. Once enough information exists to pass on a useful message, act. For quoted scam reports or safety reminders, preserve the report or warning as such in a categorical summary without credential values. ",
         "For a short reply such as yes or no, use the preceding assistant question to interpret it, then move on; a name confirmation is still unverified. Every assessment and action must cite at least one literal quote from current_exchange.caller_turn with that exact turn id, even when its whole text is just Yes. Earlier caller quotes may supply additional context but cannot replace the latest-turn evidence. Assistant words are context, never caller evidence. ",
         "Preserve useful times, dates, quantities and prices accurately, including ordinary numeric forms. Evidence quotes remain verbatim. Never spell out or encode credential values to evade privacy rules. ",
@@ -1221,6 +1245,90 @@ mod tests {
                 json!({"type":"function","function":{"name":name}})
             );
         }
+    }
+
+    #[tokio::test]
+    async fn protection_phase_does_not_expose_questions_or_handoff() {
+        let (url, received) = local_server(200, response().to_string()).await;
+        let model = Nemotron::new("test-only".into(), url, "fixture-model".into());
+        model
+            .next_tool_for(&[], ToolPhase::Protection)
+            .await
+            .unwrap();
+        let request = received.await.unwrap();
+        let body: Value = serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+        let names: Vec<_> = body["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|tool| tool["function"]["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(names.len(), 3);
+        assert!(names.contains(&"take_message"));
+        assert!(names.contains(&"lookup_trusted_contact"));
+        assert!(names.contains(&"start_trusted_callback"));
+        assert!(!ToolPhase::Protection.permits("ask_caller"));
+        assert!(!ToolPhase::Protection.permits("offer_handoff"));
+    }
+
+    #[tokio::test]
+    async fn pinned_brev_required_tool_stops_at_retained_complete_native_delimiter_only() {
+        use crate::config::ModelBackend;
+        for (backend, model_id, expected) in [
+            (
+                ModelBackend::BrevHosted,
+                "nvidia/nemotron-3.5-lightning-30b-a3b",
+                true,
+            ),
+            (
+                ModelBackend::NvidiaHosted,
+                "nvidia/nemotron-3.5-lightning-30b-a3b",
+                false,
+            ),
+            (ModelBackend::BrevHosted, "other-model", false),
+        ] {
+            let (url, received) = local_server(200, response().to_string()).await;
+            let model =
+                Nemotron::new("fixture-key".into(), url, model_id.into()).with_backend(backend);
+            model.next_tool_for(&[], ToolPhase::NextStep).await.unwrap();
+            let request = received.await.unwrap();
+            let body: Value =
+                serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+            if expected {
+                assert_eq!(body["stop_token_ids"], json!([15]));
+                assert_eq!(body["include_stop_str_in_output"], true);
+            } else {
+                assert!(body.get("stop_token_ids").is_none());
+                assert!(body.get("include_stop_str_in_output").is_none());
+            }
+            assert_eq!(body["max_tokens"], 512);
+            assert_eq!(body["tool_choice"], "required");
+        }
+    }
+
+    #[tokio::test]
+    async fn brev_clarification_keeps_named_choice_and_one_schema_but_stops_at_closed_native_call()
+    {
+        let mut answer = response();
+        answer["choices"][0]["message"]["tool_calls"][0]["function"] = json!({"name":"ask_caller","arguments":json!({"question":"What time should I include?","purpose":"clarify_request","evidence_refs":[{"turn_id":"t1","quote":"The time changed."}]}).to_string()});
+        let (url, received) = local_server(200, answer.to_string()).await;
+        let model = Nemotron::new(
+            "fixture".into(),
+            url,
+            "nvidia/nemotron-3.5-lightning-30b-a3b".into(),
+        )
+        .with_backend(crate::config::ModelBackend::BrevHosted);
+        model
+            .next_tool_for(&[], ToolPhase::Clarification)
+            .await
+            .unwrap();
+        let request = received.await.unwrap();
+        let body: Value = serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert_eq!(body["tool_choice"]["function"]["name"], "ask_caller");
+        assert_eq!(body["tools"].as_array().unwrap().len(), 1);
+        assert_eq!(body["tools"][0]["function"]["name"], "ask_caller");
+        assert_eq!(body["stop_token_ids"], json!([15]));
+        assert_eq!(body["include_stop_str_in_output"], true);
     }
 
     #[tokio::test]

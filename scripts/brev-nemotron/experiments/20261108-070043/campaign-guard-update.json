@@ -1,0 +1,20 @@
+{
+  "observed_at_utc": "2026-11-08T07:13:36.074462+00:00",
+  "exact_owned_instance_count": 1,
+  "remaining_credits_usd": 57.4,
+  "auto_recharge_enabled": false,
+  "work_stop_utc": "2026-11-08T09:09:50+00:00",
+  "cleanup_deadline_utc": "2026-11-08T09:39:50+00:00",
+  "unready_warmup_deadline_utc": "2026-11-08T07:30:43+00:00",
+  "compute_estimate_usd": 7.9558,
+  "cleanup_buffer_usd": 2,
+  "maximum_current_instance_allowance_usd": 10,
+  "total_budget_usd": 60,
+  "prior_confirmed_spend_usd": 2.6,
+  "old_local_guard_terminated": true,
+  "new_local_guard_started": true,
+  "remote_timer_active": true,
+  "remote_deadlines_match": true,
+  "remote_guard_sha256": "16f5f8903c8c73d5a6500a68feda21cf8866ca54ac7c675f132f1daa8aa46ee1",
+  "ready_marker_present": false
+}

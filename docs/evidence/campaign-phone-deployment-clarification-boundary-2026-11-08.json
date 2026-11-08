@@ -1,0 +1,14 @@
+{
+  "status": "deployed",
+  "recorded_at": "2026-11-08T07:45:55.064952+00:00",
+  "pid": 4043,
+  "command": ".tools/firstring-campaign-clarification-boundary",
+  "backend": "brev_hosted",
+  "binary_sha256": "69054b4001dec7856904e79992c5bc9cc716f07e312a36946d9757c421c617cd",
+  "supervisor_pid": 4045,
+  "public_base_url": "https://printers-saints-hay-camcorder.trycloudflare.com",
+  "handoff_calls_enabled": false,
+  "family_calls_enabled": false,
+  "calls_started": 0,
+  "database_backup": "local_only"
+}

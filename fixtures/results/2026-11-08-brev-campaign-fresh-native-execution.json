@@ -1,0 +1,9 @@
+{
+  "recorded_at": "2026-11-08T07:14:35.129661+00:00",
+  "backend": "brev_hosted",
+  "kind": "native",
+  "exit_code": 1,
+  "binary_sha256": "de002c9e59dd889c3f40db3dd76cb16a61fc943de8d19b28820955076fb28aac",
+  "report_sha256": "c597b302cae2a034339577d6901eacd5281f9e920bd6b668d8189df2054751a7",
+  "phone_calls": 0
+}

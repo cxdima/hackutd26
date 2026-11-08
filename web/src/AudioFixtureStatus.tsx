@@ -14,13 +14,18 @@ const fixtureStatus = z.object({
     "handoff_changed_george",
     "family_pickup_benign_george",
     "family_pickup_risky_george",
+    "exact_appointment_george",
+    "maya_appointment_george",
+    "appointment_correction_george",
   ]),
   destination: z.literal("owned_firstring_number_only"),
   test_kind: z.literal("automated_audio_caller"),
   voice: z.string(),
   clip_count: z.number().int().nonnegative(),
   time_limit_seconds: z.number().int().positive(),
-  remaining_attempts: z.number().int().min(0).max(6),
+  remaining_attempts: z.number().int().nonnegative(),
+  max_attempts: z.number().int().nonnegative().optional(),
+  attempt_count: z.number().int().nonnegative().optional(),
   state: z.string().optional(),
   provider_status: z.string().optional(),
   outcome: z.string().optional(),
@@ -51,6 +56,9 @@ const scenarioNames: Record<FixtureStatus["scenario_id"], string> = {
   handoff_changed_george: "Changed handoff request",
   family_pickup_benign_george: "Claimed family pickup → routine details",
   family_pickup_risky_george: "Claimed family pickup → sign-in request",
+  exact_appointment_george: "Appointment with exact time",
+  maya_appointment_george: "Maya appointment",
+  appointment_correction_george: "Appointment time correction",
 };
 
 /** Read-only: refreshing this panel cannot start or retry a caller leg. */
@@ -129,6 +137,9 @@ export function AudioFixtureStatus({ token }: { token: string }) {
           </span>
           <span>
             Attempts remaining: {status.remaining_attempts} ·{" "}
+            {status.attempt_count !== undefined &&
+              status.max_attempts !== undefined &&
+              `${status.attempt_count} of ${status.max_attempts} reserved · `}
             {status.time_limit_seconds}s call limit · {count} final ASR{" "}
             {count === 1 ? "observation" : "observations"}
           </span>

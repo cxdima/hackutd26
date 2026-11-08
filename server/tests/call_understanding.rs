@@ -142,3 +142,90 @@ fn accepted_facts_must_quote_real_caller_words_and_identity_remains_grounded() {
     assert!(s.accept_understanding(u).is_err());
     assert!(s.understanding.is_none());
 }
+
+#[test]
+fn supplied_fact_boundary_matches_native_schema_and_rejects_excess() {
+    let text = "Friday at 3 PM, north entrance, two packages.";
+    let (mut session, evidence) = assessed(text, RequestedObject::RoutineInformation);
+    let mut value = understanding(Readiness::Ready);
+    for fact in ["Friday at 3 PM", "north entrance"] {
+        value.supplied_facts.push(GroundedFact {
+            text: fact.into(),
+            evidence_refs: vec![evidence.clone()],
+        });
+    }
+    session.accept_understanding(value.clone()).unwrap();
+    let schemas = firstring::tools::schemas();
+    let schema = schemas
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|v| v["function"]["name"] == "record_assessment")
+        .unwrap();
+    assert_eq!(
+        schema["function"]["parameters"]["properties"]["understanding"]["properties"]["supplied_facts"]
+            ["maxItems"],
+        2
+    );
+    value.supplied_facts.push(GroundedFact {
+        text: "two packages".into(),
+        evidence_refs: vec![evidence],
+    });
+    assert!(session.accept_understanding(value).is_err());
+}
+
+#[test]
+fn accepted_risk_enters_protection_even_when_understanding_wants_more_information() {
+    let (mut session, _) = assessed(
+        "I need her login code.",
+        RequestedObject::AuthenticationSecret,
+    );
+    session
+        .accept_understanding(understanding(Readiness::NeedsInformation))
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(firstring::providers::nemotron::next_step_phase(&session)).unwrap(),
+        "protection"
+    );
+}
+
+#[test]
+fn native_fact_is_one_literal_source_span_not_a_second_generated_paraphrase() {
+    let text = "My train arrives at eight thirty. Meet me at the north entrance.";
+    let (mut session, evidence) = assessed(text, RequestedObject::RoutineInformation);
+    let arguments = serde_json::json!({
+        "observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},
+        "evidence_refs":[evidence],
+        "understanding":{"version":1,"claimed_identity":null,"purpose":"Arrange pickup","requested_action":"Pass on arrival and entrance","supplied_facts":[{"turn_id":evidence.turn_id,"quote":"eight thirty"},{"turn_id":evidence.turn_id,"quote":"north entrance"}],"missing_information":[],"readiness":"ready"}
+    });
+    let parsed = firstring::tools::ToolCall::parse("record_assessment", arguments.clone()).unwrap();
+    let firstring::tools::ToolCall::RecordAssessment {
+        understanding: Some(value),
+        ..
+    } = parsed
+    else {
+        panic!("assessment")
+    };
+    assert_eq!(value.supplied_facts[0].text, "eight thirty");
+    assert_eq!(
+        value.supplied_facts[0].evidence_refs[0].quote,
+        "eight thirty"
+    );
+    session.accept_understanding(value).unwrap();
+    let mut invalid = arguments.clone();
+    invalid["understanding"]["supplied_facts"][0]["quote"] = serde_json::json!("8:30 PM");
+    let firstring::tools::ToolCall::RecordAssessment {
+        understanding: Some(value),
+        ..
+    } = firstring::tools::ToolCall::parse("record_assessment", invalid).unwrap()
+    else {
+        panic!("assessment")
+    };
+    assert!(
+        session.accept_understanding(value).is_err(),
+        "Do not turn a paraphrase into literal evidence"
+    );
+    let mut invalid = arguments;
+    invalid["understanding"]["supplied_facts"][0]["verified"] = true.into();
+    assert!(firstring::tools::ToolCall::parse("record_assessment", invalid).is_err());
+}

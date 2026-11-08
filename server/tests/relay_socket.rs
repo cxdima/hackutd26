@@ -187,6 +187,17 @@ async fn websocket_ping_before_setup_preserves_authenticated_session_binding() {
     socket.send(Message::Pong(Vec::new().into())).await.unwrap();
     send_json(&mut socket, setup(&snapshot)).await;
     wait_event(&server.app, "voice.connected").await;
+    let events = server.app.store.events_after(0).await.unwrap();
+    let connected = events.iter().find(|e| e.kind == "voice.connected").unwrap();
+    assert_eq!(
+        connected.payload["speech"]["transcription_provider"],
+        "Deepgram"
+    );
+    assert_eq!(
+        connected.payload["speech"]["transcription_model"],
+        firstring::config::relay_speech_model().as_str()
+    );
+    assert_eq!(connected.payload["heard"], false);
 }
 
 // A pong is a processing barrier: the server awaits each preceding actor input.
@@ -300,11 +311,9 @@ async fn assessed_risk_model_failure_ends_relay_without_claiming_a_saved_message
         "Accepted risk must not ask the caller to leave another message after timeout"
     );
     let response = post_voice(&server, "/voice/after-relay", &[("CallSid", CALLER)]).await;
-    assert!(
-        response.contains("This call won&apos;t be connected.")
-            || response.contains("This call won&#39;t be connected.")
-            || response.contains("This call won't be connected.")
-    );
+    assert!(response.contains(&firstring::providers::twilio::escape(
+        "I can't help with that request. Goodbye."
+    )));
     assert!(response.contains("Goodbye."));
     assert!(response.find("</Say>").unwrap() < response.find("<Hangup/>").unwrap());
     assert!(
@@ -398,7 +407,7 @@ async fn benign_model_failure_keeps_existing_message_fallback() {
         output["token"]
             .as_str()
             .unwrap()
-            .contains("Please leave a brief message")
+            .contains("I couldn't save the message yet")
     );
     assert!(handle.send(Input::Snapshot).await.unwrap()["closing_reason"].is_null());
     assert!(
@@ -506,7 +515,9 @@ async fn saved_message_ends_relay_then_speaks_goodbye_in_order_before_hangup() {
         "Do not enqueue goodbye TTS then interrupt it with end"
     );
     let response = post_voice(&server, "/voice/after-relay", &[("CallSid", CALLER)]).await;
-    assert!(response.contains("Your message has been noted."));
+    assert!(response.contains(&firstring::providers::twilio::escape(
+        "Thanks, I've saved your message."
+    )));
     assert!(response.find("</Say>").unwrap() < response.find("<Hangup/>").unwrap());
     assert!(response.contains("<Gather input=\"speech\""));
     assert!(!response.contains("connection ended"));
@@ -698,7 +709,9 @@ async fn saved_message_gather_response_allows_bounded_interruption_and_retry_can
         .await;
     };
     let (response, _) = tokio::join!(work, model);
-    assert!(response.contains("Your message has been noted."));
+    assert!(response.contains(&firstring::providers::twilio::escape(
+        "Thanks, I've saved your message."
+    )));
     assert!(
         response.contains("<Gather input=\"speech\"") && response.contains("timeout=\"2\""),
         "Completed message permits a bounded interruption without soliciting another turn"
@@ -1177,7 +1190,7 @@ async fn orphan_speech_recovery_reaches_socket_but_late_recovery_after_final_is_
         message["token"]
             .as_str()
             .unwrap()
-            .contains("Please repeat your request")
+            .contains("Could you say that again?")
     );
     assert!(message.get("purpose").is_none());
     let recovery = frames.recv().await.unwrap();

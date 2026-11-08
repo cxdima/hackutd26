@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-11-08T07:15:39.074296+00:00",
+  "git_base": "6b750d0881188d73f9a35f02327da09015333792",
+  "data_origin": "synthetic",
+  "authorship": "Manually authored new scenarios after family split; no inference-generated targets",
+  "review_status": "pending_root_gold_review",
+  "training_steps": 0,
+  "optimizer_steps": 0,
+  "inference_requests": 0,
+  "phone_calls": 0,
+  "audio_generation_requests": 0,
+  "training_rows": 10,
+  "development_rows": 2,
+  "families": 7,
+  "validated_caller_turns": 17,
+  "validated_native_operations": 34,
+  "schema_source_sha256": "b5af97eec3e32ad5b9290c953f878f15a2587c0d231a42cf99935da1b73ad5df",
+  "message_builder_source_sha256": "c89ff65b5d44670748ceee35ee8266d2924a9586e5ecf6b336e949fb36683954",
+  "validator_source_sha256": "e43cc83d6dbb09595260bc9994dff370c40d521c9b0e971c235ba732a18a15d9",
+  "files": {
+    "family-split.json": {
+      "sha256": "f2bac2b6aefbe1b39e4f060c596d1eba7e8c5ae261b71d5fbff0e1af0f95e587",
+      "bytes": 1248
+    },
+    "split-freeze.json": {
+      "sha256": "1ed1c3782febfd7c87947becf0e704af9f13edeb3c99e4bb81ddd6a7fe6c756c",
+      "bytes": 201
+    },
+    "authored-trajectories.json": {
+      "sha256": "97cfa580994dd2b26881fa16328d83cf79229233111902b3c1ac8d50408a5a10",
+      "bytes": 28945
+    },
+    "review-labels.json": {
+      "sha256": "6cff40ee5bd6ef106bc5d99a8d19c85b85786865a6322334375bae48e79d63b8",
+      "bytes": 7679
+    },
+    "train.jsonl": {
+      "sha256": "b0dff6b6af4db24c64aa2b5062fe2187d89e5a68eae203b92d1fdf563c3dec47",
+      "bytes": 232816
+    },
+    "dev.jsonl": {
+      "sha256": "e00b3cdafe708c71388902c89c663b896c02371459a14d5e14e625256d3606d0",
+      "bytes": 46702
+    },
+    "validation-receipts.json": {
+      "sha256": "39ee4cdbfa94c5a633e72607389628fabb1d789c5aa9869da49162053781bf08",
+      "bytes": 32450
+    },
+    "row-index.json": {
+      "sha256": "d6b189aec3511d7233a4f7b680dd9a3c737b4a82a0c6d3fd3950f0c91a965675",
+      "bytes": 2618
+    },
+    "README.md": {
+      "sha256": "e860440fa672083800282ab413e7b2500c539097d585880214caac6a208348cd",
+      "bytes": 3944
+    }
+  },
+  "limitations": [
+    "No training or tokenizer/packing compatibility test",
+    "Development families are reserved, not a hidden benchmark",
+    "Only final caller prefix of each authored conversation is a training/development row",
+    "Semantic gold requires root review; policy acceptance alone does not prove good conversation",
+    "Full schema exported across a two-phase trajectory; production masks remain separate"
+  ],
+  "archive_status": "prior_prompt_schema_exports_preserved_training_paused_not_ready"
+}

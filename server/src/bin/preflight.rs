@@ -927,6 +927,10 @@ fn execute_inert(
             evidence_refs,
         } => {
             ensure!(
+                !session.blocked,
+                "Blocked requests must advance to protection, not further questions"
+            );
+            ensure!(
                 session.assessed_version == session.turn_version,
                 "Assess the current turn before asking a follow-up"
             );
@@ -1334,10 +1338,7 @@ async fn probe(data: &Dataset) -> Result<()> {
         "NEMOTRON_PROBE_REUSE_WARM_ASSESSMENT accepts only 1"
     );
     let reuse = reuse.is_some();
-    ensure!(
-        !reuse || (assessment_context.is_none() && model.backend() == ModelBackend::BrevHosted),
-        "Saved-prefix diagnostic requires Brev and no assessment-only selection"
-    );
+    let prefix_provenance = probe_prefix_provenance(reuse, assessment_context, model.backend())?;
     let mut budget = Budget::new(if assessment_context.is_some() || reuse {
         1
     } else {
@@ -1383,7 +1384,7 @@ async fn probe(data: &Dataset) -> Result<()> {
     );}
     Ok::<(), anyhow::Error>(())
     }.await;
-    let report = json!({"status":if outcome.is_err(){"model_probe_failed"}else if reuse {"reused_prefix_continuation_complete"}else if assessment_context.is_some(){"assessment_diagnostic_complete"}else{"model_probe_passed"},"reused_prefix":reuse,"reused_prefix_source":if reuse {Some("fixtures/results/2026-11-08-brev-native-warm.json")}else{None},"assessment_only":assessment_context.is_some(),"selected_context_index":assessment_context,
+    let report = json!({"status":if outcome.is_err(){"model_probe_failed"}else if reuse {"reused_prefix_continuation_complete"}else if assessment_context.is_some(){"assessment_diagnostic_complete"}else{"model_probe_passed"},"reused_prefix":reuse,"prefix_provenance":prefix_provenance,"reused_prefix_source":if reuse {Some("fixtures/results/2026-11-08-brev-native-warm.json")}else{None},"assessment_only":assessment_context.is_some(),"selected_context_index":assessment_context,
         "recorded_at":chrono::Utc::now().to_rfc3339(),"requested_model":model.requested_model(),"backend":model.backend(),"backend_evidence":"Configured adapter selection; this label alone does not prove GPU execution","data_origin":"synthetic",
         "request_timeout_ms":request_timeout_ms,"max_output_tokens":model.max_output_tokens(),"native_tool_choice":"named_assessment_then_readiness_gated_next_step",
         "requests_submitted":budget.submitted,"request_observations":budget.observations,
@@ -1394,6 +1395,30 @@ async fn probe(data: &Dataset) -> Result<()> {
     save_report_to(".tools/model-probe-results.json", &report)?;
     println!("{report}");
     outcome
+}
+
+fn probe_prefix_provenance(
+    reuse: bool,
+    assessment_context: Option<usize>,
+    backend: ModelBackend,
+) -> Result<Option<Value>> {
+    if !reuse {
+        return Ok(None);
+    }
+    ensure!(
+        assessment_context.is_none(),
+        "Saved-prefix continuation cannot be combined with assessment-only selection"
+    );
+    let raw = include_str!("../../../fixtures/results/2026-11-08-brev-native-warm.json");
+    let native = reused_warm_assessment(raw)?;
+    let saved: Value = serde_json::from_str(raw)?;
+    Ok(Some(json!({
+        "source_file":"fixtures/results/2026-11-08-brev-native-warm.json",
+        "source_backend":saved["backend"],"source_model":saved["requested_model"],
+        "source_recorded_at":saved["recorded_at"],"source_tool_call_id":native.id,
+        "target_backend":backend,"assessment_generated_this_run":false,
+        "reconstruction":"Native function arguments reserialized from accepted synthetic JSON; original call ID preserved; empty assistant content represented as null."
+    })))
 }
 
 fn reused_warm_assessment(raw: &str) -> Result<ModelToolCall> {
@@ -1487,7 +1512,7 @@ async fn evaluate_case(
         } = &tool
         {
             Some(if *purpose == QuestionPurpose::ClarifyCodeType {
-                "Is that an appointment reference, or a code used to sign in? Please don't read the code itself.".to_string()
+                "What's the code used for?".to_string()
             } else {
                 question.clone()
             })
@@ -1709,7 +1734,7 @@ async fn main() -> Result<()> {
         }
         Mode::Help => {
             println!(
-                "FirstRing preflight\n  (no flags)           Report environment NAMES only; no external calls.\n  --model-probe        Opt in to up to 4 selected-backend inference requests; native tool/result roundtrip for two synthetic contexts.\n  --evaluate-held-out  Up to 48 selected-backend inference requests on frozen v2; .tools/evaluation-v2-results.json.\n  --evaluate-regression  Original 12 cases; .tools/regression-results.json.\n  --evaluate-development  One case per development category; .tools/development-results.json.\n  --evaluate-a-only    Three development cases with no enrolled/calling contacts; .tools/a-only-development-results.json.\n  --evaluate-interactive-development  Five two-turn kit scenarios through real replay actors; up to 40 selected-backend inference requests; .tools/interactive-development-results.json.\n  --evaluate-conversation-development  Eight authored continuity/scope cases with actual assistant history; up to 32 selected-backend inference requests.\n  --evaluate-conversation-repairs  Two remaining development cases only; up to 8 selected-backend inference requests.\n  --evaluate-general-purpose-development  Eight frozen general-call cases plus one clinic control, with versioned readiness rubric; up to 32 selected-backend inference requests; .tools/general-purpose-understanding-v1-results.json.\n  --evaluate-backend-comparison  Six frozen development prefixes through the same native loop, up to 24 requests; separate backend-prefixed reports, actual stored-summary review and local closure checks.\n  --help              Show usage.\nModel requests use ModelSettings selected by NEMOTRON_BACKEND (default nvidia_hosted, or brev_hosted); that backend must have its own key, endpoint and actual served model configured. Configuration is not proof of GPU execution; named record_assessment with understanding v1 first, then readiness-gated native tool selection, with 3.5-second request, 6-second turn, four-step turn and 120-second run limits. NEMOTRON_PROBE_TIMEOUT_MS=1..15000 and NEMOTRON_PROBE_MAX_OUTPUT_TOKENS=1..1024 override only --model-probe; defaults are 3500ms and 512 tokens. NEMOTRON_PROBE_ASSESSMENT_CONTEXT=clinic|grocery limits the probe to one fixed synthetic assessment request and never reports a full protocol pass. NEMOTRON_PROBE_REUSE_WARM_ASSESSMENT=1 continues the fixed saved synthetic Brev assessment with its original native tool ID; this labels reused-prefix evidence and never reports a full fresh-probe pass. NEMOTRON_EVALUATION_REQUEST_CAP may only lower an evaluation request ceiling; skipped cases remain unproved. Evaluation and runtime retain their normal limits. Reports record request_timeout_ms and native_tool_choice=named_assessment_then_readiness_gated_next_step. Evaluation uses an in-memory policy executor; no command dials phones or changes application data. Run from repository root."
+                "FirstRing preflight\n  (no flags)           Report environment NAMES only; no external calls.\n  --model-probe        Opt in to up to 4 selected-backend inference requests; native tool/result roundtrip for two synthetic contexts.\n  --evaluate-held-out  Up to 48 selected-backend inference requests on frozen v2; .tools/evaluation-v2-results.json.\n  --evaluate-regression  Original 12 cases; .tools/regression-results.json.\n  --evaluate-development  One case per development category; .tools/development-results.json.\n  --evaluate-a-only    Three development cases with no enrolled/calling contacts; .tools/a-only-development-results.json.\n  --evaluate-interactive-development  Five two-turn kit scenarios through real replay actors; up to 40 selected-backend inference requests; .tools/interactive-development-results.json.\n  --evaluate-conversation-development  Eight authored continuity/scope cases with actual assistant history; up to 32 selected-backend inference requests.\n  --evaluate-conversation-repairs  Two remaining development cases only; up to 8 selected-backend inference requests.\n  --evaluate-general-purpose-development  Eight frozen general-call cases plus one clinic control, with versioned readiness rubric; up to 32 selected-backend inference requests; .tools/general-purpose-understanding-v1-results.json.\n  --evaluate-backend-comparison  Six frozen development prefixes through the same native loop, up to 24 requests; separate backend-prefixed reports, actual stored-summary review and local closure checks.\n  --help              Show usage.\nModel requests use ModelSettings selected by NEMOTRON_BACKEND (default nvidia_hosted, or brev_hosted); that backend must have its own key, endpoint and actual served model configured. Configuration is not proof of GPU execution; named record_assessment with understanding v1 first, then readiness-gated native tool selection, with 3.5-second request, 6-second turn, four-step turn and 120-second run limits. NEMOTRON_PROBE_TIMEOUT_MS=1..15000 and NEMOTRON_PROBE_MAX_OUTPUT_TOKENS=1..1024 override only --model-probe; defaults are 3500ms and 512 tokens. NEMOTRON_PROBE_ASSESSMENT_CONTEXT=clinic|grocery limits the probe to one fixed synthetic assessment request and never reports a full protocol pass. NEMOTRON_PROBE_REUSE_WARM_ASSESSMENT=1 continues the fixed saved synthetic Brev assessment on either selected backend with its original native tool ID; reports identify source and target providers and never report a full fresh-probe pass. NEMOTRON_EVALUATION_REQUEST_CAP may only lower an evaluation request ceiling; skipped cases remain unproved. Evaluation and runtime retain their normal limits. Reports record request_timeout_ms and native_tool_choice=named_assessment_then_readiness_gated_next_step. Evaluation uses an in-memory policy executor; no command dials phones or changes application data. Run from repository root."
             );
             Ok(())
         }
@@ -1836,6 +1861,318 @@ async fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn measured_termination_receipts_reject_length_and_validate_complete_native_policy() {
+        let baseline: Value = serde_json::from_str(include_str!(
+            "../../../fixtures/results/2026-11-08-brev-campaign-sixcase-baseline.json"
+        ))
+        .unwrap();
+        let data = dataset_for(
+            include_str!("../../../fixtures/backend-comparison-development.json"),
+            "conversation_development",
+        )
+        .unwrap();
+        let saved = &baseline["cases"][0]["trace"][0];
+        let first = ModelToolCall {
+            id: saved["tool_call_id"].as_str().unwrap().into(),
+            name: saved["name"].as_str().unwrap().into(),
+            arguments: saved["arguments"].clone(),
+            assistant_message: json!({"role":"assistant"}),
+        };
+        for (raw, should_parse) in [
+            (
+                include_str!("../../../fixtures/results/2026-11-08-brev-termination-required.json"),
+                false,
+            ),
+            (
+                include_str!("../../../fixtures/results/2026-11-08-brev-termination-named.json"),
+                true,
+            ),
+            (
+                include_str!("../../../fixtures/results/2026-11-08-brev-termination-boundary.json"),
+                true,
+            ),
+        ] {
+            let receipt: Value = serde_json::from_str(raw).unwrap();
+            let tools=receipt["native_tools"].as_array().unwrap().iter().map(|call|json!({"id":call["id"],"type":"function","function":{"name":call["name"],"arguments":call["arguments"].to_string()}})).collect::<Vec<_>>();
+            let parsed = firstring::providers::nemotron::parse_response(
+                json!({"choices":[{"finish_reason":receipt["finish_reason"],"message":{"role":"assistant","content":"","tool_calls":tools}}]}),
+            );
+            assert_eq!(parsed.is_ok(), should_parse);
+            if let Ok(call) = parsed {
+                let (mut session, _) = assess(&data.cases[0], &first).unwrap();
+                let tool = validate_next(&session, &call).unwrap();
+                let outcome =
+                    execute_inert(&mut session, &capabilities(&data.cases[0]), &tool).unwrap();
+                assert_eq!(outcome["message_recorded"], true);
+                assert!(
+                    session
+                        .message
+                        .as_ref()
+                        .unwrap()
+                        .summary
+                        .contains("after dinner")
+                );
+                assert!(session.legs.is_empty() && !session.inbound_ended);
+            }
+        }
+    }
+
+    #[test]
+    fn measured_single_schema_ask_variants_are_complete_grounded_and_policy_valid() {
+        let first = reused_warm_assessment(include_str!(
+            "../../../fixtures/results/2026-11-08-brev-native-warm.json"
+        ))
+        .unwrap();
+        let mut case = fixture().cases.remove(0);
+        case.turns[0].text =
+            "The clinic appointment time has changed, and I need to give her the new time.".into();
+        for raw in [
+            include_str!("../../../fixtures/results/2026-11-08-brev-termination-ask_named.json"),
+            include_str!(
+                "../../../fixtures/results/2026-11-08-brev-termination-ask_named_boundary.json"
+            ),
+            include_str!(
+                "../../../fixtures/results/2026-11-08-brev-termination-ask_required_boundary.json"
+            ),
+        ] {
+            let receipt: Value = serde_json::from_str(raw).unwrap();
+            assert_eq!(receipt["request_timeout_ms"], 3500);
+            let native = receipt["native_tools"].as_array().unwrap();
+            assert_eq!(native.len(), 1);
+            let tool = &native[0];
+            let call = firstring::providers::nemotron::parse_response(json!({"choices":[{"finish_reason":receipt["finish_reason"],"message":{"role":"assistant","content":null,"tool_calls":[{"id":tool["id"],"type":"function","function":{"name":tool["name"],"arguments":tool["arguments"].to_string()}}]}}]})).unwrap();
+            let (mut session, _) = assess(&case, &first).unwrap();
+            assert_eq!(next_step_phase(&session), ToolPhase::Clarification);
+            let parsed = validate_next(&session, &call).unwrap();
+            let ToolCall::AskCaller { question, .. } = &parsed else {
+                panic!("Expected the sole permitted tool")
+            };
+            assert_eq!(question, "What is the new appointment time?");
+            let version = session.assessed_version;
+            assert!(execute_inert(&mut session, &capabilities(&case), &parsed).is_ok());
+            assert_eq!(session.assessed_version, version);
+            assert!(session.message.is_none() && session.legs.is_empty() && !session.inbound_ended);
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "Explicit local-only export for an authorized termination diagnostic"]
+    async fn export_actual_family_continuation_payload() {
+        use axum::{Json, Router, routing::post};
+        use std::sync::{Arc, Mutex};
+        let baseline: Value = serde_json::from_str(include_str!(
+            "../../../fixtures/results/2026-11-08-brev-campaign-sixcase-baseline.json"
+        ))
+        .unwrap();
+        let data = dataset_for(
+            include_str!("../../../fixtures/backend-comparison-development.json"),
+            "conversation_development",
+        )
+        .unwrap();
+        assert_eq!(
+            contract_fingerprint(&data),
+            baseline["contract_fingerprint"],
+            "Do not silently compare changed prompts/schemas"
+        );
+        let case = &data.cases[0];
+        let saved = &baseline["cases"][0]["trace"][0];
+        assert_eq!(case.id, baseline["cases"][0]["id"]);
+        assert_eq!(saved["result"]["ok"], true);
+        let first=firstring::providers::nemotron::parse_response(json!({"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"","tool_calls":[{"id":saved["tool_call_id"],"type":"function","function":{"name":saved["name"],"arguments":saved["arguments"].to_string()}}]}}]})).unwrap();
+        let (session, _) = assess(case, &first).unwrap();
+        assert_eq!(next_step_phase(&session), ToolPhase::NextStep);
+        let expected = json!({"ok":true,"result":{"blocked":session.blocked,"ambiguous":session.ambiguous,"assessed_version":session.assessed_version,"understanding":session.understanding},"epoch":session.policy_epoch});
+        assert_eq!(expected, saved["result"]);
+        let mut context = messages(case, "");
+        append_tool_result(&mut context, &first, &expected);
+        let captured = Arc::new(Mutex::new(None::<Value>));
+        let seen = captured.clone();
+        let app = Router::new().route(
+            "/capture",
+            post(move |Json(body): Json<Value>| {
+                *seen.lock().unwrap() = Some(body);
+                async { Json(json!({"choices":[]})) }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let model = Nemotron::new(
+            "local-capture-only".into(),
+            format!("http://{}/capture", listener.local_addr().unwrap()),
+            MODEL.into(),
+        )
+        .with_backend(ModelBackend::BrevHosted);
+        let task = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        assert!(
+            model
+                .next_tool_for(&context, ToolPhase::NextStep)
+                .await
+                .is_err()
+        );
+        task.abort();
+        let payload = captured.lock().unwrap().take().unwrap();
+        assert_eq!(payload["tool_choice"], "required");
+        assert_eq!(payload["max_tokens"], 512);
+        assert_eq!(payload["messages"], json!(context));
+        let encoded = serde_json::to_string_pretty(&payload).unwrap();
+        std::fs::write(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../.tools/brev-required-family-request.json"),
+            &encoded,
+        )
+        .unwrap();
+        use sha2::{Digest, Sha256};
+        std::fs::write(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.tools/brev-required-family-provenance.json"),serde_json::to_string_pretty(&json!({
+            "case_id":case.id,"prefix_source":"fixtures/results/2026-11-08-brev-campaign-sixcase-baseline.json",
+            "prefix_kind":"reused_actual_accepted_synthetic_assessment",
+            "reconstruction":"Original tool ID, accepted argument object and result retained. Argument JSON reserialized; raw original assistant message was not archived. Not byte-identical baseline request evidence.",
+            "request_capture":"Actual current Rust Nemotron adapter HTTP body captured by loopback Axum; no provider inference in export",
+            "contract_fingerprint_matches_baseline":true,"tool_call_id":first.id,
+            "request_sha256":format!("{:x}",Sha256::digest(encoded.as_bytes())),"phone_calls":0
+        })).unwrap()).unwrap();
+    }
+
+    #[test]
+    fn inert_question_cannot_prolong_an_accepted_blocked_request() {
+        let mut session = Session::new(
+            "unit".into(),
+            "inert".into(),
+            "sarah".into(),
+            ExecutionMode::Replay,
+        );
+        let text = "Ask Sarah to read the sign-in code from her phone.";
+        let id = session.commit_turn(text);
+        let evidence = vec![firstring::tools::EvidenceRef {
+            turn_id: id,
+            quote: text.into(),
+        }];
+        session
+            .assess(
+                session.generation_id,
+                session.turn_version,
+                &observation(SpeechAct::Request, RequestedObject::AuthenticationSecret),
+                &evidence,
+            )
+            .unwrap();
+        assert!(session.blocked);
+        let result = execute_inert(
+            &mut session,
+            &ModelCapabilities::fictional_enrolled(),
+            &ToolCall::AskCaller {
+                question: "Could you tell me more?".into(),
+                purpose: QuestionPurpose::ClarifyRequest,
+                evidence_refs: evidence,
+            },
+        );
+        assert!(
+            result.is_err(),
+            "Accepted blocked policy must not emit another question"
+        );
+        assert!(session.blocked && session.message.is_none() && session.legs.is_empty());
+    }
+
+    #[test]
+    fn hosted_saved_prefix_is_explicitly_cross_provider_not_a_fresh_assessment() {
+        let provenance = super::probe_prefix_provenance(true, None, ModelBackend::NvidiaHosted)
+            .unwrap()
+            .unwrap();
+        assert_eq!(provenance["source_backend"], "brev_hosted");
+        assert_eq!(provenance["target_backend"], "nvidia_hosted");
+        assert_eq!(provenance["assessment_generated_this_run"], false);
+        assert!(
+            provenance["source_tool_call_id"]
+                .as_str()
+                .unwrap()
+                .starts_with("chatcmpl-tool-")
+        );
+        assert!(super::probe_prefix_provenance(true, Some(0), ModelBackend::NvidiaHosted).is_err());
+        assert!(
+            super::probe_prefix_provenance(false, None, ModelBackend::NvidiaHosted)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn saved_prefix_wire_preserves_native_roles_ids_results_and_strict_completion() {
+        use axum::{Json, Router, routing::post};
+        use std::sync::{Arc, Mutex};
+        for (finish, malformed) in [("stop", false), ("length", false), ("stop", true)] {
+            let captured = Arc::new(Mutex::new(None::<Value>));
+            let seen = captured.clone();
+            let app = Router::new().route("/chat", post(move |Json(request): Json<Value>| {
+                *seen.lock().unwrap() = Some(request);
+                async move {
+                    let arguments = if malformed { "{invalid".to_string() } else {
+                        json!({"question":"What is the new appointment time?","purpose":"clarify_request","evidence_refs":[{"turn_id":"turn-1","quote":"The clinic appointment time has changed"}]}).to_string()
+                    };
+                    Json(json!({"choices":[{"finish_reason":finish,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"local-followup","type":"function","function":{"name":"ask_caller","arguments":arguments}}]}}]}))
+                }
+            }));
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let model = Nemotron::new(
+                "local-only".into(),
+                format!("http://{}/chat", listener.local_addr().unwrap()),
+                "fixture".into(),
+            );
+            let task = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+            let first = reused_warm_assessment(include_str!(
+                "../../../fixtures/results/2026-11-08-brev-native-warm.json"
+            ))
+            .unwrap();
+            let id = first.id.clone();
+            let arguments = first.arguments.clone();
+            let mut case = fixture().cases.remove(0);
+            case.turns[0].text =
+                "The clinic appointment time has changed, and I need to give her the new time."
+                    .into();
+            let (session, _) = assess(&case, &first).unwrap();
+            let mut context = messages(&case, "");
+            let mut budget = Budget::new(1);
+            let result = followup(&model, &mut budget, &mut context, first, &session).await;
+            task.abort();
+            assert_eq!(result.is_ok(), finish == "stop" && !malformed);
+            if let Ok(call) = result {
+                validate_next(&session, &call).unwrap();
+            }
+            assert_eq!(budget.submitted, 1);
+            let wire = captured.lock().unwrap().take().unwrap();
+            assert_eq!(
+                wire["tool_choice"],
+                json!({"type":"function","function":{"name":"ask_caller"}})
+            );
+            assert_eq!(wire["tools"].as_array().unwrap().len(), 1);
+            assert_eq!(wire["max_tokens"], 512);
+            assert_eq!(wire["temperature"], 0.2);
+            assert_eq!(wire["parallel_tool_calls"], false);
+            assert_eq!(wire["stream"], false);
+            assert_eq!(wire["chat_template_kwargs"]["enable_thinking"], false);
+            let wire_messages = wire["messages"].as_array().unwrap();
+            let native = &wire_messages[wire_messages.len() - 2];
+            let returned = &wire_messages[wire_messages.len() - 1];
+            assert_eq!(native["role"], "assistant");
+            assert_eq!(native["tool_calls"][0]["id"], id);
+            assert_eq!(
+                serde_json::from_str::<Value>(
+                    native["tool_calls"][0]["function"]["arguments"]
+                        .as_str()
+                        .unwrap()
+                )
+                .unwrap(),
+                arguments
+            );
+            assert_eq!(returned["role"], "tool");
+            assert_eq!(returned["tool_call_id"], id);
+            let value: Value = serde_json::from_str(returned["content"].as_str().unwrap()).unwrap();
+            assert_eq!(value["ok"], true);
+            assert_eq!(
+                value["result"]["understanding"]["understanding"]["readiness"],
+                "needs_information"
+            );
+            assert_eq!(value["epoch"], session.policy_epoch);
+        }
+    }
+
     #[test]
     fn evaluation_budget_override_can_only_reduce_the_original_ceiling() {
         assert_eq!(super::evaluation_request_cap(24, None).unwrap(), 24);

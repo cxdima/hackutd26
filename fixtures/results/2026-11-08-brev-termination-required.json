@@ -1,0 +1,64 @@
+{
+  "recorded_at": "2026-11-08T07:18:50.726546+00:00",
+  "kind": "synthetic_reused_prefix_termination_diagnostic",
+  "backend": "brev_hosted",
+  "choice": "required",
+  "request_timeout_ms": 10000,
+  "max_output_tokens": 512,
+  "return_token_ids": true,
+  "request_sha256": "25b00271ffe239b4f7adef5bcfd9dc12303d69a792e0e2b37164c7ac172b0466",
+  "tools_sha256": "3ab3a85cbd0b18fd9276831f0fa5da671540a09154a76e7deda2244a399efdf1",
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "phone_calls": 0,
+  "hidden_reasoning_retained": false,
+  "prefix_provenance": {
+    "case_id": "general-dev-son-update",
+    "contract_fingerprint_matches_baseline": true,
+    "phone_calls": 0,
+    "prefix_kind": "reused_actual_accepted_synthetic_assessment",
+    "prefix_source": "fixtures/results/2026-11-08-brev-campaign-sixcase-baseline.json",
+    "reconstruction": "Original tool ID, accepted argument object and result retained. Argument JSON reserialized; raw original assistant message was not archived. Not byte-identical baseline request evidence.",
+    "request_capture": "Actual current Rust Nemotron adapter HTTP body captured by loopback Axum; no provider inference in export",
+    "request_sha256": "2722b649103920ad3c6a80b0c0bc9501e333b4ded3f96f376dea664f2ccbdef0",
+    "tool_call_id": "chatcmpl-tool-afb03cce3bd84a0f"
+  },
+  "http_status": 200,
+  "elapsed_ms": 8879,
+  "finish_reason": "length",
+  "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "completion_tokens": 512,
+  "generated_token_ids_count": 512,
+  "special_token_counts": {
+    "2": 0,
+    "11": 0,
+    "14": 6,
+    "15": 6
+  },
+  "last_three_token_ids": [
+    4890,
+    4442,
+    1395
+  ],
+  "content_chars": 0,
+  "reasoning_chars": null,
+  "native_tools": [
+    {
+      "id": "chatcmpl-tool-85114d060631f584",
+      "name": "take_message",
+      "arguments_chars": 244,
+      "arguments": {
+        "evidence_refs": [
+          {
+            "quote": "Hi, I am Sarah's son. My bus is delayed, and I will get home after dinner. Please pass that along.",
+            "turn_id": "turn-1"
+          }
+        ],
+        "summary": "Sarah's son reports his bus is delayed and he will arrive home after dinner."
+      },
+      "arguments_json_valid": true
+    }
+  ],
+  "status": "response_received",
+  "finish_accepted": false,
+  "action_executed": false
+}

@@ -73,6 +73,8 @@ pub struct AcceptedUnderstanding {
 pub struct Session {
     pub id: String,
     pub household_id: String,
+    #[serde(default)]
+    pub profile: Option<crate::profile::Profile>,
     pub state: String,
     pub policy_epoch: u64,
     pub generation_id: u64,
@@ -141,6 +143,7 @@ impl Session {
         Self {
             id,
             household_id,
+            profile: None,
             state: "screening".into(),
             policy_epoch: 0,
             generation_id: 0,
@@ -342,6 +345,27 @@ impl Session {
         );
         self.evidence_valid(evidence, true)?;
         self.require_message_readiness()?;
+        // This detects wording requiring privacy minimization, never call risk.
+        fn credential_terms(text: &str) -> bool {
+            let lower = text.to_lowercase();
+            lower.split(|c: char| !c.is_alphabetic()).any(|word| {
+                matches!(
+                    word.strip_suffix('s').unwrap_or(word),
+                    "password" | "passcode" | "otp" | "secret" | "pin"
+                )
+            }) || [
+                "one-time",
+                "one time",
+                "sign-in",
+                "sign in",
+                "verification code",
+                "authentication code",
+                "access token",
+                "recovery code",
+            ]
+            .iter()
+            .any(|term| lower.contains(term))
+        }
         // Minimize from already accepted conversation semantics, without performing
         // another risk classification. Never copy credential-bearing wording
         // from an authentication discussion into its saved message.
@@ -351,6 +375,16 @@ impl Session {
             .rev()
             .find(|assessment| {
                 assessment["observation"]["requested_object"] == "authentication_secret"
+                    || (matches!(
+                        assessment["observation"]["speech_act"].as_str(),
+                        Some("quotation" | "negation")
+                    ) && assessment["evidence_refs"]
+                        .as_array()
+                        .is_some_and(|references| {
+                            references.iter().any(|reference| {
+                                reference["quote"].as_str().is_some_and(credential_terms)
+                            })
+                        }))
             })
             .map(|assessment| &assessment["observation"]);
         // A later ordinary turn cannot relabel a previously disclosed credential
@@ -358,10 +392,8 @@ impl Session {
         // this may omit a later benign detail, but does not alter their risk policy.
         let summary = if self.blocked {
             "Suspicious request blocked; independent verification recommended."
-        } else if observation
-            .is_some_and(|value| value["requested_object"] == "authentication_secret")
-        {
-            match observation.and_then(|value| value["speech_act"].as_str()) {
+        } else if let Some(observation) = observation {
+            match observation["speech_act"].as_str() {
                 Some("negation") => "Caller shared a warning about protecting account information.",
                 Some("quotation") => {
                     "Caller reported a discussion involving sensitive account information."
@@ -371,30 +403,11 @@ impl Session {
         } else {
             summary
         };
-        let lower = summary.to_lowercase();
         // Credential material unexpectedly placed in an ordinary message is
-        // rejected. This safeguard is not a semantic classifier or a guarantee
-        // that arbitrary unlabelled strings can be recognized as secrets.
-        let credential_word = lower.split(|c: char| !c.is_alphabetic()).any(|word| {
-            matches!(
-                word.strip_suffix('s').unwrap_or(word),
-                "password" | "passcode" | "otp" | "secret" | "pin"
-            )
-        });
+        // rejected. Only evidence-backed accepted quotation/negation above can
+        // select a categorical note; a model summary cannot invent that context.
         anyhow::ensure!(
-            !credential_word
-                && ![
-                    "one-time",
-                    "one time",
-                    "sign-in",
-                    "sign in",
-                    "verification code",
-                    "authentication code",
-                    "access token",
-                    "recovery code",
-                ]
-                .iter()
-                .any(|term| lower.contains(term)),
+            !credential_terms(summary),
             "Remove authentication details from the message summary"
         );
         // Retain numeric facts such as times, dates, quantities and prices.

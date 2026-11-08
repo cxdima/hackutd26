@@ -1,6 +1,7 @@
 """Instance-local exact-ID cleanup, invoked by a root-owned systemd timer."""
 import json
 import datetime
+import math
 import pathlib
 import re
 import time
@@ -24,8 +25,23 @@ def log_event(operation, error=None, **fields):
 def cleanup_due(config, now, ready):
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", config["instance_id"]):
         raise ValueError("Invalid instance identity")
-    if not 0 < config["deadline"] - config["created_at"] <= 5400:
+    for field in ["created_at", "deadline", "warmup_deadline"]:
+        value = config.get(field)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise ValueError("Invalid deadline field")
+    if config.get("campaign_authorized") is True:
+        for field in ["campaign_started_at", "campaign_work_deadline"]:
+            value = config.get(field)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                raise ValueError("Invalid campaign deadline field")
+        start, work = config["campaign_started_at"], config["campaign_work_deadline"]
+        if not (0 <= start - config["created_at"] <= 3600 and 0 < work - start <= 7200
+                and 0 < config["deadline"] - work <= 1800):
+            raise ValueError("Invalid campaign expiry")
+    elif not 0 < config["deadline"] - config["created_at"] <= 5400:
         raise ValueError("Invalid expiry")
+    if not config["created_at"] < config["warmup_deadline"] <= min(config["created_at"] + 1800, config["deadline"]):
+        raise ValueError("Invalid warmup expiry")
     deadline = config["deadline"] if ready else config["warmup_deadline"]
     return now >= deadline
 

@@ -1,0 +1,149 @@
+{
+  "recorded_at": "2026-11-08T07:34:41.800963+00:00",
+  "kind": "read_only_runtime_call_diagnosis",
+  "session_id": "b6c12e77-6bca-47af-a294-9b24c1ba4eb1",
+  "source": "local durable events and session snapshot; SQLite opened mode=ro",
+  "window_since": "2026-11-08T07:25:00Z",
+  "new_sessions_in_window": 1,
+  "execution_mode": "live",
+  "data_origin": "synthetic",
+  "backend_observed": "nvidia_hosted",
+  "caller_identity": "unverified",
+  "provider_ids_and_phone_numbers_omitted": true,
+  "first_committed_transcript": "Hello. Sarah has an appointment tomorrow at 4.",
+  "second_turn_summary": "Caller reports hearing temporary-issue/no-connection/message fallback. Full second-turn words omitted.",
+  "committed_turns": 2,
+  "model_requests": 2,
+  "native_http_successes": 0,
+  "timeouts_ms": [
+    3504,
+    3504
+  ],
+  "accepted_assessments": 0,
+  "model_tool_proposals": 0,
+  "message_recorded": false,
+  "closing_reason": null,
+  "inbound_ended": true,
+  "child_legs": 0,
+  "fallback_output_requests": 2,
+  "first_final_to_fallback_request_ms": 3507,
+  "speech_recovery_requests": 1,
+  "speech_recovery_interrupted": true,
+  "partial_committed": false,
+  "audibility_proven_by_events": false,
+  "diagnosis": "Both native requests timed out before a response body; no grounding or summary rejection occurred. This is not evidence of invalid credentials. Transport had setup, finals and terminal callback. The measured runtime backend remained NVIDIA hosted, not the separate Brev diagnostic backend.",
+  "timeline": [
+    {
+      "sequence": 1836,
+      "occurred_at": "2026-11-08T07:29:22.218066+00:00",
+      "type": "call.inbound.received",
+      "payload": {
+        "caller_identity": "unverified",
+        "transport": "relay"
+      }
+    },
+    {
+      "sequence": 1837,
+      "occurred_at": "2026-11-08T07:29:22.529622+00:00",
+      "type": "voice.connected",
+      "payload": {
+        "transport": "relay"
+      }
+    },
+    {
+      "sequence": 1877,
+      "occurred_at": "2026-11-08T07:29:35.317820+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "generation_id": 9,
+        "turn_version": 1,
+        "observation": {
+          "backend": "nvidia_hosted",
+          "completion_tokens": null,
+          "elapsed_ms": 3504,
+          "error": "Nemotron request timed out",
+          "finish_reason": null,
+          "outcome": "timeout",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": null
+        }
+      }
+    },
+    {
+      "sequence": 1878,
+      "occurred_at": "2026-11-08T07:29:35.318866+00:00",
+      "type": "dependency.failed",
+      "payload": {
+        "detail": "Nemotron request timed out",
+        "provider": "nemotron"
+      }
+    },
+    {
+      "sequence": 1991,
+      "occurred_at": "2026-11-08T07:29:55.239745+00:00",
+      "type": "speech.recovery.requested",
+      "payload": {
+        "committed_partial": false,
+        "consent_held": true,
+        "generation_id": 36,
+        "turn_version": 1
+      }
+    },
+    {
+      "sequence": 2007,
+      "occurred_at": "2026-11-08T07:30:00.222535+00:00",
+      "type": "model.request.completed",
+      "payload": {
+        "generation_id": 39,
+        "turn_version": 2,
+        "observation": {
+          "backend": "nvidia_hosted",
+          "completion_tokens": null,
+          "elapsed_ms": 3504,
+          "error": "Nemotron request timed out",
+          "finish_reason": null,
+          "outcome": "timeout",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": null
+        }
+      }
+    },
+    {
+      "sequence": 2008,
+      "occurred_at": "2026-11-08T07:30:00.224652+00:00",
+      "type": "dependency.failed",
+      "payload": {
+        "detail": "Nemotron request timed out",
+        "provider": "nemotron"
+      }
+    },
+    {
+      "sequence": 2013,
+      "occurred_at": "2026-11-08T07:30:07.535287+00:00",
+      "type": "dependency.failed",
+      "payload": {
+        "detail": "Socket disconnected; consent held",
+        "provider": "relay"
+      }
+    },
+    {
+      "sequence": 2017,
+      "occurred_at": "2026-11-08T07:30:07.578976+00:00",
+      "type": "relay.ended",
+      "payload": {
+        "duration_seconds": 45,
+        "error_code": null,
+        "status": "completed"
+      }
+    },
+    {
+      "sequence": 2019,
+      "occurred_at": "2026-11-08T07:30:07.699211+00:00",
+      "type": "call.ended",
+      "payload": {}
+    }
+  ],
+  "database_modified": false,
+  "new_network_requests": 0,
+  "new_phone_calls": 0
+}

@@ -1,0 +1,9 @@
+{
+  "recorded_at": "2026-11-08T07:15:43.106304+00:00",
+  "backend": "brev_hosted",
+  "kind": "comparison",
+  "exit_code": 1,
+  "binary_sha256": "de002c9e59dd889c3f40db3dd76cb16a61fc943de8d19b28820955076fb28aac",
+  "report_sha256": "285ae8a4835a1085af835c370adbf8d9ac9925ae70369eaf6b5cc0b6030038bb",
+  "phone_calls": 0
+}

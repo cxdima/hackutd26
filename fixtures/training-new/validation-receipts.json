@@ -1,0 +1,1005 @@
+{
+  "inference_requests": 0,
+  "optimizer_steps": 0,
+  "phone_calls": 0,
+  "receipts": [
+    {
+      "actions_reserved": 0,
+      "delivery_verified": false,
+      "example_id": "fresh-01",
+      "inference_requests": 0,
+      "phone_calls": 0,
+      "steps": [
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "assessment",
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "next_step",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": "I'm Morgan from the neighborhood archive",
+                  "missing_information": [],
+                  "purpose": "Return Sarah's archived photo box",
+                  "readiness": "ready",
+                  "requested_action": "Pass on pickup location and deadline",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "reading room desk",
+                          "turn_id": "turn-1"
+                        }
+                      ],
+                      "text": "reading room desk"
+                    },
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "until 6 PM",
+                          "turn_id": "turn-1"
+                        }
+                      ],
+                      "text": "until 6 PM"
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 1,
+          "closing_reason": "message_saved",
+          "stored_summary": "Caller claiming to be Morgan from the neighborhood archive says Sarah's photo box is ready at the reading room desk until 6 PM.",
+          "terminal_tool": "take_message"
+        }
+      ],
+      "validation": "actual_replay_actor_with_in_memory_sqlite"
+    },
+    {
+      "actions_reserved": 0,
+      "delivery_verified": false,
+      "example_id": "fresh-02",
+      "inference_requests": 0,
+      "phone_calls": 0,
+      "steps": [
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "clarification",
+            "ok": true,
+            "result": {
+              "audio_requested": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "clarification",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [
+                    "New pickup location"
+                  ],
+                  "purpose": "Return Sarah's archive materials",
+                  "readiness": "needs_information",
+                  "requested_action": "Pass on the new pickup place",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "The pickup place changed",
+                          "turn_id": "turn-1"
+                        }
+                      ],
+                      "text": "The pickup place changed"
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 1,
+          "closing_reason": null,
+          "stored_summary": null,
+          "terminal_tool": "ask_caller"
+        }
+      ],
+      "validation": "actual_replay_actor_with_in_memory_sqlite"
+    },
+    {
+      "actions_reserved": 0,
+      "delivery_verified": false,
+      "example_id": "fresh-03",
+      "inference_requests": 0,
+      "phone_calls": 0,
+      "steps": [
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "assessment",
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "next_step",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": "I'm Jules, the dog walker",
+                  "missing_information": [],
+                  "purpose": "Cover the Saturday dog walk",
+                  "readiness": "ready",
+                  "requested_action": "Tell Sarah no replacement walker is needed",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "evening walk on Saturday",
+                          "turn_id": "turn-1"
+                        }
+                      ],
+                      "text": "evening walk on Saturday"
+                    },
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "doesn't need to arrange anyone else",
+                          "turn_id": "turn-1"
+                        }
+                      ],
+                      "text": "doesn't need to arrange anyone else"
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 1,
+          "closing_reason": "message_saved",
+          "stored_summary": "Caller claiming to be Jules, the dog walker, can cover Saturday's evening walk; no other walker is needed.",
+          "terminal_tool": "take_message"
+        }
+      ],
+      "validation": "actual_replay_actor_with_in_memory_sqlite"
+    },
+    {
+      "actions_reserved": 0,
+      "delivery_verified": false,
+      "example_id": "fresh-04",
+      "inference_requests": 0,
+      "phone_calls": 0,
+      "steps": [
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "clarification",
+            "ok": true,
+            "result": {
+              "audio_requested": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "clarification",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [
+                    "Replacement walking day"
+                  ],
+                  "purpose": "Reschedule the dog walk",
+                  "readiness": "needs_information",
+                  "requested_action": "Pass on the replacement walking day",
+                  "supplied_facts": [],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 1,
+          "closing_reason": null,
+          "stored_summary": null,
+          "terminal_tool": "ask_caller"
+        },
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "assessment",
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "next_step",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 2,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 2,
+                "policy_epoch": 0,
+                "turn_version": 2,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [],
+                  "purpose": "Reschedule the dog walk",
+                  "readiness": "ready",
+                  "requested_action": "Pass on the corrected walking time",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "Wednesday at 7 PM",
+                          "turn_id": "turn-2"
+                        }
+                      ],
+                      "text": "Wednesday at 7 PM"
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 2,
+          "closing_reason": "message_saved",
+          "stored_summary": "Caller asks to move the dog walk to Wednesday at 7 PM, correcting Tuesday.",
+          "terminal_tool": "take_message"
+        }
+      ],
+      "validation": "actual_replay_actor_with_in_memory_sqlite"
+    },
+    {
+      "actions_reserved": 0,
+      "delivery_verified": false,
+      "example_id": "fresh-05",
+      "inference_requests": 0,
+      "phone_calls": 0,
+      "steps": [
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "assessment",
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "next_step",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [],
+                  "purpose": "Collect Sarah's finished pottery",
+                  "readiness": "ready",
+                  "requested_action": "Pass on shelf and studio closing time",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "shelf D",
+                          "turn_id": "turn-1"
+                        }
+                      ],
+                      "text": "shelf D"
+                    },
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "closes at 5:30 PM",
+                          "turn_id": "turn-1"
+                        }
+                      ],
+                      "text": "closes at 5:30 PM"
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 1,
+          "closing_reason": "message_saved",
+          "stored_summary": "Caller says Sarah's blue bowl is ready on shelf D after glaze firing; the studio closes at 5:30 PM.",
+          "terminal_tool": "take_message"
+        }
+      ],
+      "validation": "actual_replay_actor_with_in_memory_sqlite"
+    },
+    {
+      "actions_reserved": 0,
+      "delivery_verified": false,
+      "example_id": "fresh-06",
+      "inference_requests": 0,
+      "phone_calls": 0,
+      "steps": [
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "clarification",
+            "ok": true,
+            "result": {
+              "audio_requested": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "clarification",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [
+                    "New collection hours"
+                  ],
+                  "purpose": "Update pottery collection hours",
+                  "readiness": "needs_information",
+                  "requested_action": "Pass on the new collection window",
+                  "supplied_facts": [],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 1,
+          "closing_reason": null,
+          "stored_summary": null,
+          "terminal_tool": "ask_caller"
+        },
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "assessment",
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "next_step",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 2,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 2,
+                "policy_epoch": 0,
+                "turn_version": 2,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [
+                    "New collection hours unavailable"
+                  ],
+                  "purpose": "Update pottery collection hours",
+                  "readiness": "caller_declined",
+                  "requested_action": "Save an honest incomplete notice",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "don't have the hours yet",
+                          "turn_id": "turn-2"
+                        }
+                      ],
+                      "text": "don't have the hours yet"
+                    },
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "studio's usual noticeboard",
+                          "turn_id": "turn-2"
+                        }
+                      ],
+                      "text": "studio's usual noticeboard"
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 2,
+          "closing_reason": "message_saved",
+          "stored_summary": "Caller reports the pottery collection window changed, but has no new hours; suggests checking the studio's usual noticeboard.",
+          "terminal_tool": "take_message"
+        }
+      ],
+      "validation": "actual_replay_actor_with_in_memory_sqlite"
+    },
+    {
+      "actions_reserved": 0,
+      "delivery_verified": false,
+      "example_id": "fresh-07",
+      "inference_requests": 0,
+      "phone_calls": 0,
+      "steps": [
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "assessment",
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "next_step",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [],
+                  "purpose": "Share a recycling safety reminder",
+                  "readiness": "ready",
+                  "requested_action": "Pass on a warning against remote access",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "drop-off service doesn't need computer access",
+                          "turn_id": "turn-1"
+                        }
+                      ],
+                      "text": "drop-off service doesn't need computer access"
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 1,
+          "closing_reason": "message_saved",
+          "stored_summary": "Caller shared a safety reminder that recycling drop-off does not require remote computer access.",
+          "terminal_tool": "take_message"
+        }
+      ],
+      "validation": "actual_replay_actor_with_in_memory_sqlite"
+    },
+    {
+      "actions_reserved": 0,
+      "delivery_verified": false,
+      "example_id": "fresh-08",
+      "inference_requests": 0,
+      "phone_calls": 0,
+      "steps": [
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "assessment",
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "next_step",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [],
+                  "purpose": "Explain a misleading recycling flyer",
+                  "readiness": "ready",
+                  "requested_action": "Pass on the distinction from real instructions",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "warning example, not our recycling instructions",
+                          "turn_id": "turn-1"
+                        }
+                      ],
+                      "text": "warning example, not our recycling instructions"
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 1,
+          "closing_reason": "message_saved",
+          "stored_summary": "Caller says a flyer asking for remote computer access is a warning example, not the recycling group's instructions.",
+          "terminal_tool": "take_message"
+        }
+      ],
+      "validation": "actual_replay_actor_with_in_memory_sqlite"
+    },
+    {
+      "actions_reserved": 0,
+      "delivery_verified": false,
+      "example_id": "fresh-09",
+      "inference_requests": 0,
+      "phone_calls": 0,
+      "steps": [
+        {
+          "actual_tool_result": {
+            "epoch": 1,
+            "next_phase": "assessment",
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 1,
+            "next_phase": "protection",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": true,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 1,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [],
+                  "purpose": "Obtain Sarah's account sign-in code",
+                  "readiness": "ready",
+                  "requested_action": "Have Sarah disclose an account-access secret",
+                  "supplied_facts": [],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": true,
+          "caller_turn": 1,
+          "closing_reason": "message_saved",
+          "stored_summary": "Suspicious request blocked; independent verification recommended.",
+          "terminal_tool": "take_message"
+        }
+      ],
+      "validation": "actual_replay_actor_with_in_memory_sqlite"
+    },
+    {
+      "actions_reserved": 0,
+      "delivery_verified": false,
+      "example_id": "fresh-10",
+      "inference_requests": 0,
+      "phone_calls": 0,
+      "steps": [
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "clarification",
+            "ok": true,
+            "result": {
+              "audio_requested": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "clarification",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": "I coordinate the shared garden",
+                  "missing_information": [
+                    "New tool pickup location"
+                  ],
+                  "purpose": "Coordinate garden tool collection",
+                  "readiness": "needs_information",
+                  "requested_action": "Pass on the new tool pickup location",
+                  "supplied_facts": [],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 1,
+          "closing_reason": null,
+          "stored_summary": null,
+          "terminal_tool": "ask_caller"
+        },
+        {
+          "actual_tool_result": {
+            "epoch": 1,
+            "next_phase": "assessment",
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 1,
+            "next_phase": "protection",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 2,
+              "blocked": true,
+              "understanding": {
+                "generation_id": 2,
+                "policy_epoch": 1,
+                "turn_version": 2,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [],
+                  "purpose": "Obtain Sarah's email login code",
+                  "readiness": "ready",
+                  "requested_action": "Have Sarah disclose an account-access secret",
+                  "supplied_facts": [],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": true,
+          "caller_turn": 2,
+          "closing_reason": "message_saved",
+          "stored_summary": "Suspicious request blocked; independent verification recommended.",
+          "terminal_tool": "take_message"
+        }
+      ],
+      "validation": "actual_replay_actor_with_in_memory_sqlite"
+    },
+    {
+      "actions_reserved": 0,
+      "delivery_verified": false,
+      "example_id": "fresh-11",
+      "inference_requests": 0,
+      "phone_calls": 0,
+      "steps": [
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "clarification",
+            "ok": true,
+            "result": {
+              "audio_requested": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "clarification",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [
+                    "New rehearsal time and room"
+                  ],
+                  "purpose": "Update community theater rehearsal",
+                  "readiness": "needs_information",
+                  "requested_action": "Pass on new rehearsal details",
+                  "supplied_facts": [],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 1,
+          "closing_reason": null,
+          "stored_summary": null,
+          "terminal_tool": "ask_caller"
+        },
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "clarification",
+            "ok": true,
+            "result": {
+              "audio_requested": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "clarification",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 2,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 2,
+                "policy_epoch": 0,
+                "turn_version": 2,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [
+                    "Rehearsal start time"
+                  ],
+                  "purpose": "Update community theater rehearsal",
+                  "readiness": "needs_information",
+                  "requested_action": "Pass on complete rehearsal details",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "Thursday",
+                          "turn_id": "turn-2"
+                        }
+                      ],
+                      "text": "Thursday"
+                    },
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "Studio B",
+                          "turn_id": "turn-2"
+                        }
+                      ],
+                      "text": "Studio B"
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 2,
+          "closing_reason": null,
+          "stored_summary": null,
+          "terminal_tool": "ask_caller"
+        },
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "assessment",
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": true,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "next_step",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 3,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 3,
+                "policy_epoch": 0,
+                "turn_version": 3,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [],
+                  "purpose": "Update community theater rehearsal",
+                  "readiness": "ready",
+                  "requested_action": "Pass on corrected rehearsal time and room",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "Studio C",
+                          "turn_id": "turn-3"
+                        }
+                      ],
+                      "text": "Studio C"
+                    },
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "8 PM on Thursday",
+                          "turn_id": "turn-3"
+                        }
+                      ],
+                      "text": "8 PM on Thursday"
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 3,
+          "closing_reason": "message_saved",
+          "stored_summary": "Caller says community theater rehearsal is Thursday at 8 PM in Studio C, correcting Studio B.",
+          "terminal_tool": "take_message"
+        }
+      ],
+      "validation": "actual_replay_actor_with_in_memory_sqlite"
+    },
+    {
+      "actions_reserved": 0,
+      "delivery_verified": false,
+      "example_id": "fresh-12",
+      "inference_requests": 0,
+      "phone_calls": 0,
+      "steps": [
+        {
+          "actual_tool_result": {
+            "epoch": 0,
+            "next_phase": "assessment",
+            "ok": true,
+            "result": {
+              "closing": true,
+              "message_recorded": false,
+              "stop": true
+            }
+          },
+          "assessment_result": {
+            "epoch": 0,
+            "next_phase": "no_message",
+            "ok": true,
+            "result": {
+              "ambiguous": false,
+              "assessed_version": 1,
+              "blocked": false,
+              "understanding": {
+                "generation_id": 1,
+                "policy_epoch": 0,
+                "turn_version": 1,
+                "understanding": {
+                  "claimed_identity": null,
+                  "missing_information": [],
+                  "purpose": "Reach the pool's lost-and-found desk",
+                  "readiness": "no_message",
+                  "requested_action": "End mistaken call without a message",
+                  "supplied_facts": [
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "wrong number",
+                          "turn_id": "turn-1"
+                        }
+                      ],
+                      "text": "wrong number"
+                    },
+                    {
+                      "evidence_refs": [
+                        {
+                          "quote": "No message, thanks",
+                          "turn_id": "turn-1"
+                        }
+                      ],
+                      "text": "No message, thanks"
+                    }
+                  ],
+                  "version": 1
+                }
+              }
+            }
+          },
+          "blocked": false,
+          "caller_turn": 1,
+          "closing_reason": "no_message",
+          "stored_summary": null,
+          "terminal_tool": "end_call"
+        }
+      ],
+      "validation": "actual_replay_actor_with_in_memory_sqlite"
+    }
+  ]
+}

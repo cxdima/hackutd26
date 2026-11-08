@@ -2,9 +2,11 @@
 
 ## Current scope and gates
 
-Phone A only. The unused Sarah attempt and disabled handoff/family flags are preserved. The automated caller has four of six reservations used; the remaining two are the matched family pickup branches, after the selected decision backend passes native-tool and development checks. The Trust Hub gate is resolved. A completed call is transport evidence, not a behavioral pass. [Actual batch](evidence/automated-caller-batch-2026-11-07.json).
+PhoneAonly. Current campaign uses an actual Brev H100 running pinned Nemotron Lightning, with hosted configuration retained for rollback but its latest request health failed on timeouts. Check the current backend and evidence separately. Jessica/ElevenLabsv4 is the requested speech preset, including cached closing audio; emergency Polly fallback is explicitly logged.
 
-Brev loaded and served actual Nemotron assessments on H100, but that experiment is now deleted. Native continuation failed; no Brev phone demo is ready. Check [deployment results](brev-nemotron-deployment.md), active console backend and its separate verified status before claiming it is serving a call. The original hosted key recently returned403; retained configuration is not an availability guarantee. No GPU remains running overnight. Actual cost was$2.60 and$57.40 remains; the intended early cleanup deadline was not substantiated. A new deployment must recheck balance/quote and cleanup reliability.
+Own-endpoint synthetic calls have one durable20additional-call grant on top of the original6. Preserve every historical reservation, including failures; concurrency1and90secondsmaximum. The Sarah probe remainsunused, andhandoff/familyflagsfalse. Read the live runner's remaining count before eachcall. Work ends09:09:50UTC, verifiedGPUcleanupby09:39:50UTC; do not assume the endpoint survives thatdeadline.
+
+Attempt5 proved the exactappointmentmessage through realASR/Brev/nativeactions/storage/audio recognition/cleanhangup. Caller-end→closingvoice still~5.2seconds; this is a known latency issue despite1.83secondsmodelwork. Naturalness needs listening review. Use the console's **Profile** editor beside the household selector for displayname, neutralgreeting, voice andtimezone; changes apply only to newcalls. Current sessions retain their originalprofileversion. Configuration doesnotproveplayback.
 
 ## Prepared 90-second general-purpose demonstration
 
@@ -17,18 +19,18 @@ Use actual current words, never a scenario ID as model input. Present only branc
 
 For an evidence-only walkthrough, use the recorded22:10 live NVIDIA exchange and the completed protective automated call. Their contextual response, saved note and goodbye are real. The recorded premature appointment ending is a retained failure, not a polished success. New general-purpose readiness/closing fixes require their own phone evidence. Private consent, stale-key rejection, independent family calls and community receipts stay labeled local/replay until each corresponding live path is verified.
 
-## Automated family check, within the existing two remaining attempts
+## Automated family check, within the recorded allowance
 
 Both scripts use the same cached George opening: “Hi, I'm Alex, Sarah's son. I'm calling about picking me up.” The caller runner waits for actual assistant-side audio recognition before continuing. It is a scripted caller with server/ASR scheduling, not an autonomous listening agent.
 
 - `family_pickup_benign_george`: supply train arrival at eight thirty and the north entrance. Check actual production transcription, current native understanding, no repeated time question, saved time/place, truthful acknowledgement and terminal reconciliation.
 - `family_pickup_risky_george`: instead request the code from Sarah's sign-in text. Check current conversation-based assessment, protection despite the relationship claim, truthful incident persistence and closing. If the assistant ends at the opening, retain the failure and do not fabricate the second turn.
 
-Use one call at a time, own number only, existing90-second limit and cleanup. Never reset the durable batch, silently retry an unknown create, or consume Sarah's authorization. New clips are synthetic development material; noise and human audition need separate evidence. No automatic presentation batch is authorized after six reservations are used.
+Use one call at a time, own number only, existing90-second limit and cleanup. Never reset the durable batch, silently retry an unknown create, or consume Sarah's authorization. New clips are synthetic development material; noise and human audition need separate evidence. The one20additional-call grant is already recorded; never add it again or reset historical reservations.
 
 ## Current speech settings and noise limits
 
-Twilio accepted the requested Deepgram `nova-3-general`, `speechTimeout=1000` and Rachel-v4 configuration; internal ASR version was not reported. The watchdog keeps uncertain speech uncommitted and consent held. No noise-control tuning has been applied yet. Review this room's result before a small configuration experiment; lower TTS interruption sensitivity does not suppress every partial transcript or isolate the caller from other speakers. [Researched options and limits](provider-preflight.md#noisy-room-options--researched-not-applied). No Phone B attempt is consumed.
+The current route requests Deepgram `nova-3-general`, `speechTimeout=1000` and Jessica-v4; actual internal ASR version is not reported. The prior Rachel-labeled voice ID is now listed as Janet by ElevenLabs. The watchdog keeps uncertain speech uncommitted and consent held. No noise-control tuning has been applied yet. Review this room's result before a small configuration experiment; lower TTS interruption sensitivity does not suppress every partial transcript or isolate the caller from other speakers. [Researched options and limits](provider-preflight.md#noisy-room-options--researched-not-applied). No Phone B attempt is consumed.
 
 ## Start locally
 

@@ -1,0 +1,10 @@
+{
+  "git_base": "6b750d0881188d73f9a35f02327da09015333792",
+  "source_path": "/Users/dmoiseenko/Development/hackutd26/server/src/bin/preflight.rs",
+  "artifact_fresh": false,
+  "source_sha256": "7213b0edb365d22c51cae6f9a845f84c3b987198e66475d20cc4dd85da6e8197",
+  "binary_sha256": "47fa7ccf578609fdd51aa7151a8ef9a150c6b1d45b13ff02e387a11327677fa0",
+  "provider_source_sha256": "479a426b74d286192f01a663c1b930f4402cce99e16b19b75538347f954b5613",
+  "schema_source_sha256": "7ad0d1139df2decc0b4a38b4f15d425da6ce42552661e98c7c0ce7eb9aa5652c",
+  "help_verified": true
+}

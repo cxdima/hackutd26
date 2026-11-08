@@ -1,0 +1,27 @@
+{
+  "kind": "single_termination_boundary_control",
+  "source_receipt": "2026-11-08-brev-termination-required.json",
+  "controlled_receipt": "2026-11-08-brev-termination-boundary.json",
+  "changed_request_fields": {
+    "stop_token_ids": [
+      15
+    ],
+    "include_stop_str_in_output": true
+  },
+  "request_hashes_verified": true,
+  "same_messages_tools_model_template_tokens_temperature_choice": true,
+  "request_timeout_ms": 10000,
+  "production_settings_changed": false,
+  "inference_requests": 1,
+  "phone_calls": 0,
+  "pinned_source_evidence": [
+    {
+      "url": "https://github.com/vllm-project/vllm/blob/v0.27.1/vllm/v1/engine/output_processor.py#L656",
+      "meaning": "STOP completion passes stop_terminated=true into detokenizer."
+    },
+    {
+      "url": "https://github.com/vllm-project/vllm/blob/v0.27.1/vllm/v1/engine/detokenizer.py#L108",
+      "meaning": "A final stop token is excluded from detokenization only when include_stop_str_in_output is false."
+    }
+  ]
+}

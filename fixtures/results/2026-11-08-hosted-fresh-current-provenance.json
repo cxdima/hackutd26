@@ -1,0 +1,11 @@
+{
+  "git_base": "6b750d0881188d73f9a35f02327da09015333792",
+  "source_path": "/Users/dmoiseenko/Development/hackutd26/server/src/bin/preflight.rs",
+  "artifact_fresh": false,
+  "binary_sha256": "2a89e93c351cc95c917c66af0453591183c72fd7346dfdb6f14938c03dd575fc",
+  "source_hashes": {
+    "server/src/bin/preflight.rs": "7213b0edb365d22c51cae6f9a845f84c3b987198e66475d20cc4dd85da6e8197",
+    "server/src/providers/nemotron.rs": "08a215758b7d4cff0812fc8164e459cee59cb58ea7cc1a48e3e8b690e563dea9",
+    "server/src/tools.rs": "bbaac74c33646028b9c1848c30a503f3b69d65b3b36e5c034611409f5eee9e83"
+  }
+}

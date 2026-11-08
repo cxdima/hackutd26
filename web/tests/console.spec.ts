@@ -36,6 +36,73 @@ const empty: ConsoleState = {
   ],
   tactics: [],
 };
+test("profile editor saves a version for new calls without changing phone state", async ({
+  page,
+}, info) => {
+  let profile = {
+    household_id: "sarah",
+    version: 0,
+    display_name: "Sarah",
+    greeting: "Hi, thanks for calling. What’s the call about?",
+    tts_provider: "ElevenLabs",
+    voice_id: "cgSgspJ2msm6clMCkdW9-v4",
+    locale: "en-US",
+    timezone: "America/Chicago",
+    source: "configured",
+    applies_to: "new_calls",
+  };
+  let puts = 0;
+  await page.route("**/api/events", () => new Promise(() => {}));
+  await page.route("**/api/state", (route) => route.fulfill({ json: empty }));
+  await page.route("**/api/profile/sarah", async (route) => {
+    expect(route.request().headers().authorization).toBe(
+      "Bearer fixture-operator-token",
+    );
+    if (route.request().method() === "PUT") {
+      puts++;
+      const body = route.request().postDataJSON();
+      expect(Object.keys(body).sort()).toEqual([
+        "display_name",
+        "greeting",
+        "locale",
+        "timezone",
+        "tts_provider",
+        "voice_id",
+      ]);
+      profile = { ...profile, ...body, version: profile.version + 1 };
+    }
+    await route.fulfill({ json: profile });
+  });
+  await page.goto("/");
+  await page.getByLabel("Operator token").fill("fixture-operator-token");
+  await page.getByRole("button", { name: "Connect console" }).click();
+  await page.getByRole("button", { name: "Edit call profile" }).click();
+  await page.getByLabel("Display name", { exact: true }).fill("Jamie");
+  await page.getByLabel("Voice preset").selectOption("JBFqnCBsd6RMkjVDRZzb-v4");
+  await page.getByRole("button", { name: "Save for new calls" }).click();
+  await expect(page.getByText("Saved version 1 for new calls.")).toBeVisible();
+  await expect(
+    page.getByText("Active calls keep their captured profile.", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  expect(puts).toBe(1);
+  await page.screenshot({
+    path: info.outputPath("profile-editor-desktop.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    page.getByRole("button", { name: "Save for new calls" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(390);
+  await page.screenshot({
+    path: info.outputPath("profile-editor-mobile.png"),
+    fullPage: true,
+  });
+});
 const revoked: ConsoleState = {
   ...empty,
   sessions: [

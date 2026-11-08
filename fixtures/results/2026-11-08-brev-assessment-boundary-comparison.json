@@ -1,0 +1,148 @@
+{
+  "kind": "synthetic_assessment_only_termination_diagnostic",
+  "recorded_at": "2026-11-08T07:58:43.244772+00:00",
+  "backend": "brev_hosted",
+  "requests_submitted": 2,
+  "common_instrumentation": {
+    "return_token_ids": true
+  },
+  "only_varied_fields": [
+    "stop_token_ids",
+    "include_stop_str_in_output"
+  ],
+  "prefix_provenance": {
+    "binary_sha256": "7a65c5d18673376ffb8cd55304469e43808faaf3cae5d2ed8353a0bcfcdca504",
+    "preflight_source_sha256": "480aa2156ce269a07a56eb62c65e128fb827cf0ebac30af4f1363b949324b785",
+    "provider_source_sha256": "259a10f1f4e25ca457dc6b7372336f93ab2a8c3496623f6c419c331e5d03dd78",
+    "tools_source_sha256": "30e5198cbe97d3c6f9e2b894aded5a2d7b34b072995410f494a06042d15bf0f3",
+    "capture_external_requests": 0,
+    "synthetic_context": "fixed clinic assessment-only probe"
+  },
+  "phone_calls": 0,
+  "hidden_reasoning_retained": false,
+  "full_cycle_verified": false,
+  "reports": [
+    {
+      "variant": "unchanged_termination",
+      "request_sha256": "312ef394d8f56e7a2ab652e54dd86f39512010cc3f4460d5ab1cd0a10e9bf122",
+      "messages_sha256": "b915f145b9d53c2004f97293897ce22f6ff678bd86cfdb08ba68d15525f5c122",
+      "tools_sha256": "c61f8ca752fb2456d093e3ebd646fd0e4c7090bd9df819f084920f79a2b27bfe",
+      "stop_token_ids": null,
+      "include_stop_str_in_output": null,
+      "request_timeout_ms": 3500,
+      "max_output_tokens": 512,
+      "native_validation_passed": true,
+      "http_status": 200,
+      "elapsed_ms": 1164,
+      "status": "response_received",
+      "finish_reason": "stop",
+      "stop_reason": null,
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "completion_tokens": 172,
+      "generated_token_ids_count": 172,
+      "special_token_counts": {
+        "2": 0,
+        "11": 1,
+        "14": 0,
+        "15": 1
+      },
+      "native_tool_count": 1,
+      "content_chars": 0,
+      "reasoning_chars": 0,
+      "native_validation_error": null,
+      "validated_assessments": [
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "The clinic appointment time has changed, and I need to give her the new time.",
+                "turn_id": "turn-1"
+              }
+            ],
+            "observation": {
+              "direction": "caller_supplies",
+              "requested_object": "routine_information",
+              "speech_act": "statement"
+            },
+            "understanding": {
+              "claimed_identity": null,
+              "missing_information": [
+                "new appointment time"
+              ],
+              "purpose": "update sarah on new clinic time",
+              "readiness": "needs_information",
+              "requested_action": "provide new appointment time",
+              "supplied_facts": [],
+              "version": 1
+            }
+          },
+          "context_index": 0,
+          "name": "record_assessment",
+          "tool_call_id": "chatcmpl-tool-a0ee680547a46191"
+        }
+      ]
+    },
+    {
+      "variant": "closed_tool_boundary",
+      "request_sha256": "82138880eb25b928c5ae8ba66c70938f3a4e28fc338178741795cae2c05d2d20",
+      "messages_sha256": "b915f145b9d53c2004f97293897ce22f6ff678bd86cfdb08ba68d15525f5c122",
+      "tools_sha256": "c61f8ca752fb2456d093e3ebd646fd0e4c7090bd9df819f084920f79a2b27bfe",
+      "stop_token_ids": [
+        15
+      ],
+      "include_stop_str_in_output": true,
+      "request_timeout_ms": 3500,
+      "max_output_tokens": 512,
+      "native_validation_passed": true,
+      "http_status": 200,
+      "elapsed_ms": 937,
+      "status": "response_received",
+      "finish_reason": "stop",
+      "stop_reason": 15,
+      "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "completion_tokens": 171,
+      "generated_token_ids_count": 171,
+      "special_token_counts": {
+        "2": 0,
+        "11": 0,
+        "14": 0,
+        "15": 1
+      },
+      "native_tool_count": 1,
+      "content_chars": 0,
+      "reasoning_chars": 0,
+      "native_validation_error": null,
+      "validated_assessments": [
+        {
+          "arguments": {
+            "evidence_refs": [
+              {
+                "quote": "The clinic appointment time has changed, and I need to give her the new time.",
+                "turn_id": "turn-1"
+              }
+            ],
+            "observation": {
+              "direction": "caller_supplies",
+              "requested_object": "routine_information",
+              "speech_act": "statement"
+            },
+            "understanding": {
+              "claimed_identity": null,
+              "missing_information": [
+                "new appointment time"
+              ],
+              "purpose": "inform sarah of new clinic time",
+              "readiness": "needs_information",
+              "requested_action": "give sarah new time",
+              "supplied_facts": [],
+              "version": 1
+            }
+          },
+          "context_index": 0,
+          "name": "record_assessment",
+          "tool_call_id": "chatcmpl-tool-96e00a3deb696150"
+        }
+      ]
+    }
+  ]
+}

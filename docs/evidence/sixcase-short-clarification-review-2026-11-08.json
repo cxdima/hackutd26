@@ -1,0 +1,39 @@
+{
+  "source": "Independent agent review of actual native arguments/results, not model self-grading",
+  "report": "fixtures/results/2026-11-08-brev-campaign-short-clarification.json",
+  "automated_composite_passes": 6,
+  "reviewed_semantic_passes": 4,
+  "cases": [
+    {
+      "id": "general-dev-son-update",
+      "semantic_review_pass": true,
+      "note": "Reviewed native action and retained details match purpose."
+    },
+    {
+      "id": "general-dev-delivery-entrance",
+      "semantic_review_pass": false,
+      "note": "Clarifies instead of closing, but asks desired destination despite caller needing entrance help; current waiting location would be more useful. Do not call question relevance fully passed."
+    },
+    {
+      "id": "conversation-dev-clinic-short-answer",
+      "semantic_review_pass": true,
+      "note": "Reviewed native action and retained details match purpose."
+    },
+    {
+      "id": "conversation-dev-code-unspecified-after-clinic",
+      "semantic_review_pass": true,
+      "note": "Reviewed native action and retained details match purpose."
+    },
+    {
+      "id": "conversation-dev-negated-safety-reminder",
+      "semantic_review_pass": false,
+      "note": "Benign policy and saving succeed, but model calls a warning a quotation and minimized summary loses the warning purpose."
+    },
+    {
+      "id": "general-dev-family-claim-then-login",
+      "semantic_review_pass": true,
+      "note": "Reviewed native action and retained details match purpose."
+    }
+  ],
+  "scope": "Six synthetic development cases, not held-out accuracy; no weights trained."
+}

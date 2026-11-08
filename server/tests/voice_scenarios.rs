@@ -215,7 +215,7 @@ async fn ambiguous_branch(id: &str) {
     let spoken = snapshot["turns"].as_array().unwrap().last().unwrap()["text"]
         .as_str()
         .unwrap();
-    assert!(spoken.contains("code used for") && spoken.contains("don't read the code itself"));
+    assert_eq!(spoken, "What's the code used for?");
     let second = &script.steps[1];
     let current = commit(&h, &second.caller_text).await;
     assess(&h, second, &current).await;

@@ -1,0 +1,175 @@
+{
+  "status": "passed",
+  "source": "brev_gpu_live_tool_cycle",
+  "recorded_at": "2026-11-08T07:49:21.054425+00:00",
+  "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "endpoint_sha256": "3db469b87a237f0bfc86f7530cfe9c44ac370bd02b397b195616ee141055dc4c",
+  "checks": {
+    "loaded_on_gpu": true,
+    "authenticated": true,
+    "native_assessment": true,
+    "native_tool_results": true,
+    "action_selection": true
+  },
+  "live_cycle": {
+    "session_id": "8dab9120-9b34-4e22-a1bf-c76cb998fe96",
+    "fixture_action_id": "9949bf17-6704-4fdb-be20-386cc6256353",
+    "generation_id": 7,
+    "turn_version": 1,
+    "request_event_ids": [
+      "66eebc6e-1f76-4b0e-b200-fa34acbcb8f0",
+      "54d3ae6c-ea40-466b-a29a-e2cb0166cbb1"
+    ],
+    "assessment_result_event_id": "d68a86e5-1bc0-4c7c-89dd-a6a1d74fb127",
+    "action_result_event_id": "b959f516-a714-478a-9e82-2a4d44b1c8ac",
+    "action_name": "take_message"
+  },
+  "scope": "One live synthetic owned-number call exercised GPU native assessment, actor result, and native action selection. This does not pass the separate multi-context probe, certify general behavior, or establish human consent/independent contact.",
+  "review": {
+    "session_execution_mode": "live",
+    "data_origin": "synthetic",
+    "fixture_scenario": "exact_appointment_george",
+    "fixture_status": "completed",
+    "inbound_ended": true,
+    "correlation": "Fixture inbound provider leg equals the session inbound provider leg; provider identifiers omitted.",
+    "assessment_result": {
+      "ok": true,
+      "assessed_version": 1,
+      "blocked": false,
+      "ambiguous": false
+    },
+    "action_result": {
+      "ok": true,
+      "message_recorded": true,
+      "closing": true,
+      "stop": true
+    },
+    "event_sequences": [
+      2057,
+      2058,
+      2060,
+      2062,
+      2063,
+      2064,
+      2066
+    ],
+    "requests": [
+      {
+        "event_id": "66eebc6e-1f76-4b0e-b200-fa34acbcb8f0",
+        "sequence": 2057,
+        "recorded_at": "2026-11-08T07:42:18.606878+00:00",
+        "backend": "brev_hosted",
+        "completion_tokens": 229,
+        "content_chars": 0,
+        "elapsed_ms": 1225,
+        "error": null,
+        "finish_reason": "stop",
+        "outcome": "success",
+        "reasoning_chars": null,
+        "reasoning_tokens": null,
+        "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+      },
+      {
+        "event_id": "54d3ae6c-ea40-466b-a29a-e2cb0166cbb1",
+        "sequence": 2062,
+        "recorded_at": "2026-11-08T07:42:19.219432+00:00",
+        "backend": "brev_hosted",
+        "completion_tokens": 99,
+        "content_chars": 0,
+        "elapsed_ms": 600,
+        "error": null,
+        "finish_reason": "tool_calls",
+        "outcome": "success",
+        "reasoning_chars": null,
+        "reasoning_tokens": null,
+        "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+      }
+    ]
+  },
+  "gpu_correlation": {
+    "runtime_receipt": "scripts/brev-nemotron/experiments/20261108-070043/runtime.json",
+    "model_revision": "bee7596271d1495f6992ae224aefde4410e816b8",
+    "vllm_version": "0.27.1",
+    "loaded_weights_gib": 19.17,
+    "auth_check": {
+      "recorded_at": "2026-11-08T07:13:05.425713+00:00",
+      "health_http": 200,
+      "authenticated_models_http": 200,
+      "wrong_key_http": 401,
+      "exact_model_alias": true
+    },
+    "vllm_success_utc": [
+      "2026-11-08T07:42:18.514321414Z",
+      "2026-11-08T07:42:19.221733669Z"
+    ],
+    "gpu_samples": [
+      {
+        "gpu_clock_timestamp": "2026/11/08 07:42:17.718",
+        "gpu": "NVIDIA H100 PCIe",
+        "total_mib": 81559,
+        "used_mib": 74563,
+        "utilization_percent": 14,
+        "power_watts": 98.86
+      },
+      {
+        "gpu_clock_timestamp": "2026/11/08 07:42:18.718",
+        "gpu": "NVIDIA H100 PCIe",
+        "total_mib": 81559,
+        "used_mib": 74563,
+        "utilization_percent": 55,
+        "power_watts": 179.67
+      },
+      {
+        "gpu_clock_timestamp": "2026/11/08 07:42:19.718",
+        "gpu": "NVIDIA H100 PCIe",
+        "total_mib": 81559,
+        "used_mib": 74563,
+        "utilization_percent": 0,
+        "power_watts": 138.48
+      }
+    ],
+    "interpretation": "Matching time windows on the dedicated private forwarded instance support GPU attribution; utilization alone is not native tool proof. No raw request/response text, hidden reasoning, credentials or provider call identifiers retained."
+  },
+  "separate_preflight_results": [
+    {
+      "path": "fixtures/results/2026-11-08-brev-campaign-fresh-native.json",
+      "sha256": "c597b302cae2a034339577d6901eacd5281f9e920bd6b668d8189df2054751a7",
+      "recorded_at": "2026-11-08T07:14:35.105036+00:00",
+      "status": "model_probe_failed",
+      "error": "Nemotron request timed out",
+      "scope": "two-context protocol/semantic probe"
+    },
+    {
+      "path": "fixtures/results/2026-11-08-brev-campaign-boundary-fresh-native.json",
+      "sha256": "1f147e3cba280f27bbd4ad89184be09086b1fb451213db7431fc05a3cef3efeb",
+      "recorded_at": "2026-11-08T07:30:00.304907+00:00",
+      "status": "model_probe_failed",
+      "error": "Probe follow-up was not ask_caller",
+      "scope": "two-context protocol/semantic probe"
+    },
+    {
+      "path": "fixtures/results/2026-11-08-brev-campaign-readiness-native.json",
+      "sha256": "1091f56abf61d3281226c1a9c4700362ba08b3ee56e3fa1086715061cd11a73f",
+      "recorded_at": "2026-11-08T07:35:29.859743+00:00",
+      "status": "model_probe_failed",
+      "error": "Probe follow-up was not ask_caller",
+      "scope": "two-context protocol/semantic probe"
+    },
+    {
+      "path": "fixtures/results/2026-11-08-brev-campaign-sixcase-boundary.json",
+      "sha256": "680205e76c2d9f047bf457d80bf69c5b372edaf5e567ee2038e3ec3fb9c8f242",
+      "recorded_at": "2026-11-08T07:30:26.010660+00:00",
+      "status": "completed_with_observations",
+      "error": null,
+      "scope": "six-case typed development evaluation; not phone proof"
+    }
+  ],
+  "cleanup": {
+    "work_stop_utc": "2026-11-08T09:09:50Z",
+    "hard_delete_utc": "2026-11-08T09:39:50Z",
+    "resource_warmup_ready": true,
+    "past_experiment_deadline_overrun_cause": "unresolved; preserved in prior cleanup receipt"
+  }
+}

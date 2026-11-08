@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "split": "development",
+  "data_origin": "synthetic",
+  "source_sha256": "0a9a7b02c6f914e4bd0f7b5fe9733c9ca3653c2626f2013a84cec47cd8056cca",
+  "clips_generated": 3,
+  "synthetic_audio_receipt": "docs/evidence/audio-focused-appointment-2026-11-08.json",
+  "runtime_scenarios": [
+    {
+      "id": "exact_appointment_george",
+      "clips": [
+        "exact_appointment_caller_george"
+      ],
+      "required_active_profile": "Sarah",
+      "expected_saved_facts": [
+        "Sarah",
+        "appointment",
+        "tomorrow",
+        "four"
+      ],
+      "must_not_invent": [
+        "AM",
+        "PM",
+        "dentist",
+        "clinic"
+      ]
+    },
+    {
+      "id": "maya_appointment_george",
+      "clips": [
+        "maya_appointment_caller_george"
+      ],
+      "required_active_profile": "Maya",
+      "expected_saved_facts": [
+        "Maya",
+        "appointment",
+        "tomorrow",
+        "four"
+      ],
+      "must_not_invent": [
+        "Sarah as recipient",
+        "AM",
+        "PM",
+        "appointment type"
+      ]
+    }
+  ],
+  "prepared_correction": {
+    "clip_id": "appointment_correction_caller_george",
+    "intended_prior_clip": "exact_appointment_caller_george",
+    "expected_current_time": "five",
+    "superseded_time": "four",
+    "automated_scenario_allowlisted": true,
+    "blocker": null,
+    "scenario_id": "appointment_correction_george",
+    "status": "implemented_and_locally_tested_not_yet_phone_verified",
+    "timing": "Actual originating partial ASR during first defender response triggers one durable same-leg TwiML update; late or closed defender suppresses playback."
+  },
+  "reused_existing_scenarios": [
+    "routine_message_george",
+    "family_pickup_benign_george",
+    "family_pickup_risky_george"
+  ],
+  "authorization_allowance_changed": false,
+  "telephony_actions": 0
+}

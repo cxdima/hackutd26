@@ -2,6 +2,8 @@ use anyhow::{Result, anyhow, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+const MAX_SUPPLIED_FACTS: usize = 2;
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EvidenceRef {
@@ -60,7 +62,7 @@ impl CallUnderstanding {
         validate_speech(&self.purpose, 180)?;
         validate_speech(&self.requested_action, 180)?;
         ensure!(
-            self.supplied_facts.len() <= 4 && self.missing_information.len() <= 3,
+            self.supplied_facts.len() <= MAX_SUPPLIED_FACTS && self.missing_information.len() <= 3,
             "Understanding exceeds bounds"
         );
         for fact in &self.supplied_facts {
@@ -214,7 +216,23 @@ pub enum ToolCall {
 }
 
 impl ToolCall {
-    pub fn parse(name: &str, arguments: Value) -> Result<Self> {
+    pub fn parse(name: &str, mut arguments: Value) -> Result<Self> {
+        // The native wire format cites each fact once. Derive display text from
+        // that literal quote; the actor still validates its actual caller turn.
+        // Keep the old internal shape readable for persisted/replay fixtures.
+        if name == "record_assessment"
+            && let Some(facts) = arguments
+                .pointer_mut("/understanding/supplied_facts")
+                .and_then(Value::as_array_mut)
+        {
+            for fact in facts {
+                if fact.get("text").is_none() {
+                    let evidence: EvidenceRef = serde_json::from_value(fact.clone())
+                        .map_err(|_| anyhow!("invalid supplied fact source"))?;
+                    *fact = json!({"text":evidence.quote,"evidence_refs":[evidence]});
+                }
+            }
+        }
         let tool: Self = serde_json::from_value(json!({"name":name,"arguments":arguments}))
             .map_err(|_| anyhow!("unknown tool or invalid tool arguments"))?;
         match &tool {
@@ -430,8 +448,8 @@ pub fn schemas() -> Value {
         &["speech_act", "requested_object", "direction"],
         json!({
             "speech_act": enumeration(&["request","statement","negation","quotation","unclear"]),
-            "requested_object": enumeration(&["authentication_secret","appointment_reference","payment","payment_diversion","remote_access","routine_information","unknown"]),
-            "direction": enumeration(&["caller_requests_from_sarah","caller_supplies","none","unclear"])
+            "requested_object": {"type":"string","enum":["authentication_secret","appointment_reference","payment","payment_diversion","remote_access","routine_information","unknown"],"description":"What information/action is actually sought. Unexplained digits/code sought from the household are unknown even after benign context; account access makes them authentication_secret. Classify a warning's object as the warned-about object while speech_act negation preserves its benign meaning."},
+            "direction": {"type":"string","enum":["caller_requests_from_sarah","caller_supplies","none","unclear"],"description":"Flow of information or requested action, not speaker identity. Caller gives an update/reference: caller_supplies. Caller seeks Sarah's secret/payment/action: caller_requests_from_sarah. Quoting a stranger or warning not to share: none. 'Please tell Sarah my train time' supplies information; it does not request a secret from Sarah."}
         }),
     );
     let evidence = json!({"type":"array","minItems":1,"maxItems":8,"items":object(&["turn_id","quote"],json!({"turn_id":string(96),"quote":string(1024)}))});
@@ -449,9 +467,9 @@ pub fn schemas() -> Value {
             "version":{"type":"integer","enum":[1]},
             "claimed_identity":{"type":["string","null"],"maxLength":120,"description":"A literal caller identity/relationship claim, or null; never verified identity."},
             "purpose":string(180), "requested_action":string(180),
-            "supplied_facts":{"type":"array","maxItems":2,"description":"Optional verbatim caller spans; use [] when not needed. Do not paraphrase facts.","items":object(&["text","evidence_refs"],json!({"text":{"type":"string","minLength":1,"maxLength":180,"description":"Copy an exact substring of the associated evidence quote, including wording and case."},"evidence_refs":evidence}))},
+            "supplied_facts":{"type":"array","maxItems":MAX_SUPPLIED_FACTS,"description":"Optional literal caller evidence, each quoted once. Never paraphrase. Use [] for sensitive content.","items":object(&["turn_id","quote"],json!({"turn_id":string(96),"quote":string(180)}))},
             "missing_information":{"type":"array","maxItems":3,"items":string(160),"description":"Essential unanswered details for the actual caller purpose; do not invent mandatory intake."},
-            "readiness":enumeration(&["needs_information","ready","caller_declined","no_message"])
+            "readiness":{"type":"string","enum":["needs_information","ready","caller_declined","no_message"],"description":"needs_information for an unresolved request for assistance or incomplete opening: ask the one fact that makes the next step useful. ready for a complete notice/update with useful details or fully understood risky action; never mark a request ready merely because its words can be saved. Unknown code purpose needs_information; established account-access extraction ready for protective handling, never seek its value."}
         }),
     );
     json!([

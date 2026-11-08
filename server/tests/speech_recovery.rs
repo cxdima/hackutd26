@@ -10,7 +10,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::broadcast;
-const REPEAT: &str = "I didn't catch the end of that. Please repeat your request without sharing passwords or sign-in codes.";
+const REPEAT: &str = "I missed the last part. Could you say that again?";
 async fn setup() -> (App, Handle, broadcast::Receiver<AudioFrame>) {
     let config = Config {
         public_base_url: "https://recovery.fixture.example".into(),

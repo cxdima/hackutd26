@@ -29,3 +29,14 @@ Closing uses a signed, bounded speech Gather around the acknowledgement, allowin
 ## Backend identity and budget (2026-11-08)
 
 `NEMOTRON_BACKEND=nvidia_hosted|brev_hosted` selects separate credentials/endpoint/model settings. Brev uses a dedicated inference key over a loopback SSH forward or HTTPS; the hosted configuration is retained. Backend labels describe selected configuration until native-cycle evidence exists. Historical hosted protocol receipts cannot verify Brev; its receipt additionally binds the endpoint hash, loaded model and GPU/native-cycle checks. The Brev experiment ceiling is $10 with at least $50 reserved for presentation, under the user's larger total existing-credit authorization. No standalone NeMo Framework experiment was implemented or retained.
+
+## Native facts and blocked actions (2026-11-08 continuation)
+
+The native assessment schema now sends up to two literal fact references as `{turn_id, quote}`. Rust derives the existing internal/display text from that quote and validates it against a real caller turn. This removes the redundant generated paraphrase; it does not repair invented evidence. Existing stored/internal fact structures remain readable. Both schema and validator enforce the same two-fact limit.
+
+An accepted blocked assessment enters a restricted protection phase. Questions and handoff are excluded from that native tool set; the runtime and inert executor also reject `ask_caller` after the block, even with current evidence. New or unresolved speech still requires a fresh assessment and cannot revive old work. Request direction is explained alongside its schema enum; Nemotron continues to interpret it.
+
+The hosted saved-prefix diagnostic explicitly records the synthetic Brev source and selected target backend. A successful reused-prefix continuation is never labeled a fresh full-cycle or telephone pass. Production request/turn limits remain3500/6000ms.
+
+## Configurable greeting and consistent speech (Nov 8)
+The user explicitly replaced the automatic Sarah/assistant introduction with a neutral configurable greeting. The model must identify itself accurately when asked, and must not impersonate the profile owner. Each incoming call snapshots the persisted profile; edits apply to new calls, including name, ElevenLabs voice, locale and timezone. Relay requests Jessica v4 by default; static closing uses cached ElevenLabs v4 audio for the same snapshot voice. Polly remains an explicitly logged emergency fallback. Configuration, media delivery, caller-side recognition and subjective listening remain separate evidence.

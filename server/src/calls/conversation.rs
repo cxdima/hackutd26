@@ -15,8 +15,7 @@ use chrono::Utc;
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
 
-const MODEL_FAILURE_CLOSING: &str =
-    "I can't help with that request. This call won't be connected. Goodbye.";
+const MODEL_FAILURE_CLOSING: &str = "I can't help with that request. Goodbye.";
 
 impl Actor {
     pub(crate) async fn conversation(&mut self, input: Input) -> anyhow::Result<Value> {
@@ -51,9 +50,18 @@ impl Actor {
                 characters,
             } => {
                 tracing::info!(session_id = %self.session.id, event, elapsed_ms, characters, "Relay transport observation");
-                self.emit("caller", "relay.telemetry", json!({"event":event,"elapsed_ms":elapsed_ms,"characters":characters,"heard":false})).await?;
+                let profile =
+                    self.session
+                        .profile
+                        .clone()
+                        .unwrap_or(crate::profile::Profile::default_for(
+                            &self.session.household_id,
+                        )?);
+                self.emit("caller", "relay.telemetry", json!({"event":event,"elapsed_ms":elapsed_ms,"characters":characters,"heard":false,
+                    "speech":{"source":"requested_profile_snapshot","provider":profile.tts_provider,"voice":profile.voice_id,"path":"conversation_relay","profile_version":profile.version,"transcription_provider":"Deepgram","transcription_model":crate::config::relay_speech_model().as_str()}})).await?;
             }
             Input::ClosingResponse => {
+                use crate::providers::speech::StaticPhrase;
                 let text = match self.session.closing_reason.as_deref() {
                     Some("message_saved") => self.saved_message_closing(),
                     Some("model_failure") => MODEL_FAILURE_CLOSING,
@@ -64,15 +72,63 @@ impl Actor {
                     return Ok(json!({"twiml":"<Response><Hangup/></Response>"}));
                 }
                 let nonce = self.closing_nonce();
+                let response_key = format!("closing.response:{nonce}");
+                if let Some(cached) = self.session.gather_replies.get(&response_key) {
+                    return Ok(json!({"twiml":cached,"duplicate":true}));
+                }
+                let phrase = match self.session.closing_reason.as_deref() {
+                    Some("message_saved") if self.session.blocked => StaticPhrase::ProtectiveSaved,
+                    Some("message_saved") => StaticPhrase::NormalSaved,
+                    Some("model_failure") => StaticPhrase::ProtectedModelFailure,
+                    _ => StaticPhrase::NoMessage,
+                };
+                let profile =
+                    self.session
+                        .profile
+                        .clone()
+                        .unwrap_or(crate::profile::Profile::default_for(
+                            &self.session.household_id,
+                        )?);
+                let prepared = if self.session.execution_mode == ExecutionMode::Live {
+                    match self.app.speech.as_ref() {
+                        Some(cache) => cache
+                            .prepare(phrase, &profile.voice_id)
+                            .await
+                            .map_err(|_| "static_speech_unavailable"),
+                        None => Err("static_speech_unconfigured"),
+                    }
+                } else {
+                    Err("replay_no_synthesis")
+                };
+                let prompt = match prepared {
+                    Ok(audio) => {
+                        let mut evidence = audio.evidence();
+                        evidence["heard"] = json!(false);
+                        evidence["transport"] = json!("twiml_closing");
+                        evidence["profile_version"] = json!(profile.version);
+                        self.emit("system", "audio.prepared", evidence).await?;
+                        format!("<Play>{}</Play>", twilio::escape(&audio.url))
+                    }
+                    Err(reason) => {
+                        self.emit("system", "audio.fallback", json!({"reason":reason,"provider":"Amazon Polly","voice":"Polly.Joanna-Neural",
+                            "requested_provider":"ElevenLabs","requested_voice":profile.voice_id,"transport":"twiml_closing","heard":false,"profile_version":profile.version})).await?;
+                        format!(
+                            "<Say voice=\"Polly.Joanna-Neural\" language=\"en-US\">{}</Say>",
+                            twilio::escape(text)
+                        )
+                    }
+                };
                 let url = self
                     .app
                     .config
                     .external_url(&format!("/voice/closing?nonce={nonce}"));
                 let twiml = format!(
-                    "<Response><Gather input=\"speech\" speechTimeout=\"1\" timeout=\"2\" actionOnEmptyResult=\"true\" action=\"{}\" method=\"POST\"><Say voice=\"Polly.Joanna-Neural\" language=\"en-US\">{}</Say></Gather><Hangup/></Response>",
+                    "<Response><Gather input=\"speech\" speechTimeout=\"1\" timeout=\"2\" actionOnEmptyResult=\"true\" action=\"{}\" method=\"POST\">{prompt}</Gather><Hangup/></Response>",
                     twilio::escape(&url),
-                    twilio::escape(text)
                 );
+                self.session
+                    .gather_replies
+                    .insert(response_key, twiml.clone());
                 return Ok(json!({"twiml":twiml}));
             }
             Input::ClosingInput { nonce, text } => return self.closing_input(nonce, text).await,
@@ -112,7 +168,15 @@ impl Actor {
                 );
                 self.relay_attached = true;
                 self.active_relay_token = Some(token);
-                self.emit("caller", "voice.connected", json!({"transport":"relay"}))
+                let profile =
+                    self.session
+                        .profile
+                        .clone()
+                        .unwrap_or(crate::profile::Profile::default_for(
+                            &self.session.household_id,
+                        )?);
+                self.emit("caller", "voice.connected", json!({"transport":"relay","heard":false,
+                    "speech":{"source":"requested_profile_snapshot","provider":profile.tts_provider,"voice":profile.voice_id,"path":"conversation_relay","profile_version":profile.version,"transcription_provider":"Deepgram","transcription_model":crate::config::relay_speech_model().as_str()}}))
                     .await?;
                 if let Some(text) = self.pending_relay_prompt.take() {
                     return self.final_prompt(text).await;
@@ -248,7 +312,7 @@ impl Actor {
                         } else {
                             "Conversation unavailable; message-taking fallback".into()
                         };
-                    self.speak("I'm having a temporary problem. I won't connect this call. Please leave a brief message without any passwords or sign-in codes.").await?;
+                    self.speak("I heard you. I couldn't save the message yet. Is there anything else to add?").await?;
                 }
             }
             Input::Whisper { offer_id, sid } => {
@@ -569,9 +633,18 @@ impl Actor {
             candidate.gather_token = candidate.relay_token.clone();
             json!({"gather_turn_token":candidate.gather_token})
         } else {
-            let twiml = crate::providers::relay::reconnect_twiml(
+            let profile =
+                candidate
+                    .profile
+                    .clone()
+                    .unwrap_or(crate::profile::Profile::default_for(
+                        &candidate.household_id,
+                    )?);
+            let twiml = crate::providers::relay::connect_twiml_for(
                 &self.app.config.public_base_url,
                 &candidate.relay_token,
+                &profile,
+                false,
             );
             candidate
                 .gather_replies
@@ -708,7 +781,7 @@ impl Actor {
         self.speech_recovery_task.take();
         self.session.current_action =
             "Please repeat the request; private acceptance remains on hold".into();
-        let text = "I didn't catch the end of that. Please repeat your request without sharing passwords or sign-in codes.";
+        let text = "I missed the last part. Could you say that again?";
         self.emit("system","speech.recovery.requested",json!({"generation_id":generation,"turn_version":self.session.turn_version,"consent_held":true,"committed_partial":false})).await?;
         self.emit(
             "system",
@@ -880,12 +953,16 @@ impl Actor {
                 evidence_refs,
             } => {
                 anyhow::ensure!(
+                    !self.session.blocked,
+                    "Blocked requests must advance to protection, not further questions"
+                );
+                anyhow::ensure!(
                     self.session.assessed_version == self.session.turn_version,
                     "Assess the current turn before asking a follow-up"
                 );
                 self.session.evidence_valid(&evidence_refs, true)?;
                 let question = if purpose == QuestionPurpose::ClarifyCodeType {
-                    "What's the code used for? Please don't read the code itself.".to_string()
+                    "What's the code used for?".to_string()
                 } else {
                     question
                 };
@@ -1153,9 +1230,9 @@ impl Actor {
 
     fn saved_message_closing(&self) -> &'static str {
         if self.session.blocked {
-            "I can't help with that request. This call won't be connected. I've saved a brief incident note. Goodbye."
+            "I can't help with that request. I've saved a note. Goodbye."
         } else {
-            "Your message has been noted. No connection has been made. Goodbye."
+            "Thanks, I've saved your message. Goodbye."
         }
     }
 }
@@ -1300,22 +1377,22 @@ mod message_tests {
             (
                 "authentication_secret",
                 "request",
-                "I can't help with that request. This call won't be connected. I've saved a brief incident note. Goodbye.",
+                "I can't help with that request. I've saved a note. Goodbye.",
             ),
             (
                 "payment_diversion",
                 "request",
-                "I can't help with that request. This call won't be connected. I've saved a brief incident note. Goodbye.",
+                "I can't help with that request. I've saved a note. Goodbye.",
             ),
             (
                 "remote_access",
                 "request",
-                "I can't help with that request. This call won't be connected. I've saved a brief incident note. Goodbye.",
+                "I can't help with that request. I've saved a note. Goodbye.",
             ),
             (
                 "authentication_secret",
                 "negation",
-                "Your message has been noted. No connection has been made. Goodbye.",
+                "Thanks, I've saved your message. Goodbye.",
             ),
         ] {
             let (app, handle, _) = prepared_message().await;
@@ -1452,5 +1529,153 @@ mod message_tests {
                 .public_value()["message"]
                 .is_null()
         );
+    }
+
+    async fn closing_audio_actor(seed: bool) -> (App, Actor, std::path::PathBuf) {
+        use crate::providers::speech::{SpeechCache, StaticPhrase};
+        let (mut app, handle, evidence) = prepared_message().await;
+        std::sync::Arc::make_mut(&mut app.config).public_base_url =
+            "https://static-closing.fixture.example".into();
+        send_tool(
+            &handle,
+            "take_message",
+            json!({"summary":"Caller asks to reschedule.","evidence_refs":evidence}),
+        )
+        .await
+        .unwrap();
+        let root =
+            std::env::temp_dir().join(format!("firstring-closing-audio-{}", uuid::Uuid::new_v4()));
+        let cache = SpeechCache::new(root.clone(), &app.config.public_base_url, None).unwrap();
+        if seed {
+            cache
+                .seed_fixture(StaticPhrase::NormalSaved, crate::profile::GEORGE)
+                .await
+                .unwrap();
+        }
+        app.speech = Some(std::sync::Arc::new(cache));
+        let mut session = app.store.sessions().await.unwrap().pop().unwrap();
+        session.execution_mode = ExecutionMode::Live;
+        session.profile.as_mut().unwrap().voice_id = crate::profile::GEORGE.into();
+        let actor = Actor {
+            app: app.clone(),
+            session,
+            handle,
+            model_task: None,
+            relay_attached: false,
+            active_relay_token: None,
+            pending_relay_prompt: None,
+            pending_speech: None,
+            speech_recovery_task: None,
+        };
+        (app, actor, root)
+    }
+
+    #[tokio::test]
+    async fn static_closing_uses_cached_snapshot_voice_and_never_claims_playback() {
+        use axum::{
+            body::{Body, to_bytes},
+            http::{Request, StatusCode},
+        };
+        use tower::ServiceExt;
+        let (app, mut actor, root) = closing_audio_actor(true).await;
+        let first = actor.conversation(Input::ClosingResponse).await.unwrap();
+        let xml = first["twiml"].as_str().unwrap();
+        assert!(xml.contains("<Gather input=\"speech\""));
+        assert!(xml.contains("<Play>https://"));
+        assert!(!xml.contains("<Say"));
+        assert!(xml.contains("</Play></Gather><Hangup/>"));
+        assert_eq!(
+            actor.conversation(Input::ClosingResponse).await.unwrap()["twiml"],
+            first["twiml"]
+        );
+        let media_url = xml
+            .split("<Play>")
+            .nth(1)
+            .unwrap()
+            .split("</Play>")
+            .next()
+            .unwrap();
+        let url = url::Url::parse(media_url).unwrap();
+        let response = crate::http::router(app.clone())
+            .oneshot(Request::get(url.path()).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["content-type"], "audio/mpeg");
+        assert_eq!(response.headers()["cache-control"], "private, no-store");
+        assert_eq!(
+            to_bytes(response.into_body(), 1000).await.unwrap().len(),
+            43
+        );
+        let events = app.store.events_after(0).await.unwrap();
+        let prepared: Vec<_> = events
+            .iter()
+            .filter(|event| event.kind == "audio.prepared")
+            .collect();
+        assert_eq!(prepared.len(), 1);
+        assert_eq!(prepared[0].payload["voice_id"], "JBFqnCBsd6RMkjVDRZzb");
+        assert_eq!(prepared[0].payload["heard"], false);
+        assert_eq!(prepared[0].payload["audible_playback_verified"], false);
+        assert!(!prepared[0].payload.to_string().contains("/media/"));
+        assert!(!events.iter().any(|event| event.kind == "audio.played"));
+        assert!(
+            app.store
+                .actions(&actor.session.id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        actor.session.inbound_ended = true;
+        assert_eq!(
+            actor.conversation(Input::ClosingResponse).await.unwrap()["twiml"],
+            "<Response><Hangup/></Response>"
+        );
+        tokio::fs::remove_dir_all(root).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn static_closing_live_cache_miss_without_key_has_explicit_emergency_fallback() {
+        let (app, mut actor, root) = closing_audio_actor(false).await;
+        let reply = actor.conversation(Input::ClosingResponse).await.unwrap();
+        assert!(
+            reply["twiml"]
+                .as_str()
+                .unwrap()
+                .contains("Polly.Joanna-Neural")
+        );
+        let events = app.store.events_after(0).await.unwrap();
+        let fallback = events
+            .iter()
+            .find(|event| event.kind == "audio.fallback")
+            .unwrap();
+        assert_eq!(fallback.payload["reason"], "static_speech_unavailable");
+        assert_eq!(fallback.payload["requested_voice"], crate::profile::GEORGE);
+        assert_eq!(fallback.payload["heard"], false);
+        assert!(!root.exists());
+    }
+
+    #[tokio::test]
+    async fn closing_reconnect_preserves_original_profile_snapshot() {
+        let (app, mut actor, root) = closing_audio_actor(true).await;
+        let nonce = actor.closing_nonce();
+        let response = actor
+            .conversation(Input::ClosingInput {
+                nonce,
+                text: "The visit is Friday instead.".into(),
+            })
+            .await
+            .unwrap();
+        let xml = response["twiml"].as_str().unwrap();
+        assert!(xml.contains(crate::profile::GEORGE));
+        assert!(!xml.contains(crate::profile::JESSICA));
+        assert!(!xml.contains("welcomeGreeting="));
+        assert!(
+            app.store
+                .actions(&actor.session.id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        tokio::fs::remove_dir_all(root).await.unwrap();
     }
 }

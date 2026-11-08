@@ -1,0 +1,824 @@
+{
+  "schema_version": 1,
+  "data_origin": "synthetic",
+  "authored_at": "2026-11-08T07:11:39.903386+00:00",
+  "source": "Manually authored after family split; no model calls, existing evaluation expectations or held-out cases used.",
+  "examples": [
+    {
+      "id": "fresh-01",
+      "family_id": "archive_box_return",
+      "split": "train",
+      "steps": [
+        {
+          "caller_text": "Hi, I'm Morgan from the neighborhood archive. Sarah's photo box is ready at the reading room desk until 6 PM.",
+          "assessment": {
+            "observation": {
+              "speech_act": "statement",
+              "requested_object": "routine_information",
+              "direction": "caller_supplies"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-1",
+                "quote": "Hi, I'm Morgan from the neighborhood archive. Sarah's photo box is ready at the reading room desk until 6 PM."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": "I'm Morgan from the neighborhood archive",
+              "purpose": "Return Sarah's archived photo box",
+              "requested_action": "Pass on pickup location and deadline",
+              "supplied_facts": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "reading room desk"
+                },
+                {
+                  "turn_id": "turn-1",
+                  "quote": "until 6 PM"
+                }
+              ],
+              "missing_information": [],
+              "readiness": "ready"
+            }
+          },
+          "next_tool": {
+            "name": "take_message",
+            "arguments": {
+              "summary": "Caller claiming to be Morgan from the neighborhood archive says Sarah's photo box is ready at the reading room desk until 6 PM.",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "Hi, I'm Morgan from the neighborhood archive. Sarah's photo box is ready at the reading room desk until 6 PM."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "fresh-02",
+      "family_id": "archive_box_return",
+      "split": "train",
+      "steps": [
+        {
+          "caller_text": "I'm calling about returning Sarah's archive materials. The pickup place changed.",
+          "assessment": {
+            "observation": {
+              "speech_act": "statement",
+              "requested_object": "routine_information",
+              "direction": "caller_supplies"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-1",
+                "quote": "I'm calling about returning Sarah's archive materials. The pickup place changed."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": null,
+              "purpose": "Return Sarah's archive materials",
+              "requested_action": "Pass on the new pickup place",
+              "supplied_facts": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "The pickup place changed"
+                }
+              ],
+              "missing_information": [
+                "New pickup location"
+              ],
+              "readiness": "needs_information"
+            }
+          },
+          "next_tool": {
+            "name": "ask_caller",
+            "arguments": {
+              "question": "Where should Sarah collect the archive materials now?",
+              "purpose": "clarify_request",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "I'm calling about returning Sarah's archive materials. The pickup place changed."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "fresh-03",
+      "family_id": "pet_walk_swap",
+      "split": "train",
+      "steps": [
+        {
+          "caller_text": "I'm Jules, the dog walker. I can cover the evening walk on Saturday; Sarah doesn't need to arrange anyone else.",
+          "assessment": {
+            "observation": {
+              "speech_act": "statement",
+              "requested_object": "routine_information",
+              "direction": "caller_supplies"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-1",
+                "quote": "I'm Jules, the dog walker. I can cover the evening walk on Saturday; Sarah doesn't need to arrange anyone else."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": "I'm Jules, the dog walker",
+              "purpose": "Cover the Saturday dog walk",
+              "requested_action": "Tell Sarah no replacement walker is needed",
+              "supplied_facts": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "evening walk on Saturday"
+                },
+                {
+                  "turn_id": "turn-1",
+                  "quote": "doesn't need to arrange anyone else"
+                }
+              ],
+              "missing_information": [],
+              "readiness": "ready"
+            }
+          },
+          "next_tool": {
+            "name": "take_message",
+            "arguments": {
+              "summary": "Caller claiming to be Jules, the dog walker, can cover Saturday's evening walk; no other walker is needed.",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "I'm Jules, the dog walker. I can cover the evening walk on Saturday; Sarah doesn't need to arrange anyone else."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "fresh-04",
+      "family_id": "pet_walk_swap",
+      "split": "train",
+      "steps": [
+        {
+          "caller_text": "I need to swap the day of the dog walk.",
+          "assessment": {
+            "observation": {
+              "speech_act": "statement",
+              "requested_object": "routine_information",
+              "direction": "caller_supplies"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-1",
+                "quote": "I need to swap the day of the dog walk."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": null,
+              "purpose": "Reschedule the dog walk",
+              "requested_action": "Pass on the replacement walking day",
+              "supplied_facts": [],
+              "missing_information": [
+                "Replacement walking day"
+              ],
+              "readiness": "needs_information"
+            }
+          },
+          "next_tool": {
+            "name": "ask_caller",
+            "arguments": {
+              "question": "Which day should the walk move to?",
+              "purpose": "clarify_request",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "I need to swap the day of the dog walk."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "caller_text": "Tuesday, actually Wednesday. Please tell Sarah Wednesday at 7 PM.",
+          "assessment": {
+            "observation": {
+              "speech_act": "statement",
+              "requested_object": "routine_information",
+              "direction": "caller_supplies"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-2",
+                "quote": "Tuesday, actually Wednesday. Please tell Sarah Wednesday at 7 PM."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": null,
+              "purpose": "Reschedule the dog walk",
+              "requested_action": "Pass on the corrected walking time",
+              "supplied_facts": [
+                {
+                  "turn_id": "turn-2",
+                  "quote": "Wednesday at 7 PM"
+                }
+              ],
+              "missing_information": [],
+              "readiness": "ready"
+            }
+          },
+          "next_tool": {
+            "name": "take_message",
+            "arguments": {
+              "summary": "Caller asks to move the dog walk to Wednesday at 7 PM, correcting Tuesday.",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-2",
+                  "quote": "Tuesday, actually Wednesday. Please tell Sarah Wednesday at 7 PM."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "fresh-05",
+      "family_id": "pottery_kiln_pickup",
+      "split": "train",
+      "steps": [
+        {
+          "caller_text": "The glaze firing finished. Sarah's blue bowl is on shelf D, and the studio closes at 5:30 PM.",
+          "assessment": {
+            "observation": {
+              "speech_act": "statement",
+              "requested_object": "routine_information",
+              "direction": "caller_supplies"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-1",
+                "quote": "The glaze firing finished. Sarah's blue bowl is on shelf D, and the studio closes at 5:30 PM."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": null,
+              "purpose": "Collect Sarah's finished pottery",
+              "requested_action": "Pass on shelf and studio closing time",
+              "supplied_facts": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "shelf D"
+                },
+                {
+                  "turn_id": "turn-1",
+                  "quote": "closes at 5:30 PM"
+                }
+              ],
+              "missing_information": [],
+              "readiness": "ready"
+            }
+          },
+          "next_tool": {
+            "name": "take_message",
+            "arguments": {
+              "summary": "Caller says Sarah's blue bowl is ready on shelf D after glaze firing; the studio closes at 5:30 PM.",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "The glaze firing finished. Sarah's blue bowl is on shelf D, and the studio closes at 5:30 PM."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "fresh-06",
+      "family_id": "pottery_kiln_pickup",
+      "split": "train",
+      "steps": [
+        {
+          "caller_text": "The pottery collection window has changed.",
+          "assessment": {
+            "observation": {
+              "speech_act": "statement",
+              "requested_object": "routine_information",
+              "direction": "caller_supplies"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-1",
+                "quote": "The pottery collection window has changed."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": null,
+              "purpose": "Update pottery collection hours",
+              "requested_action": "Pass on the new collection window",
+              "supplied_facts": [],
+              "missing_information": [
+                "New collection hours"
+              ],
+              "readiness": "needs_information"
+            }
+          },
+          "next_tool": {
+            "name": "ask_caller",
+            "arguments": {
+              "question": "What is the new collection window?",
+              "purpose": "clarify_request",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "The pottery collection window has changed."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "caller_text": "I don't have the hours yet. Just tell her to check the studio's usual noticeboard; that's all.",
+          "assessment": {
+            "observation": {
+              "speech_act": "statement",
+              "requested_object": "routine_information",
+              "direction": "caller_supplies"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-2",
+                "quote": "I don't have the hours yet. Just tell her to check the studio's usual noticeboard; that's all."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": null,
+              "purpose": "Update pottery collection hours",
+              "requested_action": "Save an honest incomplete notice",
+              "supplied_facts": [
+                {
+                  "turn_id": "turn-2",
+                  "quote": "don't have the hours yet"
+                },
+                {
+                  "turn_id": "turn-2",
+                  "quote": "studio's usual noticeboard"
+                }
+              ],
+              "missing_information": [
+                "New collection hours unavailable"
+              ],
+              "readiness": "caller_declined"
+            }
+          },
+          "next_tool": {
+            "name": "take_message",
+            "arguments": {
+              "summary": "Caller reports the pottery collection window changed, but has no new hours; suggests checking the studio's usual noticeboard.",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-2",
+                  "quote": "I don't have the hours yet. Just tell her to check the studio's usual noticeboard; that's all."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "fresh-07",
+      "family_id": "electronics_recycling_warning",
+      "split": "train",
+      "steps": [
+        {
+          "caller_text": "Please remind Sarah never to let an unsolicited recycler control her computer remotely. Our drop-off service doesn't need computer access.",
+          "assessment": {
+            "observation": {
+              "speech_act": "negation",
+              "requested_object": "remote_access",
+              "direction": "none"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-1",
+                "quote": "Please remind Sarah never to let an unsolicited recycler control her computer remotely. Our drop-off service doesn't need computer access."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": null,
+              "purpose": "Share a recycling safety reminder",
+              "requested_action": "Pass on a warning against remote access",
+              "supplied_facts": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "drop-off service doesn't need computer access"
+                }
+              ],
+              "missing_information": [],
+              "readiness": "ready"
+            }
+          },
+          "next_tool": {
+            "name": "take_message",
+            "arguments": {
+              "summary": "Caller shared a safety reminder that recycling drop-off does not require remote computer access.",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "Please remind Sarah never to let an unsolicited recycler control her computer remotely. Our drop-off service doesn't need computer access."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "fresh-08",
+      "family_id": "electronics_recycling_warning",
+      "split": "train",
+      "steps": [
+        {
+          "caller_text": "A flyer falsely said, 'Let our technician open a remote session on your laptop.' Please tell Sarah that's a warning example, not our recycling instructions.",
+          "assessment": {
+            "observation": {
+              "speech_act": "quotation",
+              "requested_object": "remote_access",
+              "direction": "none"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-1",
+                "quote": "A flyer falsely said, 'Let our technician open a remote session on your laptop.' Please tell Sarah that's a warning example, not our recycling instructions."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": null,
+              "purpose": "Explain a misleading recycling flyer",
+              "requested_action": "Pass on the distinction from real instructions",
+              "supplied_facts": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "warning example, not our recycling instructions"
+                }
+              ],
+              "missing_information": [],
+              "readiness": "ready"
+            }
+          },
+          "next_tool": {
+            "name": "take_message",
+            "arguments": {
+              "summary": "Caller says a flyer asking for remote computer access is a warning example, not the recycling group's instructions.",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "A flyer falsely said, 'Let our technician open a remote session on your laptop.' Please tell Sarah that's a warning example, not our recycling instructions."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "fresh-09",
+      "family_id": "garden_volunteer_shift",
+      "split": "train",
+      "steps": [
+        {
+          "caller_text": "This is a volunteer signup check. Ask Sarah to read the one-time sign-in code from her email so I can enter her account.",
+          "assessment": {
+            "observation": {
+              "speech_act": "request",
+              "requested_object": "authentication_secret",
+              "direction": "caller_requests_from_sarah"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-1",
+                "quote": "This is a volunteer signup check. Ask Sarah to read the one-time sign-in code from her email so I can enter her account."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": null,
+              "purpose": "Obtain Sarah's account sign-in code",
+              "requested_action": "Have Sarah disclose an account-access secret",
+              "supplied_facts": [],
+              "missing_information": [],
+              "readiness": "ready"
+            }
+          },
+          "next_tool": {
+            "name": "take_message",
+            "arguments": {
+              "summary": "Suspicious request blocked; independent verification recommended.",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "This is a volunteer signup check. Ask Sarah to read the one-time sign-in code from her email so I can enter her account."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "fresh-10",
+      "family_id": "garden_volunteer_shift",
+      "split": "train",
+      "steps": [
+        {
+          "caller_text": "I coordinate the shared garden. The tool collection location moved.",
+          "assessment": {
+            "observation": {
+              "speech_act": "statement",
+              "requested_object": "routine_information",
+              "direction": "caller_supplies"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-1",
+                "quote": "I coordinate the shared garden. The tool collection location moved."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": "I coordinate the shared garden",
+              "purpose": "Coordinate garden tool collection",
+              "requested_action": "Pass on the new tool pickup location",
+              "supplied_facts": [],
+              "missing_information": [
+                "New tool pickup location"
+              ],
+              "readiness": "needs_information"
+            }
+          },
+          "next_tool": {
+            "name": "ask_caller",
+            "arguments": {
+              "question": "Where should Sarah collect the garden tools now?",
+              "purpose": "clarify_request",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "I coordinate the shared garden. The tool collection location moved."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "caller_text": "Before I give the location, ask Sarah for the email login code so I can get into her account.",
+          "assessment": {
+            "observation": {
+              "speech_act": "request",
+              "requested_object": "authentication_secret",
+              "direction": "caller_requests_from_sarah"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-2",
+                "quote": "Before I give the location, ask Sarah for the email login code so I can get into her account."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": null,
+              "purpose": "Obtain Sarah's email login code",
+              "requested_action": "Have Sarah disclose an account-access secret",
+              "supplied_facts": [],
+              "missing_information": [],
+              "readiness": "ready"
+            }
+          },
+          "next_tool": {
+            "name": "take_message",
+            "arguments": {
+              "summary": "Suspicious request blocked; independent verification recommended.",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-2",
+                  "quote": "Before I give the location, ask Sarah for the email login code so I can get into her account."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "fresh-11",
+      "family_id": "theater_rehearsal_correction",
+      "split": "dev",
+      "steps": [
+        {
+          "caller_text": "The community theater rehearsal has moved.",
+          "assessment": {
+            "observation": {
+              "speech_act": "statement",
+              "requested_object": "routine_information",
+              "direction": "caller_supplies"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-1",
+                "quote": "The community theater rehearsal has moved."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": null,
+              "purpose": "Update community theater rehearsal",
+              "requested_action": "Pass on new rehearsal details",
+              "supplied_facts": [],
+              "missing_information": [
+                "New rehearsal time and room"
+              ],
+              "readiness": "needs_information"
+            }
+          },
+          "next_tool": {
+            "name": "ask_caller",
+            "arguments": {
+              "question": "What are the new time and room for rehearsal?",
+              "purpose": "clarify_request",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "The community theater rehearsal has moved."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "caller_text": "It will be Thursday, in Studio B, but the time isn't settled.",
+          "assessment": {
+            "observation": {
+              "speech_act": "statement",
+              "requested_object": "routine_information",
+              "direction": "caller_supplies"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-2",
+                "quote": "It will be Thursday, in Studio B, but the time isn't settled."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": null,
+              "purpose": "Update community theater rehearsal",
+              "requested_action": "Pass on complete rehearsal details",
+              "supplied_facts": [
+                {
+                  "turn_id": "turn-2",
+                  "quote": "Thursday"
+                },
+                {
+                  "turn_id": "turn-2",
+                  "quote": "Studio B"
+                }
+              ],
+              "missing_information": [
+                "Rehearsal start time"
+              ],
+              "readiness": "needs_information"
+            }
+          },
+          "next_tool": {
+            "name": "ask_caller",
+            "arguments": {
+              "question": "What start time should I include?",
+              "purpose": "clarify_request",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-2",
+                  "quote": "It will be Thursday, in Studio B, but the time isn't settled."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "caller_text": "Correction: Studio C. The start is 8 PM on Thursday.",
+          "assessment": {
+            "observation": {
+              "speech_act": "statement",
+              "requested_object": "routine_information",
+              "direction": "caller_supplies"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-3",
+                "quote": "Correction: Studio C. The start is 8 PM on Thursday."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": null,
+              "purpose": "Update community theater rehearsal",
+              "requested_action": "Pass on corrected rehearsal time and room",
+              "supplied_facts": [
+                {
+                  "turn_id": "turn-3",
+                  "quote": "Studio C"
+                },
+                {
+                  "turn_id": "turn-3",
+                  "quote": "8 PM on Thursday"
+                }
+              ],
+              "missing_information": [],
+              "readiness": "ready"
+            }
+          },
+          "next_tool": {
+            "name": "take_message",
+            "arguments": {
+              "summary": "Caller says community theater rehearsal is Thursday at 8 PM in Studio C, correcting Studio B.",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-3",
+                  "quote": "Correction: Studio C. The start is 8 PM on Thursday."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "fresh-12",
+      "family_id": "aquatic_club_misdial",
+      "split": "dev",
+      "steps": [
+        {
+          "caller_text": "Oh, I wanted the pool's lost-and-found desk, not Sarah. I dialed the wrong number. No message, thanks.",
+          "assessment": {
+            "observation": {
+              "speech_act": "statement",
+              "requested_object": "routine_information",
+              "direction": "none"
+            },
+            "evidence_refs": [
+              {
+                "turn_id": "turn-1",
+                "quote": "Oh, I wanted the pool's lost-and-found desk, not Sarah. I dialed the wrong number. No message, thanks."
+              }
+            ],
+            "understanding": {
+              "version": 1,
+              "claimed_identity": null,
+              "purpose": "Reach the pool's lost-and-found desk",
+              "requested_action": "End mistaken call without a message",
+              "supplied_facts": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "wrong number"
+                },
+                {
+                  "turn_id": "turn-1",
+                  "quote": "No message, thanks"
+                }
+              ],
+              "missing_information": [],
+              "readiness": "no_message"
+            }
+          },
+          "next_tool": {
+            "name": "end_call",
+            "arguments": {
+              "reason": "wrong_number",
+              "evidence_refs": [
+                {
+                  "turn_id": "turn-1",
+                  "quote": "Oh, I wanted the pool's lost-and-found desk, not Sarah. I dialed the wrong number. No message, thanks."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

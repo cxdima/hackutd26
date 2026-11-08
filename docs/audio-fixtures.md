@@ -52,3 +52,9 @@ bash scripts/cargo.sh run --bin audio_fixtures -- \
 ```
 
 The generator also accepts repeated `--scenario ID` selections from an authored development dataset. It validates the complete source and ancestry before selecting clips, preserves the 36-request maximum, and creates a fresh cache rather than overwriting existing audio.
+
+## Focused appointment clips
+
+On **Nov 8 at 01:29 Central**, the existing generator synthesized exactly three additional George clips from [the authored development source](../fixtures/audio-focused-appointment-development.json): “Sarah has an appointment tomorrow at four.”, “Actually, tomorrow at five, not four.”, and “Maya has an appointment tomorrow at four.” No AM/PM, clinic or appointment type was added. The [receipt](evidence/audio-focused-appointment-2026-11-08.json) records **120 characters, 3/3 successful requests, 116,739 bytes**, verified text/render/audio hashes, and 434/390/294ms HTTP-through-transfer times. Two metadata reads preceded synthesis; no retry, error or unknown attempt occurred. Billing was not measured; no listening, ASR or phone result is claimed.
+
+The [phone plan](../fixtures/audio-focused-phone-plan.json) allowlists `exact_appointment_george` and `maya_appointment_george` as single-clip runs. The operator must select the matching fictional active profile before starting; the caller cannot change it. Existing missing-time and family scenarios reuse their caches. The correction clip is prepared but deliberately has no startable scenario: this runner waits for the defender's response and stops when that call ends, so it cannot guarantee correction before a valid message closure. An actual pre-closure interruption cue is still required. No call allowance, reservation, model configuration or telephone state changed during synthesis.

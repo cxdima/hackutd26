@@ -79,6 +79,10 @@ pub fn router(app: App) -> Router {
     let api = Router::new()
         .route("/api/state", get(state))
         .route("/api/session/{id}", get(session))
+        .route(
+            "/api/profile/{household_id}",
+            get(profile_get).put(profile_put),
+        )
         .route("/api/events", get(events))
         .route("/api/demo/probe", post(probe))
         .route("/api/demo/replay", post(replay))
@@ -96,6 +100,7 @@ pub fn router(app: App) -> Router {
         .route("/health/live", get(|| async { Json(json!({"ok":true})) }))
         .route("/health/ready", get(ready))
         .route("/media/fixture/{capability}/{clip}", get(fixture_audio))
+        .route("/media/speech/{capability}", get(speech_audio))
         .merge(voice)
         .merge(api)
         .fallback_service(
@@ -120,6 +125,24 @@ async fn admin(State(app): State<App>, req: Request, next: Next) -> Response {
             .into_response();
     }
     next.run(req).await
+}
+async fn profile_get(State(app): State<App>, Path(household_id): Path<String>) -> ApiResult {
+    let profile = crate::profile::Profile::load(&app.store, &household_id).await?;
+    Ok(profile_response(profile))
+}
+async fn profile_put(
+    State(app): State<App>,
+    Path(household_id): Path<String>,
+    Json(update): Json<crate::profile::ProfileUpdate>,
+) -> ApiResult {
+    let profile = crate::profile::Profile::save(&app.store, &household_id, update).await?;
+    Ok(profile_response(profile))
+}
+fn profile_response(profile: crate::profile::Profile) -> Response {
+    let mut value = serde_json::to_value(profile).expect("Profile consists of JSON scalar fields");
+    value["source"] = json!("configured");
+    value["applies_to"] = json!("new_calls");
+    Json(value).into_response()
 }
 async fn signed(State(app): State<App>, req: Request, next: Next) -> Response {
     let sig = req
@@ -209,14 +232,12 @@ async fn incoming(State(app): State<App>, Extension(form): Extension<FormData>) 
         )));
     }
     if app.config.transport == "relay" {
-        return Ok(xml(crate::providers::relay::connect_twiml(
+        let profile: crate::profile::Profile = serde_json::from_value(snapshot["profile"].clone())?;
+        return Ok(xml(crate::providers::relay::connect_twiml_for(
             &app.config.public_base_url,
             snapshot["relay_token"].as_str().unwrap_or_default(),
-            if snapshot["household_id"] == "maya" {
-                "Maya"
-            } else {
-                "Sarah"
-            },
+            &profile,
+            true,
         )));
     }
     if app.config.transport == "gather" {
@@ -225,7 +246,9 @@ async fn incoming(State(app): State<App>, Extension(form): Extension<FormData>) 
                 "/voice/turn?turn_id={}",
                 snapshot["relay_token"].as_str().unwrap_or_default()
             )),
-            "I'm your automated assistant. What is the call about? Please don't share any sign-in codes or passwords.",
+            snapshot["profile"]["greeting"]
+                .as_str()
+                .unwrap_or("Hi, thanks for calling. What’s the call about?"),
         )));
     }
     Ok(xml(twilio::gather(
@@ -358,6 +381,22 @@ async fn fixture_audio(
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }
+async fn speech_audio(State(app): State<App>, Path(capability): Path<String>) -> Response {
+    if let Some(cache) = &app.speech
+        && let Ok(Some(bytes)) = cache.media(&capability).await
+    {
+        return (
+            [
+                (header::CONTENT_TYPE, "audio/mpeg"),
+                (header::CACHE_CONTROL, "private, no-store"),
+                (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+            ],
+            bytes,
+        )
+            .into_response();
+    }
+    StatusCode::NOT_FOUND.into_response()
+}
 async fn fixture_partial(
     State(app): State<App>,
     Path((action, step)): Path<(String, u8)>,
@@ -474,6 +513,12 @@ async fn state(State(app): State<App>) -> ApiResult {
     let evidence = crate::evidence::view(&app.store).await?;
     let model_backend = crate::evidence::model_backend(c, &app.store).await?;
     let phone_b = crate::evidence::phone_b(c, &app.store).await?;
+    let selected_household = app
+        .store
+        .metadata("selected_household")
+        .await?
+        .unwrap_or_else(|| "sarah".into());
+    let profile = crate::profile::Profile::load(&app.store, &selected_household).await?;
     let capabilities = json!([
     {"id":"inbound","status":if c.inbound_configured(){"configured"}else{"pending"},"detail":"Local signing and HTTPS inputs; recorded phone proof is shown separately"},
     {"id":"outbound","status":if c.outbound_configured(){"configured"}else{"pending"},"detail":"Separate Photon SIP credentials and caller number; endpoint enrollment, authorization and real outbound test remain separate gates"},
@@ -483,7 +528,7 @@ async fn state(State(app): State<App>) -> ApiResult {
     {"id":"family","status":if c.family_enabled{"configured"}else{"disabled"},"detail":"Family calls require separate enrollment and authorization"},
     {"id":"voice_clone","status":"disabled","detail":"Preset assistant voice; no clone endpoint verified"}
     ]);
-    Ok(Json(json!({"execution_mode":c.mode,"data_origin":"synthetic","transport":c.transport,"phone_display":if c.photon_number.is_empty(){"Not configured"}else{&c.photon_number},"selected_household":app.store.metadata("selected_household").await?.unwrap_or_else(||"sarah".into()),"capabilities":capabilities,"evidence":evidence,"model_backend":model_backend,"phone_b":phone_b,"speech":relay::speech_configuration(&c.transport),"sessions":snapshots,"community":community,"tactics":tactics})).into_response())
+    Ok(Json(json!({"execution_mode":c.mode,"data_origin":"synthetic","transport":c.transport,"phone_display":if c.photon_number.is_empty(){"Not configured"}else{&c.photon_number},"selected_household":app.store.metadata("selected_household").await?.unwrap_or_else(||"sarah".into()),"capabilities":capabilities,"evidence":evidence,"model_backend":model_backend,"phone_b":phone_b,"profile":profile,"speech":relay::speech_configuration_for(&c.transport, &profile),"sessions":snapshots,"community":community,"tactics":tactics})).into_response())
 }
 async fn ready(State(app): State<App>) -> Response {
     let c = &app.config;

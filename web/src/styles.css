@@ -275,6 +275,70 @@ p {
   min-width: 99px;
   font-weight: 650;
 }
+.profile-editor {
+  position: relative;
+}
+.profile-form {
+  position: absolute;
+  top: calc(100% + 16px);
+  right: 0;
+  width: min(370px, calc(100vw - 40px));
+  z-index: 30;
+  padding: 22px;
+  color: var(--ink);
+  background: #fffdf8;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 12px 35px #243f3420;
+  font-size: 12px;
+}
+.profile-form-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.profile-form p {
+  line-height: 1.5;
+  margin: 10px 0 16px;
+}
+.profile-form form {
+  display: grid;
+  gap: 8px;
+}
+.profile-form label {
+  margin-top: 6px;
+  font-weight: 650;
+}
+.profile-form input,
+.profile-form textarea,
+.profile-form select {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  border: 1px solid var(--line);
+  background: white;
+  color: inherit;
+  border-radius: 7px;
+  padding: 9px 10px;
+}
+.profile-form textarea {
+  resize: vertical;
+}
+.profile-form small {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 8px 0;
+}
+.profile-error {
+  color: #8b3d27;
+}
+.profile-snapshot {
+  max-width: 680px;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  color: var(--muted);
+}
 .stage-heading {
   display: flex;
   justify-content: space-between;

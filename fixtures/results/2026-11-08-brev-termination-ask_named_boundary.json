@@ -1,0 +1,83 @@
+{
+  "recorded_at": "2026-11-08T07:40:43.940107+00:00",
+  "kind": "synthetic_reused_prefix_termination_diagnostic",
+  "backend": "brev_hosted",
+  "choice": "ask_named_boundary",
+  "request_timeout_ms": 3500,
+  "max_output_tokens": 512,
+  "return_token_ids": true,
+  "request_sha256": "0e1152a0c7e4e396d6ad4786d3806f996d0a66c06bf8e1b4e61b05ed19f870cf",
+  "tools_sha256": "85d534436b0a599efec2e5c687061898f0780c872034d7e7f4ba0260f7884e33",
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "phone_calls": 0,
+  "hidden_reasoning_retained": false,
+  "prefix_provenance": {
+    "kind": "existing_saved_prefix_probe_loopback_capture",
+    "binary_sha256": "b04b9fd25d2fc814e3c9bdc7b1888db466707a7a74a3bfa2040225f752ff44ab",
+    "compiler_source": "/Users/dmoiseenko/Development/hackutd26/server/src/bin/preflight.rs",
+    "fresh_build": true,
+    "provider_source_sha256": "80b7b47fee8e785b8161408dc033be50fb4e92d14df997851e2c2c0c7e8042c6",
+    "preflight_source_sha256": "6cc1ca9f73148804ce841c525320cab31e4119014c2e6fbf012c5433c3f7aec9",
+    "tools_source_sha256": "30e5198cbe97d3c6f9e2b894aded5a2d7b34b072995410f494a06042d15bf0f3",
+    "prefix_source": "fixtures/results/2026-11-08-brev-native-warm.json",
+    "source_tool_call_id": "chatcmpl-tool-a049b233d03e7a99",
+    "prefix_kind": "synthetic_reused_native_assessment",
+    "original_arguments_reserialized": true,
+    "new_assessment_generated": false,
+    "local_capture_requests": 1,
+    "external_inference_requests": 0,
+    "phone_calls": 0,
+    "local_mock_result_not_provider_evidence": true
+  },
+  "stop_token_ids": [
+    15
+  ],
+  "include_stop_str_in_output": true,
+  "tool_choice": {
+    "function": {
+      "name": "ask_caller"
+    },
+    "type": "function"
+  },
+  "http_status": 200,
+  "elapsed_ms": 765,
+  "finish_reason": "stop",
+  "stop_reason": 15,
+  "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "completion_tokens": 86,
+  "generated_token_ids_count": 86,
+  "special_token_counts": {
+    "2": 0,
+    "11": 0,
+    "14": 0,
+    "15": 1
+  },
+  "last_three_token_ids": [
+    5165,
+    1561,
+    15
+  ],
+  "content_chars": 0,
+  "reasoning_chars": null,
+  "native_tools": [
+    {
+      "id": "chatcmpl-tool-8b7984af53ec0650",
+      "name": "ask_caller",
+      "arguments_chars": 211,
+      "arguments": {
+        "evidence_refs": [
+          {
+            "quote": "The clinic appointment time has changed, and I need to give her the new time.",
+            "turn_id": "turn-1"
+          }
+        ],
+        "purpose": "clarify_request",
+        "question": "What is the new appointment time?"
+      },
+      "arguments_json_valid": true
+    }
+  ],
+  "status": "response_received",
+  "finish_accepted": true,
+  "action_executed": false
+}

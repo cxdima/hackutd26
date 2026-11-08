@@ -83,6 +83,123 @@ pub async fn view(store: &Store) -> anyhow::Result<Value> {
     }))
 }
 
+/// A reviewed GPU receipt must also reference an actual ordered live cycle.
+/// Endpoint/GPU/authentication provenance comes from the operator receipt; local
+/// events establish the same session, generation, model and accepted results.
+async fn live_brev_cycle(store: &Store, value: &Value, model: &str) -> anyhow::Result<bool> {
+    let cycle = &value["live_cycle"];
+    let (Some(session_id), Some(action_id), Some(generation), Some(turn)) = (
+        cycle["session_id"].as_str(),
+        cycle["fixture_action_id"].as_str(),
+        cycle["generation_id"].as_u64(),
+        cycle["turn_version"].as_u64(),
+    ) else {
+        return Ok(false);
+    };
+    if turn == 0 {
+        return Ok(false);
+    }
+    let session: Option<String> = sqlx::query_scalar("SELECT data FROM sessions WHERE id=?")
+        .bind(session_id)
+        .fetch_optional(&store.pool)
+        .await?;
+    let session: Value = session
+        .and_then(|v| serde_json::from_str(&v).ok())
+        .unwrap_or(Value::Null);
+    if session["execution_mode"] != "live" {
+        return Ok(false);
+    }
+    let action_exists: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM actions WHERE id=? AND kind='fixture_caller' AND mode='live'",
+    )
+    .bind(action_id)
+    .fetch_one(&store.pool)
+    .await?;
+    let run: Value = store
+        .metadata(&format!("audio-fixture.run.v2:{action_id}"))
+        .await?
+        .and_then(|v| serde_json::from_str(&v).ok())
+        .unwrap_or(Value::Null);
+    if action_exists != 1
+        || run["leg"]["action_id"] != action_id
+        || !session["inbound_sid"].is_string()
+        || run["inbound_sid"] != session["inbound_sid"]
+    {
+        return Ok(false);
+    }
+    let Some(requests) = cycle["request_event_ids"]
+        .as_array()
+        .filter(|v| v.len() == 2)
+    else {
+        return Ok(false);
+    };
+    let mut events = Vec::with_capacity(4);
+    for id in [
+        &requests[0],
+        &cycle["assessment_result_event_id"],
+        &requests[1],
+        &cycle["action_result_event_id"],
+    ] {
+        let Some(id) = id.as_str() else {
+            return Ok(false);
+        };
+        let raw: Option<String> = sqlx::query_scalar("SELECT data FROM events WHERE json_extract(data,'$.id')=? AND json_extract(data,'$.session_id')=? LIMIT 1")
+            .bind(id).bind(session_id).fetch_optional(&store.pool).await?;
+        let event: Value = raw
+            .and_then(|v| serde_json::from_str(&v).ok())
+            .unwrap_or(Value::Null);
+        if event["execution_mode"] != "live"
+            || event["payload"]["generation_id"] != generation
+            || event["payload"]["turn_version"] != turn
+            || event["sequence"].as_i64().is_none()
+        {
+            return Ok(false);
+        }
+        events.push(event);
+    }
+    if !events
+        .windows(2)
+        .all(|pair| pair[0]["sequence"].as_i64() < pair[1]["sequence"].as_i64())
+    {
+        return Ok(false);
+    }
+    for event in [&events[0], &events[2]] {
+        let observation = &event["payload"]["observation"];
+        if event["type"] != "model.request.completed"
+            || observation["backend"] != "brev_hosted"
+            || observation["outcome"] != "success"
+            || observation["requested_model"] != model
+            || observation["response_model"] != model
+            || observation["content_chars"] != 0
+            || !matches!(
+                observation["finish_reason"].as_str(),
+                Some("stop" | "tool_calls")
+            )
+        {
+            return Ok(false);
+        }
+    }
+    let assessment = &events[1];
+    let action = &events[3];
+    Ok(assessment["type"] == "agent.tool.result"
+        && assessment["payload"]["name"] == "record_assessment"
+        && assessment["payload"]["ok"] == true
+        && assessment["payload"]["result"]["assessed_version"] == turn
+        && action["type"] == "agent.tool.result"
+        && action["payload"]["ok"] == true
+        && action["payload"]["name"] == cycle["action_name"]
+        && matches!(
+            cycle["action_name"].as_str(),
+            Some(
+                "ask_caller"
+                    | "take_message"
+                    | "end_call"
+                    | "offer_handoff"
+                    | "call_trusted_contact"
+            )
+        ))
+}
+
 /// Historical hosted receipts never verify a different deployment. Brev proof
 /// additionally requires the operator's GPU-loading/native-cycle receipt.
 pub async fn model_backend(config: &Config, store: &Store) -> anyhow::Result<Value> {
@@ -100,8 +217,11 @@ pub async fn model_backend(config: &Config, store: &Store) -> anyhow::Result<Val
                 .await?
                 .and_then(|s| serde_json::from_str(&s).ok())
                 .unwrap_or(Value::Null);
+            let source_valid = stored["source"] == "brev_gpu_model_probe"
+                || (stored["source"] == "brev_gpu_live_tool_cycle"
+                    && live_brev_cycle(store, &stored, &config.model).await?);
             let passed = stored["status"] == "passed"
-                && stored["source"] == "brev_gpu_model_probe"
+                && source_valid
                 && stored["model"] == config.model
                 && stored["endpoint_sha256"]
                     == crate::config::endpoint_fingerprint(&config.model_url)

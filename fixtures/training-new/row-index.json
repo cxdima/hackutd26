@@ -1,0 +1,88 @@
+{
+  "rows": [
+    {
+      "example_id": "fresh-01",
+      "family_id": "archive_box_return",
+      "line": 1,
+      "row_sha256": "828864690e68dafbb385b7322fbcbf3fd682e335cc0d71e639d98b870d156df1",
+      "split": "train"
+    },
+    {
+      "example_id": "fresh-02",
+      "family_id": "archive_box_return",
+      "line": 2,
+      "row_sha256": "efcfdbc4bea974d8205e2dcc61a9e389d70a27b809b657eb1432b3e8e60d8780",
+      "split": "train"
+    },
+    {
+      "example_id": "fresh-03",
+      "family_id": "pet_walk_swap",
+      "line": 3,
+      "row_sha256": "a29b088b2355ebfd1e772ab48eb631c944fe09e468bf8003ba17f4bcb491df63",
+      "split": "train"
+    },
+    {
+      "example_id": "fresh-04",
+      "family_id": "pet_walk_swap",
+      "line": 4,
+      "row_sha256": "706ef21638064079d7ff81aa9a4d2e90b58e87a24435cda3fa42c2350d3bac5b",
+      "split": "train"
+    },
+    {
+      "example_id": "fresh-05",
+      "family_id": "pottery_kiln_pickup",
+      "line": 5,
+      "row_sha256": "4a92d6ab2302b4163d8b1be47fc09e2d7fa642bd1a6eff8dafce9744f6d00e4b",
+      "split": "train"
+    },
+    {
+      "example_id": "fresh-06",
+      "family_id": "pottery_kiln_pickup",
+      "line": 6,
+      "row_sha256": "902089d5dcb2f8c190ce46116df32601cf027975336430bddf10f012577ab0fc",
+      "split": "train"
+    },
+    {
+      "example_id": "fresh-07",
+      "family_id": "electronics_recycling_warning",
+      "line": 7,
+      "row_sha256": "3b3a3f7760e34d5f368f0c656c3453f8736b9b1ddd627e7ec389145ff2ab8bb8",
+      "split": "train"
+    },
+    {
+      "example_id": "fresh-08",
+      "family_id": "electronics_recycling_warning",
+      "line": 8,
+      "row_sha256": "4408e8c5d0283fdc27c4e7b9adb563d61ad1f7cc380a10c899a5717e1cf429c1",
+      "split": "train"
+    },
+    {
+      "example_id": "fresh-09",
+      "family_id": "garden_volunteer_shift",
+      "line": 9,
+      "row_sha256": "b39259ac163eeee60c2ad5a2b7c8e1110d03d013a2c313ebd430cd11c5185e47",
+      "split": "train"
+    },
+    {
+      "example_id": "fresh-10",
+      "family_id": "garden_volunteer_shift",
+      "line": 10,
+      "row_sha256": "afc5cb23db073c92bd129990fe23a97ba7b79cd13c56e2dcc8609e5dd899dd51",
+      "split": "train"
+    },
+    {
+      "example_id": "fresh-11",
+      "family_id": "theater_rehearsal_correction",
+      "line": 1,
+      "row_sha256": "3b6b6f9b3544f30ff43f4510e6b0ba049a0ef977c31ebcad4886b5af06dc6922",
+      "split": "dev"
+    },
+    {
+      "example_id": "fresh-12",
+      "family_id": "aquatic_club_misdial",
+      "line": 2,
+      "row_sha256": "252d9b3612829dac7101bbbca096cbaaad211077f3a7f8f942fc5880657c8b77",
+      "split": "dev"
+    }
+  ]
+}

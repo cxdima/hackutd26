@@ -213,3 +213,75 @@ The unchanged `fa2b05ba6138d59249e928160d839f1bca1bd229` checkpoint was archived
 The [verified original probe](../fixtures/results/2026-11-08-fallback-fa2b05b-native.json) **failed** after two requests: the native assessment completed in **1568ms** with the expected returned model; its matching next-step request timed out at **3503ms**. It accepted zero native-result roundtrips and no follow-up. Default request settings were unchanged. This proves the candidate reached hosted inference, but does not restore the fallback's protocol gate. No retry followed.
 
 An earlier attempt reused a newer binary from Cargo's shared target because the archive sources had older timestamps. Its [3505ms timeout](../fixtures/results/2026-11-08-fallback-build-attribution-invalid.json) is explicitly invalid as checkpoint evidence. After diagnosing that attribution error, the archive was force-recompiled, compiler artifact source paths and `fresh=false` were checked, and the executable was copied to an isolated path before the authorized corrected run. The extra failed request is retained rather than omitted from the ledger. No application source content was changed for either attempt.
+
+
+## Hosted named continuation isolation, Nov 8 00:57 Central
+
+The existing saved-prefix probe now accepts either configured backend and reports the prefix's source provider/model/time/tool ID separately from the target backend. It revalidates the fixed synthetic accepted assessment, reserializes its JSON arguments and preserves its original native ID. The assistant's empty content is represented as null; this is a reconstructed native prefix, not a newly generated assessment or a byte-identical raw provider message. Production deadlines and execution policy were not changed.
+
+A local HTTP regression checks the actual outgoing assistant/tool roles, matching call/result IDs, equivalent argument objects, accepted readiness/epoch result, named `ask_caller` with its sole schema, 512-token cap, temperature 0.2, non-streaming/non-parallel calls and disabled thinking flag. Both a complete-looking `length` response and malformed arguments remain rejected. The hosted-selection regression failed against the former Brev-only restriction and passed after the narrowly scoped extension; all 32 preflight tests pass.
+
+The [single hosted continuation](../fixtures/results/2026-11-08-hosted-named-prefix.json) **passed in 1292ms**, returning 86 completion tokens, `finish_reason=tool_calls`, reported reasoning tokens zero and the expected model. Its valid question requested the new appointment day/time. The report explicitly states that its assessment came from the earlier Brev run. The [attributed executable](../fixtures/results/2026-11-08-hosted-named-prefix-provenance.json) was built from the current source and copied before execution; the candidate key was process-only. This establishes one successful named native continuation, not a fresh full probe, a two-provider performance comparison, or a telephone result.
+
+The separately authorized [fresh current-contract probe](../fixtures/results/2026-11-08-hosted-fresh-current-native.json), using a newly [attributed executable](../fixtures/results/2026-11-08-hosted-fresh-current-provenance.json), then failed on its **first assessment at 3504ms**. No response body, completion usage or native arguments arrived; one request was submitted and no roundtrip accepted. The later protection-phase change was present in this build, but this request never reached that phase. No retry or six-case batch followed. The isolated success does not erase this fresh-probe failure. The next meaningful single-variable experiment would compare identical saved prefixes with named versus required tool choice, or measure the initial assessment separately; neither result may be inferred from this mixed set.
+
+
+### Controlled timeout measurement and compact fact wire
+
+The [assessment-only 10-second diagnostic](../fixtures/results/2026-11-08-hosted-assessment-oldwire-10000ms.json) used the exact preserved executable from the preceding failed fresh run, verified against its [binary provenance](../fixtures/results/2026-11-08-hosted-assessment-oldwire-provenance.json). Only the diagnostic request timeout changed; the output cap remained 512. One assessment completed in **1343ms / 166 tokens**, `finish_reason=tool_calls`, reported reasoning tokens zero. It fit the ordinary 3500ms deadline. This observation does not justify extending production limits or establish the timeout's root cause; no follow-up was requested in this diagnostic.
+
+The next native schema represents each supplied fact once as `{turn_id,quote}`, from which Rust derives the internal text and evidence. This removes the second model-generated paraphrase while retaining exact caller-turn validation and the two-fact maximum. Protection-phase filtering and runtime rejection of further questions after an accepted blocked assessment were also present. The evaluator now rejects that same blocked follow-up: its independent unit regression first failed against the former permissive simulation, then passed; all 33 preflight tests passed. This changes execution parity, not the frozen case answers.
+
+The [compact-wire fresh probe](../fixtures/results/2026-11-08-hosted-compact-native.json), with [attributed current binary/source hashes](../fixtures/results/2026-11-08-hosted-compact-provenance.json), **failed** at 01:00 Central on its first assessment: **3504ms timeout**, no returned finish reason, tokens or arguments, zero native-result roundtrips. Default production limits were used. No automatic retry or six-case evaluation followed. The report does not attribute that timeout to truncation, schema validity or thinking because no response body arrived. Production remains at 3500ms per request / 6000ms per turn / 512 output tokens.
+
+
+### Independent semantic review before the next backend window
+
+These are reviews of retained synthetic outputs, separate from parser validity and latency. They are not additional inference requests or a held-out accuracy claim.
+
+| Observed output | Direction / speech act | Purpose and missing information | Action / closure meaning |
+|---|---|---|---|
+| Brev warm assessment, 972ms | Incorrect: `caller_requests_from_sarah` and `request`; the caller is supplying notice of a changed appointment | Correctly identifies giving the new clinic time and that the replacement time is missing; `needs_information` is appropriate | Its next request timed out; no accepted question or closing |
+| Hosted named continuation, 1292ms | Reuses the above assessment; it does not independently correct or re-score direction | Its question asks for the replacement day/time, relevant to the actual missing fact | Correct request for clarification; no claim of an already saved or delivered message. The “I’ll record it” phrase states intent only |
+| Preserved old-wire hosted assessment-only diagnostic, 1343ms | `statement` is appropriate; `caller_requests_from_sarah` is still incorrect for this supplied update | Purpose, missing replacement time and `needs_information` are appropriate | Assessment only; no next action or closing tested |
+| Fresh compact-wire hosted probe | Unscored: no response body | Unscored | No action; first-request timeout |
+
+The frozen six-case review remains unchanged and will separately examine direction, actual purpose, supplied facts/number preservation, appropriate question relevance and local closing. Family identity is always an unverified claim. Stored summary wording, not the proposal alone, is the fact-preservation evidence; local closing is not provider hangup. No six-case inference result exists yet. Further hosted probes are paused.
+
+
+## Brev termination isolation, Nov 8 01:18–01:19 Central
+
+After the [six-case baseline](../fixtures/results/2026-11-08-brev-campaign-sixcase-baseline.json), the first family-message case's actual accepted assessment was reused to isolate its next native request. The current Rust message builder, accepted policy result and `append_tool_result` constructed the continuation; a loopback Axum server captured the adapter's real outgoing body. Prompt/schema fingerprints matched the baseline. The original native ID and argument object were preserved, but the argument JSON was reserialized because the baseline did not archive the raw assistant message. This is semantic prefix reconstruction, not a byte-identical baseline request or a fresh full conversation.
+
+Exactly two authorized requests used that captured body, the same six tools, 512 output tokens, a diagnostic-only 10000ms timeout and `return_token_ids: true`. [Control provenance](../fixtures/results/2026-11-08-brev-termination-provenance.json) verifies that **only `tool_choice` differed**. Production timeouts were unchanged.
+
+| Diagnostic | HTTP time | Finish / output tokens | Counts of IDs 2 / 11 / 14 / 15 | Final three IDs |
+|---|---:|---|---|---|
+| [Required native choice](../fixtures/results/2026-11-08-brev-termination-required.json) | 8879ms | `length`, 512 | 0 / 0 / 6 / 6 | 4890, 4442, 1395 |
+| [Named `take_message`](../fixtures/results/2026-11-08-brev-termination-named.json) | 5495ms | `stop`, 175 | 0 / 1 / 1 / 2 | 1561, 15, 11 |
+
+The required response emitted six tool opening/closing markers without either EOS token before exhausting its cap. The API's parser exposed only one complete `take_message` object; it does not reveal the names or contents of every generated tool segment. Full token IDs were discarded after counting, so those extra tool names are unknown. The adapter continues to reject the `length` completion even though its exposed argument JSON looks complete. No hidden reasoning or ordinary assistant content was retained; ordinary-content character count was zero for both responses.
+
+The named control terminated with EOS 11 and the same exposed 244-character argument object. Offline Rust parsing, evidence validation and inert message policy accept that complete response; the required completion is rejected by the same parser. Neither response executed an application action or phone call. The named summary preserves the delayed bus and arrival after dinner, but says “Sarah's son reports” without explicitly marking the relationship as unverified; that wording remains a semantic limitation. Its 5495ms request still exceeds the 3500ms production request limit, so this is not a production latency or full native-cycle pass. No further inference request was issued in that two-request control. The evidence supports a required-choice termination problem in this controlled prefix; it does not establish compilation as the cause of either latency or generalize to every prompt.
+
+
+### Retained tool-close boundary, Nov 8 01:25 Central
+
+A separately authorized [third diagnostic](../fixtures/results/2026-11-08-brev-termination-boundary.json) reused the exact captured required-choice body, adding only `stop_token_ids: [15]` and `include_stop_str_in_output: true`. [Request provenance](../fixtures/results/2026-11-08-brev-termination-boundary-provenance.json) verifies both hashes and identifies the pinned vLLM 0.27.1 implementation: its [detokenizer retains the final stop token when inclusion is enabled](https://github.com/vllm-project/vllm/blob/v0.27.1/vllm/v1/engine/detokenizer.py#L108). The existing diagnostic `return_token_ids`, 512-token limit and 10000ms timeout remained identical.
+
+This response completed in **889ms / 92 tokens**, `finish_reason=tool_calls`, `stop_reason=15`, with one complete native `take_message`. Token counts for 2 / 11 / 14 / 15 were 0 / 0 / 0 / 1; the last three IDs were 5165, 1561, 15. It stopped at the retained tool delimiter without an EOS token. The unchanged strict Rust parser, evidence validation and inert message executor accept the complete native response; the earlier `length` response remains rejected. The saved synthetic summary retains the bus delay and arrival after dinner, with the same identity-claim wording limitation.
+
+This is one successful continuation from a reused assessment, not a fresh two-phase, end-to-end phone, or broad latency result. No production setting or model decision was changed, and no application action or phone call was executed during inference. A production adapter change still requires its own focused regression and fresh native-cycle validation.
+
+
+### Single-schema clarification format, Nov 8 01:40–01:41 Central
+
+The existing saved-prefix `--model-probe` was captured against a localhost endpoint with an attributed current binary. Its original synthetic assessment ID, matching tool result, current messages and the sole unchanged `ask_caller` schema were preserved. The localhost mock was capture scaffolding, not provider evidence. [Comparison provenance](../fixtures/results/2026-11-08-brev-ask-choice-provenance.json) verifies the exact request hashes and controlled fields. Three GPU requests used the ordinary **3500ms / 512-token** limits; none generated a fresh assessment or dialed a phone.
+
+| Format | HTTP duration | Completion | Tool markers / EOS |
+|---|---:|---|---|
+| [Current named ask](../fixtures/results/2026-11-08-brev-termination-ask_named.json) | 2368ms | `stop`, 132 tokens | ID14 ×3, ID15 ×4, EOS11 ×1 |
+| [Named ask, retained close boundary](../fixtures/results/2026-11-08-brev-termination-ask_named_boundary.json) | 765ms | `stop`, 86 tokens | ID15 ×1; no EOS |
+| [Required choice, retained close boundary](../fixtures/results/2026-11-08-brev-termination-ask_required_boundary.json) | 893ms | `tool_calls`, 86 tokens | ID15 ×1; no EOS |
+
+All three exposed the same complete, evidence-grounded question: “What is the new appointment time?” The existing strict Rust parser and inert policy accept each. The first pair changes only the retained delimiter setting; the latter pair changes only `tool_choice`, with the same single allowed tool. The smallest supported next change is therefore testing the retained close boundary for the existing named clarification phase, without changing its tool choice. These are one sample per condition from a reused prefix, not a general latency claim or proof of fresh conversation/phone behavior. Full token sequences, hidden reasoning and ordinary assistant content were not retained. Production was not changed by this diagnostic.

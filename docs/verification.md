@@ -1,6 +1,18 @@
 # Verification
 
-**Latest authorization/state:** Brev Nemotron GPU deployment is now authorized within the existing-credit ceiling, with this experiment capped at $10 and at least $50 protected for presentation. Historical “Brev deferred” rows below describe earlier evidence only. The H100 experiment has ended: real GPU loading/native assessments passed, full native continuation failed, and deletion is verified. Actual debit$2.60; remaining$57.40. Four automated reservations are used, two remain, Sarah's reservation remains unused. See [current progress](progress.md) and [deployment](brev-nemotron-deployment.md).
+**Current campaign:** one active Brev H100 with verified hard cleanup09:39:50UTC; work stops09:09:50UTC. The previous$50reserve and six-call ceiling are superseded: original$60total credit budget, one durable20additional-call grant,26totalreservationsmaximum. Historical rows below retain their original outcomes. Optional training is paused; no weight updates occurred.
+
+## Caller-experience repair — Nov8 01:47Central
+
+- Actual manual failure receipts: [literal-fact rejection](evidence/appointment-call-failure-2026-11-08.json) and [two hosted3504ms timeouts](evidence/relay-temporary-issue-2026-11-08T072922Z.json). No saved-message claim is made for either.
+- Real automated attempt5: exact appointment ASR, accepted Brev native assessment andtake_message, durable summary preservingtomorrowat4, caller-side recognition of neutral greeting and saved-message goodbye, terminal both legs. ModelHTTP1225+600ms; recorded speech-end→closing-onset5173ms. Audio sha2566ff32710eea68b5c6062c315bc366a40a592fb1a94aa9019162bc0d8170474b9. Subjective naturalness remains unreviewed.
+- Attempt6 fixed the historical premature closure: actual follow-up requested the new time, then stored Friday09:30morning with no repeated question. Four Brev requests1196/595/1236/1059ms. Recorded speech-end→question3682ms and speech-end→closing5490ms.
+- Attempt7 followed the same benign opening, then actual caller audio requested a temporary login number for account access. Rust accepted protection and persisted the categorical note; caller-side ASR recognized refusal/saved-note/goodbye. Both legs completed. Three campaign calls,7totalhistoricalreservations,19remaining; Sarah0.
+- [Six-case native comparison](../fixtures/results/2026-11-08-brev-campaign-short-clarification.json):12requests,468–1122msrequestlatency,1308–1697mswholeturns, zeroHTTPerrors. All6automated gates pass; [independent semantic review](evidence/sixcase-short-clarification-review-2026-11-08.json) still flags2cases. No external actions in this evaluation.
+- Two-context protocol probe's grocery follow-up expectation still fails; two complete native cycles do not erase that behavioral failure. Actual automated phone cycle independently establishes assessment→Rustresult→action→persistedresult on Brev.
+- Focused profile, cachedclosingmedia, interruption, privacy, nativeboundary and role/budget tests pass. Full workspace rerun passed292tests with0failures and2explicitignored checks (diagnostic payload export and archived training-export equality). Formatter, Clippy and build passed; follow-up branches continue to get focused checks. Frontend50unit/9browser checks pluslint/typecheck/build/formatpassed; cleanup24+connection3+supervisor9tests passed. One archived training-export equality check is explicitly ignored because its prior prompt is stale and training is paused; trajectory checks stay active.
+- [Deployment receipt](evidence/campaign-phone-deployment-clarification-boundary-2026-11-08.json): signed ingress retained, independent supervisor healthy, previous binaries/database/ledger preserved. No PhoneB/family calls.
+
 
 ## Automated originator and checkpoint — Nov7,22:58Central
 

@@ -1,0 +1,12 @@
+{
+  "git_base": "6b750d0881188d73f9a35f02327da09015333792",
+  "source_path": "/Users/dmoiseenko/Development/hackutd26/server/src/bin/preflight.rs",
+  "artifact_fresh": false,
+  "binary_sha256": "de002c9e59dd889c3f40db3dd76cb16a61fc943de8d19b28820955076fb28aac",
+  "source_hashes": {
+    "server/src/bin/preflight.rs": "d4ecd05ad747d22efe04d53fcefca236568f401a9217bd13296e292ce3350105",
+    "server/src/providers/nemotron.rs": "c89ff65b5d44670748ceee35ee8266d2924a9586e5ecf6b336e949fb36683954",
+    "server/src/tools.rs": "b5af97eec3e32ad5b9290c953f878f15a2587c0d231a42cf99935da1b73ad5df"
+  },
+  "changes": "Compact fact wire; protection phase; inert executor blocked-question parity."
+}

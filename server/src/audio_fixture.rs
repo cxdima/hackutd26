@@ -18,7 +18,142 @@ pub const SCENARIO: &str = "clinic_to_login_george";
 const KEY: &str = "audio-fixture:owned-number:one-attempt:2026-11-07";
 const META: &str = "audio-fixture.run.v1";
 const ACTIVE: &str = "audio-fixture.active.v2";
-const MAX_ATTEMPTS: usize = 6;
+const BASE_ATTEMPTS: usize = 6;
+pub const AUTHORIZATION_PREFIX: &str = "audio-fixture.authorization.v1:";
+pub const FAILURE_PREFIX: &str = "audio-fixture.failure.v1:";
+pub const FIX_PREFIX: &str = "audio-fixture.fix.v1:";
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuthorizationGrant {
+    pub schema_version: u32,
+    pub grant_id: String,
+    pub additional_attempts: usize,
+    pub authorization_reference: String,
+    pub authorized_at: String,
+    pub execution_mode: ExecutionMode,
+    pub destination_scope: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FailureReview {
+    pub schema_version: u32,
+    pub action_id: String,
+    pub failure_signature: String,
+    pub evidence_reference: String,
+    pub recorded_at: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FixReceipt {
+    pub schema_version: u32,
+    pub through_action_id: String,
+    pub failure_signature: String,
+    pub change_reference: String,
+    pub recorded_at: String,
+}
+
+fn safe_label(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 96
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_.:".contains(&b))
+}
+fn reference(value: &str) -> bool {
+    !value.trim().is_empty() && value.len() <= 240 && !value.chars().any(char::is_control)
+}
+impl AuthorizationGrant {
+    pub(crate) fn validate(&self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.schema_version == 1
+                && safe_label(&self.grant_id)
+                && (1..=1000).contains(&self.additional_attempts)
+                && reference(&self.authorization_reference)
+                && self.execution_mode == ExecutionMode::Live
+                && self.destination_scope == "owned_firstring_number_only",
+            "Invalid fixture authorization grant"
+        );
+        chrono::DateTime::parse_from_rfc3339(&self.authorized_at)?;
+        Ok(())
+    }
+}
+impl FailureReview {
+    pub(crate) fn validate(&self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.schema_version == 1
+                && safe_label(&self.action_id)
+                && safe_label(&self.failure_signature)
+                && reference(&self.evidence_reference),
+            "Invalid fixture failure review"
+        );
+        chrono::DateTime::parse_from_rfc3339(&self.recorded_at)?;
+        Ok(())
+    }
+}
+impl FixReceipt {
+    pub(crate) fn validate(&self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.schema_version == 1
+                && safe_label(&self.through_action_id)
+                && safe_label(&self.failure_signature)
+                && reference(&self.change_reference),
+            "Invalid fixture fix receipt"
+        );
+        chrono::DateTime::parse_from_rfc3339(&self.recorded_at)?;
+        Ok(())
+    }
+}
+
+pub(crate) fn fix_key(action_id: &str, signature: &str) -> String {
+    format!("{FIX_PREFIX}{action_id}:{signature}")
+}
+
+async fn authorization_grants(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+) -> anyhow::Result<Vec<AuthorizationGrant>> {
+    let rows: Vec<(String, String)> =
+        sqlx::query_as("SELECT key,value FROM metadata WHERE key LIKE ? ORDER BY rowid")
+            .bind(format!("{AUTHORIZATION_PREFIX}%"))
+            .fetch_all(&mut **tx)
+            .await?;
+    rows.into_iter()
+        .map(|(key, raw)| {
+            let grant: AuthorizationGrant = serde_json::from_str(&raw)?;
+            grant.validate()?;
+            anyhow::ensure!(
+                key == format!("{AUTHORIZATION_PREFIX}{}", grant.grant_id),
+                "Authorization identity does not match its ledger key"
+            );
+            Ok(grant)
+        })
+        .collect()
+}
+
+fn authorized_limit(grants: &[AuthorizationGrant]) -> anyhow::Result<usize> {
+    grants.iter().try_fold(BASE_ATTEMPTS, |total, grant| {
+        total
+            .checked_add(grant.additional_attempts)
+            .ok_or_else(|| anyhow::anyhow!("Fixture authorization allowance overflow"))
+    })
+}
+
+async fn authorization_view(store: &Store) -> anyhow::Result<Value> {
+    let mut tx = store.pool.begin().await?;
+    let grants = authorization_grants(&mut tx).await?;
+    let limit = authorized_limit(&grants)?;
+    let count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM actions WHERE kind='fixture_caller' AND mode='live'",
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(
+        json!({"base_attempts":BASE_ATTEMPTS,"max_attempts":limit,"attempt_count":count,"remaining_attempts":limit.saturating_sub(count as usize),"grants":grants}),
+    )
+}
 fn run_key(action: &str) -> String {
     format!("audio-fixture.run.v2:{action}")
 }
@@ -38,13 +173,18 @@ fn scenario_clips(id: &str) -> anyhow::Result<&'static [usize]> {
         "handoff_changed_george" => &[7, 8],
         "family_pickup_benign_george" => &[9, 10],
         "family_pickup_risky_george" => &[9, 11],
+        "exact_appointment_george" => &[12],
+        "maya_appointment_george" => &[13],
+        "appointment_correction_george" => &[12, 14],
         _ => anyhow::bail!("Unknown audio fixture scenario"),
     })
 }
 const CACHE: &str = ".tools/audio-fixtures/20261108T035107Z-f7c2c209-a79e-4ae9-bc1a-e8e3b27812c4";
 const FAMILY_CACHE: &str =
     ".tools/audio-fixtures/20261108T052514Z-53c19a1c-2bc3-4ce0-8aa7-d16a7615235e";
-const CLIPS: [(&str, &str, &str); 12] = [
+const FOCUSED_CACHE: &str =
+    ".tools/audio-fixtures/20261108T072946Z-2c1256e0-ea86-45a3-9b04-51bebe3131e5";
+const CLIPS: [(&str, &str, &str); 15] = [
     (
         "clinic_opening_caller_brisk",
         "003ee739433076ec124e2b68353c6c93b37163e32c6424073f95b4b52978a58f",
@@ -105,7 +245,30 @@ const CLIPS: [(&str, &str, &str); 12] = [
         "171b514138fdb6c332fae46ec58e37f449cc65df5621f769ffc931521aead451",
         FAMILY_CACHE,
     ),
+    (
+        "exact_appointment_caller_george",
+        "0094139e75e78740039fe31ddd85eb1494f06ce345208c797dc9bbca7b271c11",
+        FOCUSED_CACHE,
+    ),
+    (
+        "maya_appointment_caller_george",
+        "df3e5765553fa6571add06cfed922873b2ea39ef6ddffa5393e9dcb5450dac9b",
+        FOCUSED_CACHE,
+    ),
+    (
+        "appointment_correction_caller_george",
+        "19c1c314257480f7024a1507520d7099a130edaf4536a60534250ada0e8dab6b",
+        FOCUSED_CACHE,
+    ),
 ];
+
+#[derive(Clone, Serialize, Deserialize)]
+struct ScriptedCorrection {
+    source: String,
+    observer_step: u8,
+    reserved_at: String,
+    status: String,
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Run {
@@ -117,6 +280,10 @@ pub struct Run {
     #[serde(default)]
     loop_detected: bool,
     pub expires_at: i64,
+    #[serde(default)]
+    started_at: i64,
+    #[serde(default)]
+    correction: Option<ScriptedCorrection>,
     capability: String,
     next_step: u8,
     replies: BTreeMap<u8, String>,
@@ -134,6 +301,72 @@ pub struct Run {
     provider_error_code: Option<u32>,
 }
 impl Run {
+    fn correction_target_open(&self, defender: &crate::calls::state::Session) -> bool {
+        self.inbound_sid.as_deref() == Some(defender.inbound_sid.as_str())
+            && !self.inbound_ended
+            && self.leg.status == "in-progress"
+            && !defender.inbound_ended
+            && !defender.end_requested
+            && !defender.bridge_committed
+            && !defender.blocked
+            && defender.turn_version == 1
+            && defender
+                .closing_reason
+                .as_deref()
+                .is_none_or(|reason| reason == "message_saved")
+            && chrono::Utc::now().timestamp() < self.expires_at
+            && chrono::Utc::now().timestamp() < self.started_at.saturating_add(90)
+    }
+
+    fn reserve_correction(
+        &mut self,
+        base: &str,
+        sid: &str,
+        step: u8,
+        defender: &crate::calls::state::Session,
+    ) -> anyhow::Result<Option<String>> {
+        anyhow::ensure!(
+            self.leg.call_sid.as_deref() == Some(sid) && self.inbound_sid.as_deref() != Some(sid),
+            "Wrong correction origin leg"
+        );
+        if self.scenario_id != "appointment_correction_george"
+            || step != 2
+            || self.next_step != 2
+            || self.correction.is_some()
+            || !self.correction_target_open(defender)
+            || !self.partial_observations.get(&2).is_some_and(|value| {
+                value["unstable_speech_result"]
+                    .as_str()
+                    .is_some_and(|text| !text.trim().is_empty())
+            })
+        {
+            return Ok(None);
+        }
+        let action = twilio::escape(&format!("{base}/voice/fixture/{}/3", self.leg.action_id));
+        let partial = twilio::escape(&format!(
+            "{base}/voice/fixture-partial/{}/3",
+            self.leg.action_id
+        ));
+        let listen = format!(
+            "<Gather input=\"speech\" language=\"en-US\" timeout=\"12\" speechTimeout=\"2\" actionOnEmptyResult=\"true\" action=\"{action}\" method=\"POST\" partialResultCallback=\"{partial}\" partialResultCallbackMethod=\"POST\"></Gather><Hangup/>"
+        );
+        let play = twilio::escape(&format!("{base}/media/fixture/{}/1", self.capability));
+        // A late final callback from the superseded Gather may keep listening,
+        // but must never play the correction a second time or invent final ASR.
+        self.replies
+            .insert(2, format!("<Response>{listen}</Response>"));
+        self.next_step = 3;
+        self.correction = Some(ScriptedCorrection {
+            source: "scripted_originating_partial_asr".into(),
+            observer_step: step,
+            reserved_at: chrono::Utc::now().to_rfc3339(),
+            status: "reserved_no_retry".into(),
+        });
+        Ok(Some(format!(
+            "<Response><Play>{play}</Play>{listen}</Response>"
+        )))
+    }
+
     fn bind(&mut self, sid: &str) -> anyhow::Result<u8> {
         anyhow::ensure!(twilio::valid_call_sid(sid), "Invalid defender leg");
         if self.inbound_sid.as_deref() == Some(sid) {
@@ -193,6 +426,8 @@ impl Run {
             inbound_ended: false,
             loop_detected: false,
             expires_at: chrono::Utc::now().timestamp() + 300,
+            started_at: chrono::Utc::now().timestamp(),
+            correction: None,
             capability: format!(
                 "{}{}",
                 uuid::Uuid::new_v4().simple(),
@@ -235,6 +470,17 @@ impl Run {
             return Ok(reply.clone());
         }
         anyhow::ensure!(step == self.next_step, "Out-of-order fixture step");
+        if self.scenario_id == "appointment_correction_george"
+            && step == 2
+            && self.correction.is_none()
+        {
+            self.outcome = "correction_partial_trigger_not_observed".into();
+            self.next_step = last_step + 1;
+            let stop = "<Response><Hangup/></Response>".to_string();
+            self.replies.insert(step, stop.clone());
+            return Ok(stop);
+        }
+
         anyhow::ensure!(
             chrono::Utc::now().timestamp() < self.expires_at
                 && (self.inbound_ended || !terminal(&self.leg.status)),
@@ -300,7 +546,7 @@ impl Run {
         Ok(reply)
     }
     fn public(&self) -> Value {
-        json!({"scenario_id":self.scenario_id,"action_id":self.leg.action_id,"execution_mode":"live","data_origin":"synthetic","test_kind":"automated_audio_caller","destination":"owned_firstring_number_only","voice":"George","clip_count":scenario_clips(&self.scenario_id).map_or(0,|clips|clips.len()),"time_limit_seconds":90,"provider_status":self.leg.status,"provider_error_code":self.provider_error_code,"call_sid_bound":self.leg.call_sid.is_some(),"inbound_bound":self.inbound_sid.is_some(),"inbound_ended":self.inbound_ended,"outcome":self.outcome,"next_step":self.next_step,"observations":self.observations,"partial_observations":self.partial_observations,"recording_available":self.recording_sid.is_some(),"recording_duration_seconds":self.recording_duration_seconds,"human_audition":false,"noise_tested":false,"verdict":"ungraded"})
+        json!({"scenario_id":self.scenario_id,"action_id":self.leg.action_id,"execution_mode":"live","data_origin":"synthetic","test_kind":"automated_audio_caller","destination":"owned_firstring_number_only","voice":"George","clip_count":scenario_clips(&self.scenario_id).map_or(0,|clips|clips.len()),"time_limit_seconds":90,"provider_status":self.leg.status,"provider_error_code":self.provider_error_code,"call_sid_bound":self.leg.call_sid.is_some(),"inbound_bound":self.inbound_sid.is_some(),"inbound_ended":self.inbound_ended,"outcome":self.outcome,"next_step":self.next_step,"observations":self.observations,"partial_observations":self.partial_observations,"recording_available":self.recording_sid.is_some(),"recording_duration_seconds":self.recording_duration_seconds,"human_audition":false,"noise_tested":false,"verdict":"ungraded","scripted_correction":self.correction})
     }
 }
 
@@ -403,11 +649,13 @@ pub(crate) async fn check_budget(
     )
     .fetch_all(&mut **tx)
     .await?;
+    let limit = authorized_limit(&authorization_grants(tx).await?)?;
     anyhow::ensure!(
-        rows.len() < MAX_ATTEMPTS,
-        "Six-attempt fixture budget exhausted (including failures and retries)"
+        rows.len() < limit,
+        "Authorized fixture attempt budget exhausted (including failures and retries)"
     );
     let mut failures = Vec::new();
+    let mut reviews = Vec::new();
     for raw in rows {
         let leg: Leg = serde_json::from_str(&raw)?;
         anyhow::ensure!(
@@ -448,11 +696,47 @@ pub(crate) async fn check_budget(
             leg.status.as_str(),
             "failed" | "busy" | "no-answer" | "canceled"
         ));
+        let review: Option<String> = sqlx::query_scalar("SELECT value FROM metadata WHERE key=?")
+            .bind(format!("{FAILURE_PREFIX}{}", leg.action_id))
+            .fetch_optional(&mut **tx)
+            .await?;
+        let review = review
+            .map(|raw| -> anyhow::Result<FailureReview> {
+                let review: FailureReview = serde_json::from_str(&raw)?;
+                review.validate()?;
+                anyhow::ensure!(
+                    review.action_id == leg.action_id,
+                    "Failure review identity mismatch"
+                );
+                Ok(review)
+            })
+            .transpose()?;
+        reviews.push(review);
     }
     anyhow::ensure!(
         failures.len() < 2 || !failures[failures.len() - 2..].iter().all(|failed| *failed),
         "Repeated infrastructure failures; batch stopped"
     );
+    if reviews.len() >= 3
+        && let [Some(first), Some(second), Some(last)] = &reviews[reviews.len() - 3..]
+        && first.failure_signature == second.failure_signature
+        && second.failure_signature == last.failure_signature
+    {
+        let raw: Option<String> = sqlx::query_scalar("SELECT value FROM metadata WHERE key=?")
+            .bind(fix_key(&last.action_id, &last.failure_signature))
+            .fetch_optional(&mut **tx)
+            .await?;
+        let receipt: FixReceipt = serde_json::from_str(&raw.ok_or_else(|| anyhow::anyhow!(
+            "Three identical reviewed call failures; record a specific fix for the latest failure before another attempt"))?)?;
+        receipt.validate()?;
+        anyhow::ensure!(
+            receipt.through_action_id == last.action_id
+                && receipt.failure_signature == last.failure_signature
+                && chrono::DateTime::parse_from_rfc3339(&receipt.recorded_at)?
+                    >= chrono::DateTime::parse_from_rfc3339(&last.recorded_at)?,
+            "Fix receipt does not cover the latest repeated failure"
+        );
+    }
     Ok(())
 }
 async fn clip(index: usize) -> anyhow::Result<Vec<u8>> {
@@ -479,19 +763,22 @@ async fn clip(index: usize) -> anyhow::Result<Vec<u8>> {
 }
 pub async fn view(app: &App) -> anyhow::Result<Value> {
     let runs = all_runs(&app.store).await?;
-    let count: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM actions WHERE kind='fixture_caller' AND mode='live'",
-    )
-    .fetch_one(&app.store.pool)
-    .await?;
+    let authorization = authorization_view(&app.store).await?;
+    let count = authorization["attempt_count"].as_i64().unwrap_or_default();
     let mut value = if let Some(run) = load(&app.store).await? {
         run.public()
     } else {
         json!({"scenario_id":SCENARIO,"state":if count==0{"not_started"}else{"reservation_requires_reconciliation"},"destination":"owned_firstring_number_only","voice":"George","clip_count":2,"time_limit_seconds":90,"test_kind":"automated_audio_caller","human_audition":false,"noise_tested":false})
     };
-    value["max_attempts"] = json!(MAX_ATTEMPTS);
-    value["attempt_count"] = json!(count);
-    value["remaining_attempts"] = json!(MAX_ATTEMPTS.saturating_sub(count as usize));
+    for key in [
+        "base_attempts",
+        "max_attempts",
+        "attempt_count",
+        "remaining_attempts",
+    ] {
+        value[key] = authorization[key].clone();
+    }
+    value["authorization_grants"] = authorization["grants"].clone();
     value["history"] = json!(runs.iter().map(Run::public).collect::<Vec<_>>());
     value["supported_scenarios"] = json!([
         SCENARIO,
@@ -504,10 +791,16 @@ pub async fn view(app: &App) -> anyhow::Result<Value> {
         "quoted_report_george",
         "handoff_changed_george",
         "family_pickup_benign_george",
-        "family_pickup_risky_george"
+        "family_pickup_risky_george",
+        "exact_appointment_george",
+        "maya_appointment_george",
+        "appointment_correction_george"
     ]);
     value["noise_supported"] = json!(false);
-    value["intentional_interrupt_supported"] = json!(false);
+    value["intentional_interrupt_supported"] = json!(true);
+    value["intentional_interrupt_scenarios"] = json!(["appointment_correction_george"]);
+    value["intentional_interrupt_trigger"] =
+        json!("scripted_originating_partial_asr_step2; not autonomous speech understanding");
     let current = value["scenario_id"].as_str().unwrap_or(SCENARIO);
     let mut cached = true;
     for index in scenario_clips(current)? {
@@ -517,15 +810,17 @@ pub async fn view(app: &App) -> anyhow::Result<Value> {
     Ok(value)
 }
 async fn public_run(store: &Store, run: &Run) -> anyhow::Result<Value> {
-    let count: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM actions WHERE kind='fixture_caller' AND mode='live'",
-    )
-    .fetch_one(&store.pool)
-    .await?;
+    let authorization = authorization_view(store).await?;
     let mut value = run.public();
-    value["max_attempts"] = json!(MAX_ATTEMPTS);
-    value["attempt_count"] = json!(count);
-    value["remaining_attempts"] = json!(MAX_ATTEMPTS.saturating_sub(count as usize));
+    for key in [
+        "base_attempts",
+        "max_attempts",
+        "attempt_count",
+        "remaining_attempts",
+    ] {
+        value[key] = authorization[key].clone();
+    }
+    value["authorization_grants"] = authorization["grants"].clone();
     Ok(value)
 }
 pub async fn start(app: &App, scenario: &str) -> anyhow::Result<Value> {
@@ -667,15 +962,87 @@ pub async fn partial(
     step: u8,
     text: &str,
 ) -> anyhow::Result<()> {
-    change_action(&app.store, action, |run| {
+    let trigger = change_action(&app.store, action, |run| {
         anyhow::ensure!(run.leg.action_id == action && run.leg.call_sid.as_deref() == Some(sid), "Wrong fixture leg");
         anyhow::ensure!((1..=(scenario_clips(&run.scenario_id)?.len() as u8+1)).contains(&step) && step <= run.next_step && chrono::Utc::now().timestamp() < run.expires_at, "Invalid fixture observer step");
         if !text.trim().is_empty() {
             run.partial_observations.insert(step, json!({"step":step,"unstable_speech_result":text.chars().take(2000).collect::<String>(),"is_final":false,"origin":"twilio_gather_audio_asr","received_at":chrono::Utc::now().to_rfc3339()}));
         }
-        Ok(())
-    }).await
+        Ok(app.config.mode == ExecutionMode::Live && run.scenario_id == "appointment_correction_george" && step == 2 && !text.trim().is_empty() && run.correction.is_none())
+    }).await?;
+    if trigger {
+        let (app, action, sid) = (app.clone(), action.to_string(), sid.to_string());
+        tokio::spawn(async move {
+            let _ = submit_correction(&app, &action, &sid).await;
+        });
+    }
+    Ok(())
 }
+// Uses only the already authorized originating leg. A reserved/unknown update
+// is never retried after callbacks, duplicate triggers, or process recovery.
+async fn submit_correction(app: &App, action: &str, sid: &str) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        app.config.mode == ExecutionMode::Live,
+        "Replay cannot correct provider calls"
+    );
+    let run = load_action(&app.store, action)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Unknown fixture action"))?;
+    let defender_sid = run
+        .inbound_sid
+        .as_deref()
+        .ok_or_else(|| anyhow::anyhow!("No bound defender"))?;
+    let handle = app.by_sid(defender_sid).await?;
+    let defender: crate::calls::state::Session =
+        serde_json::from_value(handle.send(crate::calls::actor::Input::Snapshot).await?)?;
+    let Some(twiml) = change_action(&app.store, action, |run| {
+        run.reserve_correction(&app.config.public_base_url, sid, 2, &defender)
+    })
+    .await?
+    else {
+        return Ok(());
+    };
+    app.store.append(None,"fixture_caller","fixture.correction.reserved",json!({"action_id":action,"trigger_source":"scripted_originating_partial_asr","observer_step":2,"autonomous_hearing_decision":false,"heard":false}),ExecutionMode::Live).await?;
+    let latest: crate::calls::state::Session =
+        serde_json::from_value(handle.send(crate::calls::actor::Input::Snapshot).await?)?;
+    let submit = change_action(&app.store, action, |run| {
+        let open = run.leg.call_sid.as_deref() == Some(sid) && run.correction_target_open(&latest);
+        let marker = run
+            .correction
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("No correction reservation"))?;
+        if marker.status != "reserved_no_retry" {
+            return Ok(false);
+        }
+        marker.status = if open {
+            "submitted_outcome_pending"
+        } else {
+            "suppressed_target_closed"
+        }
+        .into();
+        Ok(open)
+    })
+    .await?;
+    if !submit {
+        return Ok(());
+    }
+    let accepted = app.twilio.update(sid, &[("Twiml", twiml)]).await.is_ok();
+    change_action(&app.store, action, |run| {
+        if let Some(marker) = run.correction.as_mut() {
+            marker.status = if accepted {
+                "provider_update_accepted"
+            } else {
+                "failed_or_unknown_no_retry"
+            }
+            .into();
+        }
+        Ok(())
+    })
+    .await?;
+    app.store.append(None,"fixture_caller","fixture.correction.update_result",json!({"action_id":action,"provider_update_accepted":accepted,"actual_correction_asr_pending":true,"heard":false,"retry":false}),ExecutionMode::Live).await?;
+    Ok(())
+}
+
 pub async fn audio(app: &App, capability: &str, index: usize) -> anyhow::Result<Vec<u8>> {
     let runs = all_runs(&app.store).await?;
     let run = runs
@@ -812,7 +1179,513 @@ pub async fn recording(app: &App, action: Option<&str>) -> anyhow::Result<Vec<u8
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn additional_grant(id: &str) -> AuthorizationGrant {
+        AuthorizationGrant {
+            schema_version: 1,
+            grant_id: id.into(),
+            additional_attempts: 20,
+            authorization_reference: "user:additional-automated-calls:2026-11-08".into(),
+            authorized_at: "2026-11-08T07:00:00Z".into(),
+            execution_mode: ExecutionMode::Live,
+            destination_scope: "owned_firstring_number_only".into(),
+        }
+    }
+
+    fn failed_review(run: &Run) -> FailureReview {
+        FailureReview {
+            schema_version: 1,
+            action_id: run.leg.action_id.clone(),
+            failure_signature: "premature_message_closing".into(),
+            evidence_reference: "local-test-receipt:observed-missing-detail".into(),
+            recorded_at: "2026-11-08T07:01:00Z".into(),
+        }
+    }
+
+    #[tokio::test]
+    async fn additional_authorization_keeps_four_reservations_and_adds_twenty_once() {
+        let app = app().await;
+        for n in 0..4 {
+            seed_terminal(&app, &format!("old-{n}"), "completed", true).await;
+        }
+        let before = view(&app).await.unwrap();
+        assert_eq!(before["max_attempts"], 6);
+        assert_eq!(before["remaining_attempts"], 2);
+        let grant = additional_grant("user-additional-20-v1");
+        assert!(
+            app.store
+                .record_fixture_authorization(&grant)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !app.store
+                .record_fixture_authorization(&grant)
+                .await
+                .unwrap()
+        );
+        let mut conflict = grant.clone();
+        conflict.additional_attempts = 21;
+        assert!(
+            app.store
+                .record_fixture_authorization(&conflict)
+                .await
+                .is_err()
+        );
+        let after = view(&app).await.unwrap();
+        assert_eq!(after["max_attempts"], 26);
+        assert_eq!(after["remaining_attempts"], 22);
+        assert_eq!(after["attempt_count"], 4);
+        assert_eq!(after["history"], before["history"]);
+        for n in 4..26 {
+            seed_terminal(&app, &format!("new-{n}"), "completed", true).await;
+        }
+        assert!(
+            app.store
+                .reserve(
+                    "audio-fixture",
+                    "over-grant",
+                    &Run::new().leg,
+                    ExecutionMode::Live
+                )
+                .await
+                .is_err()
+        );
+        assert_eq!(view(&app).await.unwrap()["remaining_attempts"], 0);
+        assert!(
+            !app.store
+                .reserve(
+                    "audio-fixture",
+                    "old-0",
+                    &Run::new().leg,
+                    ExecutionMode::Live
+                )
+                .await
+                .unwrap()
+                .1
+        );
+    }
+
+    #[tokio::test]
+    async fn grant_persists_restart_without_erasing_a_pending_reservation() {
+        let path = std::env::temp_dir().join(format!(
+            "firstring-fixture-grant-{}.sqlite",
+            uuid::Uuid::new_v4()
+        ));
+        let url = format!("sqlite://{}", path.display());
+        let store = Store::open(&url).await.unwrap();
+        let pending = Run::new();
+        store
+            .reserve(
+                "audio-fixture",
+                "pending-before-grant",
+                &pending.leg,
+                ExecutionMode::Live,
+            )
+            .await
+            .unwrap();
+        let grant = additional_grant("persisted-grant");
+        store.record_fixture_authorization(&grant).await.unwrap();
+        store.pool.close().await;
+        let reopened = Store::open(&url).await.unwrap();
+        assert_eq!(
+            authorization_view(&reopened).await.unwrap()["max_attempts"],
+            26
+        );
+        assert!(!reopened.record_fixture_authorization(&grant).await.unwrap());
+        assert!(
+            reopened
+                .reserve(
+                    "audio-fixture",
+                    "still-blocked",
+                    &Run::new().leg,
+                    ExecutionMode::Live
+                )
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            reopened.actions("audio-fixture").await.unwrap()[0].action_id,
+            pending.leg.action_id
+        );
+        reopened.pool.close().await;
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[tokio::test]
+    async fn three_identical_reviews_require_a_fix_bound_to_the_latest_failure() {
+        let app = app().await;
+        let mut runs = Vec::new();
+        for n in 0..3 {
+            let run = seed_terminal(&app, &format!("reviewed-{n}"), "completed", true).await;
+            assert!(
+                app.store
+                    .record_fixture_failure(&failed_review(&run))
+                    .await
+                    .unwrap()
+            );
+            runs.push(run);
+        }
+        app.store
+            .record_fixture_authorization(&additional_grant("does-not-clear-pause"))
+            .await
+            .unwrap();
+        assert!(
+            app.store
+                .reserve(
+                    "audio-fixture",
+                    "fourth",
+                    &Run::new().leg,
+                    ExecutionMode::Live
+                )
+                .await
+                .is_err(),
+            "A grant must not clear repeated semantic failures"
+        );
+        let mut fix = FixReceipt {
+            schema_version: 1,
+            through_action_id: runs[0].leg.action_id.clone(),
+            failure_signature: "premature_message_closing".into(),
+            change_reference: "git:test-purpose-readiness-fix".into(),
+            recorded_at: "2026-11-08T07:02:00Z".into(),
+        };
+        app.store.record_fixture_fix(&fix).await.unwrap();
+        assert!(
+            app.store
+                .reserve(
+                    "audio-fixture",
+                    "fourth",
+                    &Run::new().leg,
+                    ExecutionMode::Live
+                )
+                .await
+                .is_err()
+        );
+        fix.through_action_id = runs[2].leg.action_id.clone();
+        assert!(app.store.record_fixture_fix(&fix).await.unwrap());
+        assert!(!app.store.record_fixture_fix(&fix).await.unwrap());
+        let fourth = seed_terminal(&app, "fourth", "completed", true).await;
+        app.store
+            .record_fixture_failure(&failed_review(&fourth))
+            .await
+            .unwrap();
+        assert!(
+            app.store
+                .reserve(
+                    "audio-fixture",
+                    "fifth",
+                    &Run::new().leg,
+                    ExecutionMode::Live
+                )
+                .await
+                .is_err(),
+            "Old fix cannot approve a later identical failure"
+        );
+    }
+
+    #[tokio::test]
+    async fn authorization_cannot_change_destination_or_replay_and_does_not_clear_infrastructure_stop()
+     {
+        let app = app().await;
+        let mut grant = additional_grant("scope-test");
+        grant.execution_mode = ExecutionMode::Replay;
+        assert!(
+            app.store
+                .record_fixture_authorization(&grant)
+                .await
+                .is_err()
+        );
+        grant.execution_mode = ExecutionMode::Live;
+        grant.destination_scope = "+15555550199".into();
+        assert!(
+            app.store
+                .record_fixture_authorization(&grant)
+                .await
+                .is_err()
+        );
+        seed_terminal(&app, "infra-one", "failed", false).await;
+        seed_terminal(&app, "infra-two", "failed", false).await;
+        app.store
+            .record_fixture_authorization(&additional_grant("infra-still-paused"))
+            .await
+            .unwrap();
+        assert!(
+            app.store
+                .reserve(
+                    "audio-fixture",
+                    "infra-three",
+                    &Run::new().leg,
+                    ExecutionMode::Live
+                )
+                .await
+                .is_err()
+        );
+    }
     const SID: &str = "CA11111111111111111111111111111111";
+    fn correction_fixture() -> (Run, crate::calls::state::Session) {
+        let mut run = Run::new();
+        run.scenario_id = "appointment_correction_george".into();
+        run.leg.call_sid = Some(SID.into());
+        run.leg.status = "in-progress".into();
+        run.inbound_sid = Some("CA22222222222222222222222222222222".into());
+        run.next_step = 2;
+        run.partial_observations
+            .insert(2, json!({"unstable_speech_result":"Your message"}));
+        let mut defender = crate::calls::state::Session::new(
+            "correction-target".into(),
+            run.inbound_sid.clone().unwrap(),
+            "sarah".into(),
+            ExecutionMode::Live,
+        );
+        defender.closing_reason = Some("message_saved".into());
+        defender.turn_version = 1;
+        (run, defender)
+    }
+
+    #[test]
+    fn correction_trigger_is_bound_once_and_never_replays_in_stale_final_callback() {
+        let (mut run, defender) = correction_fixture();
+        let xml = run
+            .reserve_correction("https://fixture.example", SID, 2, &defender)
+            .unwrap()
+            .expect("Actual step2 partial must reserve correction");
+        assert!(xml.starts_with("<Response><Play>"));
+        assert!(xml.contains("/1</Play><Gather"));
+        assert!(xml.contains(&format!("/voice/fixture/{}/3", run.leg.action_id)));
+        assert!(!xml.contains("<Dial") && !xml.contains("<Conference"));
+        assert!(
+            run.reserve_correction("https://fixture.example", SID, 2, &defender)
+                .unwrap()
+                .is_none()
+        );
+        let mut restored: Run =
+            serde_json::from_value(serde_json::to_value(&run).unwrap()).unwrap();
+        assert!(
+            restored
+                .reserve_correction("https://fixture.example", SID, 2, &defender)
+                .unwrap()
+                .is_none()
+        );
+        let stale = restored
+            .respond(
+                "https://fixture.example",
+                SID,
+                2,
+                "old acknowledgement",
+                "0.9",
+            )
+            .unwrap();
+        assert!(
+            !stale.contains("<Play>"),
+            "Late old Gather callback must never replay correction"
+        );
+        assert_eq!(restored.next_step, 3);
+        restored.inbound_ended = true;
+        assert_eq!(
+            restored
+                .respond(
+                    "https://fixture.example",
+                    SID,
+                    3,
+                    "corrected message saved",
+                    "0.9"
+                )
+                .unwrap(),
+            "<Response><Hangup/></Response>"
+        );
+    }
+
+    #[test]
+    fn correction_trigger_rejects_closed_wrong_or_unobserved_targets() {
+        for variation in 0..10 {
+            let (mut run, mut defender) = correction_fixture();
+            match variation {
+                0 => defender.inbound_ended = true,
+                1 => defender.end_requested = true,
+                2 => defender.bridge_committed = true,
+                3 => run.inbound_ended = true,
+                4 => run.leg.status = "completed".into(),
+                5 => run.expires_at = 0,
+                6 => {
+                    run.partial_observations.clear();
+                }
+                7 => defender.inbound_sid = "CA33333333333333333333333333333333".into(),
+                8 => run.started_at = chrono::Utc::now().timestamp() - 91,
+                _ => defender.blocked = true,
+            }
+            assert!(
+                run.reserve_correction("https://fixture.example", SID, 2, &defender)
+                    .unwrap()
+                    .is_none(),
+                "variation {variation}"
+            );
+        }
+        let (mut run, defender) = correction_fixture();
+        assert!(
+            run.reserve_correction(
+                "https://fixture.example",
+                "CA33333333333333333333333333333333",
+                2,
+                &defender
+            )
+            .is_err()
+        );
+        assert!(
+            run.reserve_correction("https://fixture.example", SID, 1, &defender)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn correction_reservation_is_durable_atomic_and_replay_callbacks_are_inert() {
+        let app = app().await;
+        let (run, defender) = correction_fixture();
+        app.store
+            .reserve(
+                "audio-fixture",
+                "correction-once",
+                &run.leg,
+                ExecutionMode::Live,
+            )
+            .await
+            .unwrap();
+        app.store
+            .set_metadata(
+                &run_key(&run.leg.action_id),
+                &serde_json::to_string(&run).unwrap(),
+            )
+            .await
+            .unwrap();
+        partial(&app, &run.leg.action_id, SID, 2, "Your message has")
+            .await
+            .unwrap();
+        assert!(
+            load_action(&app.store, &run.leg.action_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .correction
+                .is_none()
+        );
+        assert!(
+            submit_correction(&app, &run.leg.action_id, SID)
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("Replay cannot")
+        );
+        let (left, right) = tokio::join!(
+            change_action(&app.store, &run.leg.action_id, |state| state
+                .reserve_correction("https://fixture.example", SID, 2, &defender)),
+            change_action(&app.store, &run.leg.action_id, |state| state
+                .reserve_correction("https://fixture.example", SID, 2, &defender)),
+        );
+        assert_eq!(
+            usize::from(left.unwrap().is_some()) + usize::from(right.unwrap().is_some()),
+            1
+        );
+        let mut restored = load_action(&app.store, &run.leg.action_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            restored.correction.as_ref().unwrap().status,
+            "reserved_no_retry"
+        );
+        assert_eq!(
+            restored.correction.as_ref().unwrap().source,
+            "scripted_originating_partial_asr"
+        );
+        assert!(
+            restored
+                .reserve_correction("https://fixture.example", SID, 2, &defender)
+                .unwrap()
+                .is_none()
+        );
+        let actions: i64 = sqlx::query_scalar("SELECT count(*) FROM actions")
+            .fetch_one(&app.store.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            actions, 1,
+            "Updating an existing leg must not reserve another call"
+        );
+        assert!(app.store.events_after(0).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn focused_appointments_play_exact_one_clip_without_implicit_correction() {
+        let app = app().await;
+        let public = view(&app).await.unwrap();
+        for (scenario, expected_clip) in [
+            (
+                "exact_appointment_george",
+                "exact_appointment_caller_george",
+            ),
+            ("maya_appointment_george", "maya_appointment_caller_george"),
+        ] {
+            let selected = scenario_clips(scenario).expect("Focused reminder must be allowlisted");
+            assert_eq!(selected.len(), 1);
+            assert_eq!(CLIPS[selected[0]].0, expected_clip);
+            let cache_manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join(FOCUSED_CACHE)
+                .join("manifest.json");
+            if cache_manifest.is_file() {
+                assert_eq!(
+                    format!("{:x}", Sha256::digest(clip(selected[0]).await.unwrap())),
+                    CLIPS[selected[0]].1
+                );
+            }
+            assert!(
+                public["supported_scenarios"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|value| value == scenario)
+            );
+            let mut run = Run::new();
+            run.scenario_id = scenario.into();
+            run.respond("https://fixture.example", SID, 0, "", "")
+                .unwrap();
+            let first = run
+                .respond(
+                    "https://fixture.example",
+                    SID,
+                    1,
+                    "assistant greeting",
+                    "0.9",
+                )
+                .unwrap();
+            assert!(first.contains("/0</Play>"));
+            assert!(!first.contains("/1</Play>"));
+            assert_eq!(
+                run.respond("https://fixture.example", SID, 2, "goodbye", "0.9")
+                    .unwrap(),
+                "<Response><Hangup/></Response>"
+            );
+            let error = start_request(&app, scenario, Some(&uuid::Uuid::new_v4().to_string()))
+                .await
+                .unwrap_err();
+            assert!(error.to_string().contains("Replay cannot call"));
+        }
+        assert_eq!(
+            scenario_clips("appointment_correction_george").unwrap(),
+            &[12, 14]
+        );
+        assert_eq!(scenario_clips("routine_message_george").unwrap(), &[0, 2]);
+        assert_eq!(
+            scenario_clips("family_pickup_risky_george").unwrap(),
+            &[9, 11]
+        );
+        let actions: i64 = sqlx::query_scalar("SELECT count(*) FROM actions")
+            .fetch_one(&app.store.pool)
+            .await
+            .unwrap();
+        assert_eq!(actions, 0);
+    }
+
     #[tokio::test]
     async fn family_scenarios_share_opening_select_their_continuation_and_stay_replay_inert() {
         let app = app().await;

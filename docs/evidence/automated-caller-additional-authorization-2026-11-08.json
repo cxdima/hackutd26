@@ -1,0 +1,21 @@
+{
+  "recorded_at": "2026-11-08T07:09:33.901056+00:00",
+  "grant": {
+    "schema_version": 1,
+    "grant_id": "user-2026-11-08-additional20",
+    "additional_attempts": 20,
+    "authorization_reference": "user-request:2026-11-08:20-additional-automated-calls",
+    "authorized_at": "2026-11-08T07:08:11.519855+00:00",
+    "execution_mode": "live",
+    "destination_scope": "owned_firstring_number_only"
+  },
+  "prior_allowance": 6,
+  "authorized_total": 26,
+  "reservations": {
+    "fixture_caller": 4
+  },
+  "remaining_owned_endpoint_attempts": 22,
+  "sarah_reservations": 0,
+  "calls_placed_by_grant": 0,
+  "scope": "Existing verified own FirstRing endpoint only; one at a time;90seconds; Sarah/family disabled"
+}

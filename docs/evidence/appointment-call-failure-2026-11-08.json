@@ -1,0 +1,81 @@
+{
+  "recorded_at": "2026-11-08T07:29:49.670705+00:00",
+  "session_sha256": "75a0ed81e5ff92ddb816fc34c0d7bc04f0480cb60c2122297ad8a045251a4c74",
+  "call_start_utc": "2026-11-08T07:09:00.213309+00:00",
+  "source": "production_SQLite_events_plus_user_audible_report",
+  "caller_turns": [
+    "Hello. Sarah has an appointment tomorrow at 4."
+  ],
+  "assistant_turns": [
+    "I'm having a temporary problem. I won't connect this call. Please leave a brief message without any passwords or sign-in codes."
+  ],
+  "accepted_assessments": 0,
+  "message_saved": false,
+  "inbound_ended": false,
+  "events": [
+    {
+      "sequence": 1873,
+      "type": "transcript.final",
+      "occurred_at": "2026-11-08T07:29:31.812754+00:00",
+      "payload": {
+        "text": "Hello. Sarah has an appointment tomorrow at 4.",
+        "turn_id": "be4f89f6-6cdd-45c5-9d2e-a593af218403"
+      }
+    },
+    {
+      "sequence": 1877,
+      "type": "model.request.completed",
+      "occurred_at": "2026-11-08T07:29:35.317820+00:00",
+      "payload": {
+        "boundary": "model_http",
+        "generation_id": 9,
+        "heard": false,
+        "observation": {
+          "backend": "nvidia_hosted",
+          "completion_tokens": null,
+          "elapsed_ms": 3504,
+          "error": "Nemotron request timed out",
+          "finish_reason": null,
+          "outcome": "timeout",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": null
+        },
+        "turn_version": 1
+      }
+    },
+    {
+      "sequence": 1878,
+      "type": "dependency.failed",
+      "occurred_at": "2026-11-08T07:29:35.318866+00:00",
+      "payload": {
+        "detail": "Nemotron request timed out",
+        "provider": "nemotron"
+      }
+    },
+    {
+      "sequence": 1879,
+      "type": "audio.requested",
+      "occurred_at": "2026-11-08T07:29:35.319982+00:00",
+      "payload": {
+        "heard": false,
+        "text": "I'm having a temporary problem. I won't connect this call. Please leave a brief message without any passwords or sign-in codes.",
+        "voice": "preset"
+      }
+    }
+  ],
+  "failure_class": "native_fact_grounding_rejection",
+  "nvidia_completion_ms": 3052,
+  "configured_speech": {
+    "transport": "ConversationRelay",
+    "provider": "ElevenLabs",
+    "voice_id": "21m00Tcm4TlvDq8ikWAM-v4",
+    "legacy_ui_label": "Rachel v4",
+    "current_direct_API_label": "Janet",
+    "greeting_and_recovery_same_Relay_path": true,
+    "polly_closing_reached": false
+  },
+  "audibility": "User heard greeting and recovery, described voice as robotic; no call recording available",
+  "cause": "Running preserved binary still requested redundant fact text plus evidence and rejected a paraphrase; compact one-source native fact format was not yet deployed. No timeout or authentication failure in this request.",
+  "deployment_note": "Binary preserved at05:40:30; exactsourcecommitnotestablished, oldwireverifiedbyrequesterrorfields",
+  "next_gate": "Deploy validated compact facts and complete native next action, then actual own-endpoint audio tests"
+}
