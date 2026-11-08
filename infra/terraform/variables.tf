@@ -36,3 +36,16 @@ variable "dmarc_record" {
   type        = string
   default     = "v=DMARC1; p=quarantine; adkim=r; aspf=r; rua=mailto:dmarc_rua@onsecureserver.net;"
 }
+
+variable "live_api_host" {
+  description = "Hostname of the tunnel to the live FirstRing server (no scheme). Empty disables /api/* on the site."
+  type        = string
+  default     = ""
+}
+
+variable "edge_read_secret" {
+  description = "Shared secret CloudFront sends as x-firstring-edge; the server allows read-only GETs with it. Supply via TF_VAR_edge_read_secret, never commit it."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

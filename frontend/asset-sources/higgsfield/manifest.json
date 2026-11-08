@@ -1,224 +1,240 @@
 {
-  "generated_on": "2026-11-08",
-  "provider": "Higgsfield",
-  "account_plan": "starter",
-  "balance_before_credits": 270,
-  "job_budget": 12,
-  "jobs_submitted": 10,
-  "notes": [
-    "All art only: no interface text, numbers or diagrams were baked into generated media.",
-    "Concept 1 (vinyl, ring held at chest) was chosen as Ringo's reference design; every later job passed it (or the hero derived from it) as a reference.",
-    "A kling3_0 'pro' video request was rejected before submission with 'Requires plus plan or higher'; no job was created and no credits were charged. The same request was submitted in 'std' mode.",
-    "Credit costs are the tool's get_cost preflight quotes for the same settings (gpt_image_2_6 high 1k: 6 credits per 4 images => 1.5 per image; kling3_0 std 5s silent: 7.5). The provider did not return per-job charges in job results; 2k image costs were not separately quoted.",
-    "Source downloads live beside this manifest; web-optimized derivatives are produced by scripts/optimize-assets.mjs into public/media.",
-    "Account balance read 270 before and 240.5 after the batch: 29.5 credits actually spent for 10 jobs (two 2k images were not separately quoted)."
-  ],
-  "jobs": [
-    {
-      "index": 0,
-      "job_id": "eba2a1c0-a0fd-4ac3-afc9-fce975d1bb30",
-      "purpose": "Ringo concept A (clay, ring on nose)",
-      "model": "gpt_image_2_6",
-      "settings": {
-        "quality": "high",
-        "resolution": "1k",
-        "aspect_ratio": "1:1"
-      },
-      "source": "concepts/concept-0-clay.png",
-      "dimensions": "1024x1024",
-      "quoted_credits": 1.5,
-      "used": false,
-      "prompt": "Original mascot character design named Ringo: an adult California sea lion (not a seal) with clearly recognizable sea-lion anatomy: small external ear flaps, long front flippers, sleek tapered body, short whiskers, sitting upright on its rear flippers. Ringo calmly balances a single lime-green ring (#76B900) upright on the tip of its nose, looking slightly toward the viewer. The ring has exactly one small, restrained magenta (#E20074) band near its bottom. Body: deep charcoal slate (#2C322E) with a slightly lighter warm grey belly. Personality: observant, calm, friendly, dependable, slightly playful; understated expressive dark eyes with small catchlights, gentle closed-mouth smile. Finish: hand-sculpted matte polymer clay figure with controlled fine texture and subtle tool marks, soft directional studio light from upper left, soft contact shadow. Plain seamless warm white (#F7F7F2) studio background. Full body visible, centered, strong clear silhouette, generous margin. No text, no letters, no logo, no badge, no armor, no costume, no robot parts, no emoji face, not childish."
-    },
-    {
-      "index": 1,
-      "job_id": "3ccf1554-6947-4fcf-aa01-02cc769ffe7f",
-      "purpose": "Ringo concept B (soft-touch vinyl, ring held at chest) — CHOSEN reference design",
-      "model": "gpt_image_2_6",
-      "settings": {
-        "quality": "high",
-        "resolution": "1k",
-        "aspect_ratio": "1:1"
-      },
-      "source": "concepts/concept-1-vinyl.png",
-      "dimensions": "1024x1024",
-      "quoted_credits": 1.5,
-      "used": true,
-      "shipping": [
-        "public/media/ringo-reference-640.webp"
-      ],
-      "prompt": "Original mascot character design named Ringo: an adult California sea lion (not a seal) with clearly recognizable sea-lion anatomy: small external ear flaps, long front flippers, sleek tapered body, short whiskers, upright posture propped on its front flippers. Ringo gently holds a single lime-green ring (#76B900) against its chest with one front flipper, like someone holding a steering wheel calmly. The ring has exactly one small, restrained magenta (#E20074) band. Body: soft slate charcoal (#343A36) with a lighter warm grey muzzle and belly. Personality: observant, calm, friendly, dependable, slightly playful; understated expressive eyes, attentive head tilt. Finish: premium matte soft-touch vinyl designer figure with subtle sculpted surface detail and a faint speckled texture, soft studio lighting, soft contact shadow. Plain seamless warm white (#F7F7F2) background. Full body visible, centered, clear silhouette. No text, no letters, no logo, no badge, no armor, no costume, no robot parts, no emoji face, not childish."
-    },
-    {
-      "index": 2,
-      "job_id": "4406b91e-357b-48c8-ab1e-cd84d5c6e65c",
-      "purpose": "Ringo concept C (gouache illustration, ring on nose)",
-      "model": "gpt_image_2_6",
-      "settings": {
-        "quality": "high",
-        "resolution": "1k",
-        "aspect_ratio": "1:1"
-      },
-      "source": "concepts/concept-2-gouache.png",
-      "dimensions": "1024x1024",
-      "quoted_credits": 1.5,
-      "used": false,
-      "prompt": "Original mascot character illustration named Ringo: an adult California sea lion (not a seal) with clearly recognizable sea-lion anatomy: small external ear flaps, long front flippers, sleek tapered body, short whiskers, sitting upright. Ringo calmly balances a lime-green ring (#76B900) on its nose with a small, restrained magenta (#E20074) stripe on the ring. Body: deep charcoal (#2A2F2B) with a muted warm grey belly. Personality: observant, calm, friendly, dependable, slightly playful; understated expressive eyes, relaxed confident posture. Finish: contemporary editorial illustration in gouache and coloured pencil with controlled paper grain, confident shapes, minimal outlines, soft shading, sculptural volume. Plain warm white (#F7F7F2) background. Full body visible, centered, clear silhouette. No text, no letters, no logo, no badge, no armor, no costume, no robot parts, no emoji face, not childish."
-    },
-    {
-      "index": 3,
-      "job_id": "58eb9817-23ea-4c51-bf87-d314da970ccc",
-      "purpose": "Hero composition (desktop) with negative space for HTML copy; mobile square crop derived locally",
-      "model": "gpt_image_2_6",
-      "settings": {
-        "quality": "high",
-        "resolution": "2k",
-        "aspect_ratio": "16:9",
-        "reference": "3ccf1554-6947-4fcf-aa01-02cc769ffe7f"
-      },
-      "source": "hero/hero-desktop-2k.png",
-      "dimensions": "2688x1520",
-      "quoted_credits": null,
-      "used": true,
-      "shipping": [
-        "public/media/ringo-hero-{1280,1920,2688}.{avif,webp}",
-        "public/media/ringo-hero-square-{720,1200}.{avif,webp} (crop x=1100 y=0 1520x1520)"
-      ],
-      "prompt": "Use the attached reference image as the exact character design: the same sea lion named Ringo with identical proportions, the same slate charcoal soft-touch matte vinyl finish with faint speckle, the same lighter warm grey muzzle and belly, the same small external ear flaps, eyes and whiskers, and the same lime-green ring with exactly one small magenta band. Wide 16:9 website hero composition: Ringo sits on the right side of the frame, full body visible, centered horizontally at about 72% of the frame width, occupying about 70% of the frame height, calmly holding the lime ring against its chest with one front flipper, head turned slightly toward the left of the frame with a calm, attentive, friendly look, as if listening. The left 55% of the frame is completely empty plain seamless warm white (#F7F7F2) studio background, reserved for website text. Soft daylight from the upper left, gentle soft contact shadow under Ringo, very subtle floor-to-wall sweep in the same warm white. Steady camera at Ringo's eye level. No text, no letters, no logo, no props, no frame, no border."
-    },
-    {
-      "index": 4,
-      "job_id": "295f8b30-9997-42d0-9ec5-8de1e36650f5",
-      "purpose": "Greeting pose, transparent",
-      "model": "gpt_image_2_6",
-      "settings": {
-        "quality": "high",
-        "resolution": "1k",
-        "aspect_ratio": "1:1",
-        "background": "transparent",
-        "reference": "3ccf1554-6947-4fcf-aa01-02cc769ffe7f"
-      },
-      "source": "poses/greeting.png",
-      "dimensions": "1024x1024 RGBA",
-      "quoted_credits": 1.5,
-      "used": true,
-      "shipping": [
-        "public/media/ringo-greeting-{480,960}.webp"
-      ],
-      "prompt": "Use the attached reference image as the exact character design: the same sea lion Ringo with identical proportions, slate charcoal soft-touch matte vinyl finish with faint speckle, lighter warm grey muzzle and belly, small external ear flaps, same eyes and whiskers, and the same lime-green ring with exactly one small magenta band. Pose: GREETING. Ringo sits upright facing the viewer in a gentle three-quarter view and raises one front flipper in a small, friendly wave at shoulder height, while the other flipper loosely holds the lime ring resting upright against its side. Calm, warm, welcoming expression, closed-mouth smile. Full body visible with margin on all sides. Isolated character on a fully transparent background, no floor, no shadow, no text, no logo."
-    },
-    {
-      "index": 5,
-      "job_id": "23142edb-14ec-49c5-b936-9b578761bc37",
-      "purpose": "Listening pose, transparent",
-      "model": "gpt_image_2_6",
-      "settings": {
-        "quality": "high",
-        "resolution": "1k",
-        "aspect_ratio": "1:1",
-        "background": "transparent",
-        "reference": "3ccf1554-6947-4fcf-aa01-02cc769ffe7f"
-      },
-      "source": "poses/listening.png",
-      "dimensions": "1024x1024 RGBA",
-      "quoted_credits": 1.5,
-      "used": true,
-      "shipping": [
-        "public/media/ringo-listening-{480,960}.webp"
-      ],
-      "prompt": "Use the attached reference image as the exact character design: the same sea lion Ringo with identical proportions, slate charcoal soft-touch matte vinyl finish with faint speckle, lighter warm grey muzzle and belly, small external ear flaps, same eyes and whiskers, and the same lime-green ring with exactly one small magenta band. Pose: LISTENING. Ringo sits upright in profile-three-quarter view, head tilted slightly to one side, small ear flap clearly visible, eyes attentive and thoughtful, mouth closed, holding the lime ring upright in front of its chest with both front flippers like a frame it is looking through. Calm, focused, observant. Full body visible with margin on all sides. Isolated character on a fully transparent background, no floor, no shadow, no text, no logo."
-    },
-    {
-      "index": 6,
-      "job_id": "f2d10561-a1d6-4804-97d4-1d8da62c675e",
-      "purpose": "Quiet rest pose for success/empty states, transparent",
-      "model": "gpt_image_2_6",
-      "settings": {
-        "quality": "high",
-        "resolution": "1k",
-        "aspect_ratio": "1:1",
-        "background": "transparent",
-        "reference": "3ccf1554-6947-4fcf-aa01-02cc769ffe7f"
-      },
-      "source": "poses/rest.png",
-      "dimensions": "1024x1024 RGBA",
-      "quoted_credits": 1.5,
-      "used": true,
-      "shipping": [
-        "public/media/ringo-rest-{480,960}.webp"
-      ],
-      "prompt": "Use the attached reference image as the exact character design: the same sea lion Ringo with identical proportions, slate charcoal soft-touch matte vinyl finish with faint speckle, lighter warm grey muzzle and belly, small external ear flaps, same eyes and whiskers, and the same lime-green ring with exactly one small magenta band. Pose: QUIET REST. Ringo lies down comfortably on its belly, front flippers relaxed forward, chin resting on the edge of the lime ring which lies flat in front of it, eyes gently half-closed with a content, peaceful closed-mouth smile. Calm, settled, all-is-well mood. Full body visible with margin on all sides. Isolated character on a fully transparent background, no floor, no shadow, no text, no logo."
-    },
-    {
-      "index": 7,
-      "job_id": "204fe6c7-b2e3-4c26-9f4c-611b0669d38f",
-      "purpose": "Hero motion loop (start frame = end frame = hero still for a seamless loop)",
-      "model": "kling3_0",
-      "settings": {
-        "mode": "std",
-        "duration": 5,
-        "sound": "off",
-        "aspect_ratio": "16:9",
-        "start_image": "58eb9817-23ea-4c51-bf87-d314da970ccc",
-        "end_image": "58eb9817-23ea-4c51-bf87-d314da970ccc"
-      },
-      "source": "video/hero-loop-kling.mp4",
-      "dimensions": "1276x720, 24 fps, 121 frames, 5.04 s",
-      "quoted_credits": 7.5,
-      "used": true,
-      "verification": "Frames 0/30/60/90/120 inspected: anatomy and ring design stable; frame 0 and frame 120 match (clean loop seam).",
-      "shipping": [
-        "public/media/ringo-hero-loop.{mp4,webm}",
-        "public/media/ringo-hero-loop-square.{mp4,webm}",
-        "public/media/ringo-hero-loop-poster.jpg"
-      ],
-      "prompt": "Locked-off static camera, no zoom, no pan, no cut. The sea lion stays seated in exactly the same place. Very subtle, calm idle motion only: slow gentle breathing that softly lifts the chest, one natural relaxed blink, the whiskers twitch slightly, the front flipper holding the lime ring makes a small easy adjustment so the ring tilts a few degrees and settles back. The face, eyes, body shape, colors and the ring keep exactly the same design throughout. Plain warm white studio background stays perfectly still and empty. Calm, unhurried, friendly. No text, no new objects, no camera shake."
-    },
-    {
-      "index": 8,
-      "job_id": "fdae25bd-5c0c-4f7d-850a-c6c037c9a368",
-      "purpose": "Community still: connected rings on calm water (also video poster)",
-      "model": "gpt_image_2_6",
-      "settings": {
-        "quality": "high",
-        "resolution": "2k",
-        "aspect_ratio": "16:9",
-        "reference": "3ccf1554-6947-4fcf-aa01-02cc769ffe7f"
-      },
-      "source": "community/community-rings-2k.png",
-      "dimensions": "2688x1520",
-      "quoted_credits": null,
-      "used": true,
-      "shipping": [
-        "public/media/community-rings-{960,1600,2400}.{avif,webp}"
-      ],
-      "prompt": "Top-down view of a calm, pale sea-green water surface in soft morning daylight. Five lime-green rings (#76B900), each the same soft-touch matte vinyl ring as in the reference image with exactly one small magenta (#E20074) band, float spread loosely across the frame at different distances. From the ring nearest the left, gentle concentric ripples spread outward across the water and reach the neighbouring rings, whose own faint ripples overlap softly. Serene, hopeful, quiet, uncluttered composition with generous calm water around the rings, slight soft caustic light, fine natural texture. No animals, no people, no boats, no text, no letters, no logo, no border."
-    },
-    {
-      "index": 9,
-      "job_id": "92400345-d5cf-4966-b95f-006c8b061269",
-      "purpose": "Community motion loop (ripples travel from one ring to the others)",
-      "model": "kling3_0",
-      "settings": {
-        "mode": "std",
-        "duration": 5,
-        "sound": "off",
-        "aspect_ratio": "16:9",
-        "start_image": "fdae25bd-5c0c-4f7d-850a-c6c037c9a368",
-        "end_image": "fdae25bd-5c0c-4f7d-850a-c6c037c9a368"
-      },
-      "source": "video/community-loop-kling.mp4",
-      "dimensions": "1276x720, 24 fps, 121 frames",
-      "quoted_credits": 7.5,
-      "used": true,
-      "verification": "Frames 0/40/80/120 inspected: five rings keep position, size and single magenta band; ripples propagate; start/end frames match.",
-      "shipping": [
-        "public/media/community-loop.{mp4,webm}",
-        "public/media/community-loop-poster.jpg"
-      ],
-      "prompt": "Locked-off static top-down camera, no zoom, no pan, no cut. Calm water: gentle concentric ripples slowly spread outward from the ring on the left and travel across the surface to reach the other rings, which bob very gently in place as the ripples arrive, then the surface settles. Soft shimmering light caustics drift slowly. The five rings keep the same position, size, color and single magenta band throughout. Serene, slow, quiet. No new objects, no text, no splashes, no camera shake."
-    }
-  ],
-  "balance_after_credits": 240.5,
-  "actual_spend_credits": 29.5
+ "generated_on": "2026-11-08",
+ "provider": "Higgsfield",
+ "account_plan": "starter",
+ "balance_before_credits": 270,
+ "job_budget": 12,
+ "jobs_submitted": 10,
+ "notes": [
+  "All art only: no interface text, numbers or diagrams were baked into generated media.",
+  "Concept 1 (vinyl, ring held at chest) was chosen as Ringo's reference design; every later job passed it (or the hero derived from it) as a reference.",
+  "A kling3_0 'pro' video request was rejected before submission with 'Requires plus plan or higher'; no job was created and no credits were charged. The same request was submitted in 'std' mode.",
+  "Credit costs are the tool's get_cost preflight quotes for the same settings (gpt_image_2_6 high 1k: 6 credits per 4 images => 1.5 per image; kling3_0 std 5s silent: 7.5). The provider did not return per-job charges in job results; 2k image costs were not separately quoted.",
+  "Source downloads live beside this manifest; web-optimized derivatives are produced by scripts/optimize-assets.mjs into public/media.",
+  "Account balance read 270 before and 240.5 after the batch: 29.5 credits actually spent for 10 jobs (two 2k images were not separately quoted).",
+  "Nov 8 hero v2: five 2k gpt_image_2_6 renders were generated; four were rejected for anatomy or pose (extra flippers) and are not committed."
+ ],
+ "jobs": [
+  {
+   "index": 0,
+   "job_id": "eba2a1c0-a0fd-4ac3-afc9-fce975d1bb30",
+   "purpose": "Ringo concept A (clay, ring on nose)",
+   "model": "gpt_image_2_6",
+   "settings": {
+    "quality": "high",
+    "resolution": "1k",
+    "aspect_ratio": "1:1"
+   },
+   "source": "concepts/concept-0-clay.png",
+   "dimensions": "1024x1024",
+   "quoted_credits": 1.5,
+   "used": false,
+   "prompt": "Original mascot character design named Ringo: an adult California sea lion (not a seal) with clearly recognizable sea-lion anatomy: small external ear flaps, long front flippers, sleek tapered body, short whiskers, sitting upright on its rear flippers. Ringo calmly balances a single lime-green ring (#76B900) upright on the tip of its nose, looking slightly toward the viewer. The ring has exactly one small, restrained magenta (#E20074) band near its bottom. Body: deep charcoal slate (#2C322E) with a slightly lighter warm grey belly. Personality: observant, calm, friendly, dependable, slightly playful; understated expressive dark eyes with small catchlights, gentle closed-mouth smile. Finish: hand-sculpted matte polymer clay figure with controlled fine texture and subtle tool marks, soft directional studio light from upper left, soft contact shadow. Plain seamless warm white (#F7F7F2) studio background. Full body visible, centered, strong clear silhouette, generous margin. No text, no letters, no logo, no badge, no armor, no costume, no robot parts, no emoji face, not childish."
+  },
+  {
+   "index": 1,
+   "job_id": "3ccf1554-6947-4fcf-aa01-02cc769ffe7f",
+   "purpose": "Ringo concept B (soft-touch vinyl, ring held at chest) — CHOSEN reference design",
+   "model": "gpt_image_2_6",
+   "settings": {
+    "quality": "high",
+    "resolution": "1k",
+    "aspect_ratio": "1:1"
+   },
+   "source": "concepts/concept-1-vinyl.png",
+   "dimensions": "1024x1024",
+   "quoted_credits": 1.5,
+   "used": true,
+   "shipping": [
+    "public/media/ringo-reference-640.webp"
+   ],
+   "prompt": "Original mascot character design named Ringo: an adult California sea lion (not a seal) with clearly recognizable sea-lion anatomy: small external ear flaps, long front flippers, sleek tapered body, short whiskers, upright posture propped on its front flippers. Ringo gently holds a single lime-green ring (#76B900) against its chest with one front flipper, like someone holding a steering wheel calmly. The ring has exactly one small, restrained magenta (#E20074) band. Body: soft slate charcoal (#343A36) with a lighter warm grey muzzle and belly. Personality: observant, calm, friendly, dependable, slightly playful; understated expressive eyes, attentive head tilt. Finish: premium matte soft-touch vinyl designer figure with subtle sculpted surface detail and a faint speckled texture, soft studio lighting, soft contact shadow. Plain seamless warm white (#F7F7F2) background. Full body visible, centered, clear silhouette. No text, no letters, no logo, no badge, no armor, no costume, no robot parts, no emoji face, not childish."
+  },
+  {
+   "index": 2,
+   "job_id": "4406b91e-357b-48c8-ab1e-cd84d5c6e65c",
+   "purpose": "Ringo concept C (gouache illustration, ring on nose)",
+   "model": "gpt_image_2_6",
+   "settings": {
+    "quality": "high",
+    "resolution": "1k",
+    "aspect_ratio": "1:1"
+   },
+   "source": "concepts/concept-2-gouache.png",
+   "dimensions": "1024x1024",
+   "quoted_credits": 1.5,
+   "used": false,
+   "prompt": "Original mascot character illustration named Ringo: an adult California sea lion (not a seal) with clearly recognizable sea-lion anatomy: small external ear flaps, long front flippers, sleek tapered body, short whiskers, sitting upright. Ringo calmly balances a lime-green ring (#76B900) on its nose with a small, restrained magenta (#E20074) stripe on the ring. Body: deep charcoal (#2A2F2B) with a muted warm grey belly. Personality: observant, calm, friendly, dependable, slightly playful; understated expressive eyes, relaxed confident posture. Finish: contemporary editorial illustration in gouache and coloured pencil with controlled paper grain, confident shapes, minimal outlines, soft shading, sculptural volume. Plain warm white (#F7F7F2) background. Full body visible, centered, clear silhouette. No text, no letters, no logo, no badge, no armor, no costume, no robot parts, no emoji face, not childish."
+  },
+  {
+   "index": 3,
+   "job_id": "58eb9817-23ea-4c51-bf87-d314da970ccc",
+   "purpose": "Hero composition (desktop) with negative space for HTML copy; mobile square crop derived locally",
+   "model": "gpt_image_2_6",
+   "settings": {
+    "quality": "high",
+    "resolution": "2k",
+    "aspect_ratio": "16:9",
+    "reference": "3ccf1554-6947-4fcf-aa01-02cc769ffe7f"
+   },
+   "source": "hero/hero-desktop-2k.png",
+   "dimensions": "2688x1520",
+   "quoted_credits": null,
+   "used": true,
+   "shipping": [
+    "public/media/ringo-hero-{1280,1920,2688}.{avif,webp}",
+    "public/media/ringo-hero-square-{720,1200}.{avif,webp} (crop x=1100 y=0 1520x1520)"
+   ],
+   "prompt": "Use the attached reference image as the exact character design: the same sea lion named Ringo with identical proportions, the same slate charcoal soft-touch matte vinyl finish with faint speckle, the same lighter warm grey muzzle and belly, the same small external ear flaps, eyes and whiskers, and the same lime-green ring with exactly one small magenta band. Wide 16:9 website hero composition: Ringo sits on the right side of the frame, full body visible, centered horizontally at about 72% of the frame width, occupying about 70% of the frame height, calmly holding the lime ring against its chest with one front flipper, head turned slightly toward the left of the frame with a calm, attentive, friendly look, as if listening. The left 55% of the frame is completely empty plain seamless warm white (#F7F7F2) studio background, reserved for website text. Soft daylight from the upper left, gentle soft contact shadow under Ringo, very subtle floor-to-wall sweep in the same warm white. Steady camera at Ringo's eye level. No text, no letters, no logo, no props, no frame, no border."
+  },
+  {
+   "index": 4,
+   "job_id": "295f8b30-9997-42d0-9ec5-8de1e36650f5",
+   "purpose": "Greeting pose, transparent",
+   "model": "gpt_image_2_6",
+   "settings": {
+    "quality": "high",
+    "resolution": "1k",
+    "aspect_ratio": "1:1",
+    "background": "transparent",
+    "reference": "3ccf1554-6947-4fcf-aa01-02cc769ffe7f"
+   },
+   "source": "poses/greeting.png",
+   "dimensions": "1024x1024 RGBA",
+   "quoted_credits": 1.5,
+   "used": true,
+   "shipping": [
+    "public/media/ringo-greeting-{480,960}.webp"
+   ],
+   "prompt": "Use the attached reference image as the exact character design: the same sea lion Ringo with identical proportions, slate charcoal soft-touch matte vinyl finish with faint speckle, lighter warm grey muzzle and belly, small external ear flaps, same eyes and whiskers, and the same lime-green ring with exactly one small magenta band. Pose: GREETING. Ringo sits upright facing the viewer in a gentle three-quarter view and raises one front flipper in a small, friendly wave at shoulder height, while the other flipper loosely holds the lime ring resting upright against its side. Calm, warm, welcoming expression, closed-mouth smile. Full body visible with margin on all sides. Isolated character on a fully transparent background, no floor, no shadow, no text, no logo."
+  },
+  {
+   "index": 5,
+   "job_id": "23142edb-14ec-49c5-b936-9b578761bc37",
+   "purpose": "Listening pose, transparent",
+   "model": "gpt_image_2_6",
+   "settings": {
+    "quality": "high",
+    "resolution": "1k",
+    "aspect_ratio": "1:1",
+    "background": "transparent",
+    "reference": "3ccf1554-6947-4fcf-aa01-02cc769ffe7f"
+   },
+   "source": "poses/listening.png",
+   "dimensions": "1024x1024 RGBA",
+   "quoted_credits": 1.5,
+   "used": true,
+   "shipping": [
+    "public/media/ringo-listening-{480,960}.webp"
+   ],
+   "prompt": "Use the attached reference image as the exact character design: the same sea lion Ringo with identical proportions, slate charcoal soft-touch matte vinyl finish with faint speckle, lighter warm grey muzzle and belly, small external ear flaps, same eyes and whiskers, and the same lime-green ring with exactly one small magenta band. Pose: LISTENING. Ringo sits upright in profile-three-quarter view, head tilted slightly to one side, small ear flap clearly visible, eyes attentive and thoughtful, mouth closed, holding the lime ring upright in front of its chest with both front flippers like a frame it is looking through. Calm, focused, observant. Full body visible with margin on all sides. Isolated character on a fully transparent background, no floor, no shadow, no text, no logo."
+  },
+  {
+   "index": 6,
+   "job_id": "f2d10561-a1d6-4804-97d4-1d8da62c675e",
+   "purpose": "Quiet rest pose for success/empty states, transparent",
+   "model": "gpt_image_2_6",
+   "settings": {
+    "quality": "high",
+    "resolution": "1k",
+    "aspect_ratio": "1:1",
+    "background": "transparent",
+    "reference": "3ccf1554-6947-4fcf-aa01-02cc769ffe7f"
+   },
+   "source": "poses/rest.png",
+   "dimensions": "1024x1024 RGBA",
+   "quoted_credits": 1.5,
+   "used": true,
+   "shipping": [
+    "public/media/ringo-rest-{480,960}.webp"
+   ],
+   "prompt": "Use the attached reference image as the exact character design: the same sea lion Ringo with identical proportions, slate charcoal soft-touch matte vinyl finish with faint speckle, lighter warm grey muzzle and belly, small external ear flaps, same eyes and whiskers, and the same lime-green ring with exactly one small magenta band. Pose: QUIET REST. Ringo lies down comfortably on its belly, front flippers relaxed forward, chin resting on the edge of the lime ring which lies flat in front of it, eyes gently half-closed with a content, peaceful closed-mouth smile. Calm, settled, all-is-well mood. Full body visible with margin on all sides. Isolated character on a fully transparent background, no floor, no shadow, no text, no logo."
+  },
+  {
+   "index": 7,
+   "job_id": "204fe6c7-b2e3-4c26-9f4c-611b0669d38f",
+   "purpose": "Hero motion loop (start frame = end frame = hero still for a seamless loop)",
+   "model": "kling3_0",
+   "settings": {
+    "mode": "std",
+    "duration": 5,
+    "sound": "off",
+    "aspect_ratio": "16:9",
+    "start_image": "58eb9817-23ea-4c51-bf87-d314da970ccc",
+    "end_image": "58eb9817-23ea-4c51-bf87-d314da970ccc"
+   },
+   "source": "video/hero-loop-kling.mp4",
+   "dimensions": "1276x720, 24 fps, 121 frames, 5.04 s",
+   "quoted_credits": 7.5,
+   "used": true,
+   "verification": "Frames 0/30/60/90/120 inspected: anatomy and ring design stable; frame 0 and frame 120 match (clean loop seam).",
+   "shipping": [
+    "public/media/ringo-hero-loop.{mp4,webm}",
+    "public/media/ringo-hero-loop-square.{mp4,webm}",
+    "public/media/ringo-hero-loop-poster.jpg"
+   ],
+   "prompt": "Locked-off static camera, no zoom, no pan, no cut. The sea lion stays seated in exactly the same place. Very subtle, calm idle motion only: slow gentle breathing that softly lifts the chest, one natural relaxed blink, the whiskers twitch slightly, the front flipper holding the lime ring makes a small easy adjustment so the ring tilts a few degrees and settles back. The face, eyes, body shape, colors and the ring keep exactly the same design throughout. Plain warm white studio background stays perfectly still and empty. Calm, unhurried, friendly. No text, no new objects, no camera shake."
+  },
+  {
+   "index": 8,
+   "job_id": "fdae25bd-5c0c-4f7d-850a-c6c037c9a368",
+   "purpose": "Community still: connected rings on calm water (also video poster)",
+   "model": "gpt_image_2_6",
+   "settings": {
+    "quality": "high",
+    "resolution": "2k",
+    "aspect_ratio": "16:9",
+    "reference": "3ccf1554-6947-4fcf-aa01-02cc769ffe7f"
+   },
+   "source": "community/community-rings-2k.png",
+   "dimensions": "2688x1520",
+   "quoted_credits": null,
+   "used": true,
+   "shipping": [
+    "public/media/community-rings-{960,1600,2400}.{avif,webp}"
+   ],
+   "prompt": "Top-down view of a calm, pale sea-green water surface in soft morning daylight. Five lime-green rings (#76B900), each the same soft-touch matte vinyl ring as in the reference image with exactly one small magenta (#E20074) band, float spread loosely across the frame at different distances. From the ring nearest the left, gentle concentric ripples spread outward across the water and reach the neighbouring rings, whose own faint ripples overlap softly. Serene, hopeful, quiet, uncluttered composition with generous calm water around the rings, slight soft caustic light, fine natural texture. No animals, no people, no boats, no text, no letters, no logo, no border."
+  },
+  {
+   "index": 9,
+   "job_id": "92400345-d5cf-4966-b95f-006c8b061269",
+   "purpose": "Community motion loop (ripples travel from one ring to the others)",
+   "model": "kling3_0",
+   "settings": {
+    "mode": "std",
+    "duration": 5,
+    "sound": "off",
+    "aspect_ratio": "16:9",
+    "start_image": "fdae25bd-5c0c-4f7d-850a-c6c037c9a368",
+    "end_image": "fdae25bd-5c0c-4f7d-850a-c6c037c9a368"
+   },
+   "source": "video/community-loop-kling.mp4",
+   "dimensions": "1276x720, 24 fps, 121 frames",
+   "quoted_credits": 7.5,
+   "used": true,
+   "verification": "Frames 0/40/80/120 inspected: five rings keep position, size and single magenta band; ripples propagate; start/end frames match.",
+   "shipping": [
+    "public/media/community-loop.{mp4,webm}",
+    "public/media/community-loop-poster.jpg"
+   ],
+   "prompt": "Locked-off static top-down camera, no zoom, no pan, no cut. Calm water: gentle concentric ripples slowly spread outward from the ring on the left and travel across the surface to reach the other rings, which bob very gently in place as the ripples arrive, then the surface settles. Soft shimmering light caustics drift slowly. The five rings keep the same position, size, color and single magenta band throughout. Serene, slow, quiet. No new objects, no text, no splashes, no camera shake."
+  },
+  {
+   "index": 10,
+   "job_id": "ce2e0a3c-5168-436b-9f19-54d7ef5fe4dd",
+   "purpose": "Hero v2 (desktop): Ringo holding the ring at the chest with anatomically correct flippers; edit of job b71dd3c4-269f-44ca-853b-f819302f4aa0 to remove an extra flipper. Square phone crop derived locally.",
+   "model": "gpt_image_2_6",
+   "settings": {
+    "quality": "high",
+    "resolution": "2k",
+    "aspect_ratio": "16:9"
+   },
+   "source": "hero-v2/hero-v2-edit.png",
+   "dimensions": "2688x1520",
+   "used": true,
+   "replaces": "hero/hero-desktop-2k.png and the hero motion loop (the earlier pose showed an extra flipper)"
+  }
+ ],
+ "balance_after_credits": 240.5,
+ "actual_spend_credits": 29.5
 }

@@ -149,6 +149,38 @@ resource "aws_cloudfront_origin_access_control" "site" {
   signing_protocol                  = "sigv4"
 }
 
+data "aws_cloudfront_cache_policy" "caching_disabled" {
+  name = "Managed-CachingDisabled"
+}
+
+data "aws_cloudfront_origin_request_policy" "all_viewer_except_host" {
+  name = "Managed-AllViewerExceptHostHeader"
+}
+
+locals {
+  # The live API is optional: only when a tunnel host and a long edge secret are supplied.
+  live_api_enabled = var.live_api_host != "" && length(var.edge_read_secret) >= 24
+}
+
+# Angular deep links (/console/present, /console/calls/:id, ...) are not S3 objects. A
+# viewer-request function serves the SPA shell for extension-less paths on the S3 origin
+# only, so API errors from the live origin keep their real status codes.
+resource "aws_cloudfront_function" "spa" {
+  name    = "firstring-spa-shell"
+  runtime = "cloudfront-js-2.0"
+  publish = true
+  code    = <<-EOT
+    function handler(event) {
+      var request = event.request;
+      var uri = request.uri;
+      if (uri.lastIndexOf('.') <= uri.lastIndexOf('/')) {
+        request.uri = '/index.html';
+      }
+      return request;
+    }
+  EOT
+}
+
 resource "aws_cloudfront_distribution" "site" {
   enabled             = true
   comment             = "FirstRing static site (${var.domain_name})"
@@ -164,6 +196,43 @@ resource "aws_cloudfront_distribution" "site" {
     origin_access_control_id = aws_cloudfront_origin_access_control.site.id
   }
 
+  # Read-only live data: GET/HEAD /api/* goes through the Cloudflare tunnel to the FirstRing
+  # server on the presenting laptop. The server accepts this secret header only for GETs on
+  # an allowlist of read-only paths; writes, recordings and voice cloning stay local.
+  dynamic "origin" {
+    for_each = local.live_api_enabled ? [var.live_api_host] : []
+    content {
+      origin_id   = "live-api"
+      domain_name = origin.value
+      custom_origin_config {
+        http_port                = 80
+        https_port               = 443
+        origin_protocol_policy   = "https-only"
+        origin_ssl_protocols     = ["TLSv1.2"]
+        origin_read_timeout      = 60
+        origin_keepalive_timeout = 60
+      }
+      custom_header {
+        name  = "x-firstring-edge"
+        value = var.edge_read_secret
+      }
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = local.live_api_enabled ? ["/api/*"] : []
+    content {
+      path_pattern             = ordered_cache_behavior.value
+      target_origin_id         = "live-api"
+      viewer_protocol_policy   = "https-only"
+      allowed_methods          = ["GET", "HEAD"]
+      cached_methods           = ["GET", "HEAD"]
+      compress                 = false
+      cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+      origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
+    }
+  }
+
   default_cache_behavior {
     target_origin_id       = "s3-site"
     viewer_protocol_policy = "redirect-to-https"
@@ -171,22 +240,11 @@ resource "aws_cloudfront_distribution" "site" {
     cached_methods         = ["GET", "HEAD"]
     compress               = true
     cache_policy_id        = data.aws_cloudfront_cache_policy.caching_optimized.id
-  }
 
-  # Angular deep links (/console/present, /console/calls/:id, ...) are not S3 objects. Without
-  # s3:ListBucket, S3 answers 403 for missing keys; both 403 and 404 serve the SPA shell.
-  custom_error_response {
-    error_code            = 403
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 10
-  }
-
-  custom_error_response {
-    error_code            = 404
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 10
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa.arn
+    }
   }
 
   restrictions {

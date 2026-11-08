@@ -1,7 +1,6 @@
 import {
   afterNextRender,
   Component,
-  computed,
   DestroyRef,
   effect,
   ElementRef,
@@ -61,19 +60,39 @@ import { SiteHeader } from './site-header';
     LucideEarOff,
   ],
   templateUrl: './landing-page.html',
+  styles: `
+    .hero-title {
+      font-size: clamp(2.75rem, 0.9rem + 3.4vw, 4.6rem);
+      line-height: 1;
+      letter-spacing: -0.035em;
+      text-wrap: balance;
+    }
+    .hero-art-mask {
+      -webkit-mask-image:
+        linear-gradient(to right, transparent 0, #000 32%),
+        linear-gradient(to bottom, transparent 0, #000 5%, #000 78%, transparent 100%);
+      -webkit-mask-composite: source-in;
+      mask-image:
+        linear-gradient(to right, transparent 0, #000 32%),
+        linear-gradient(to bottom, transparent 0, #000 5%, #000 78%, transparent 100%);
+      mask-composite: intersect;
+    }
+    .hero-mark {
+      background-image: linear-gradient(var(--color-lime), var(--color-lime));
+      background-repeat: no-repeat;
+      background-size: 100% 0.2em;
+      background-position: 0 86%;
+      padding-inline: 0.03em;
+    }
+  `,
 })
 export class LandingPage {
   readonly motion = inject(Motion);
-  readonly heroVideo: VideoSource = {
-    mp4: 'media/ringo-hero-loop.mp4',
-    webm: 'media/ringo-hero-loop.webm',
-    poster: 'media/ringo-hero-loop-poster.jpg',
-  };
-  readonly heroVideoNarrow: VideoSource = {
-    mp4: 'media/ringo-hero-loop-square.mp4',
-    webm: 'media/ringo-hero-loop-square.webm',
-    poster: 'media/ringo-hero-square-720.webp',
-  };
+  readonly heroPoints = [
+    { icon: 'shield', text: 'Never shares codes, PINs or SSNs' },
+    { icon: 'rules', text: 'Nemotron proposes; fixed rules decide' },
+    { icon: 'check', text: 'Trusted callers skip screening' },
+  ];
   readonly communityVideo: VideoSource = {
     mp4: 'media/community-loop.mp4',
     webm: 'media/community-loop.webm',
@@ -83,27 +102,28 @@ export class LandingPage {
   /** Only what has receipts today; everything else is listed under "Next". */
   readonly today = [
     'Answers calls on a real phone number and asks what the call is about, tested with automated test callers.',
-    'Judges the request with NVIDIA Nemotron. FirstRing’s own rules decide what is allowed, not the model.',
-    'Refuses requests for codes, unusual payments or device access, and saves a private note.',
-    'Takes ordinary messages and shows each call’s transcript, decisions and receipts in the dashboard.',
-    'Shares minimized, expiring tactic warnings between two fictional households.',
+    'Judges each turn with NVIDIA Nemotron. FirstRing’s own rules decide what is allowed, not the model.',
+    'Refuses requests for codes, passwords, Social Security numbers, payments or device access, and saves a private note.',
+    'Takes ordinary messages, asks a follow-up when a detail is missing, and shows every decision in the dashboard.',
+    'Reports numbers that ask for codes; the next call from that number starts with the history.',
+    'Shares expiring tactic warnings between two fictional households.',
   ];
   readonly next = [
     {
       title: 'Ringing your own phone first',
-      text: 'A private summary, then press 1 to connect. Built into the server; not yet shown on a real handset.',
+      text: 'A private summary, then press 1 to connect. Built and armed on demand; not yet shown on a real handset.',
     },
     {
-      title: 'Reported-number history',
-      text: 'Independent reports, expiry and corrections for a number. In development.',
+      title: 'Trusted callers',
+      text: 'Numbers you list skip screening and ring straight through. Built and tested; not yet shown on a real call.',
     },
     {
       title: 'An assistant voice that sounds like you',
-      text: 'Optional, with explicit consent and an off switch. Designed, not available.',
+      text: 'Record it on one call, with consent and an off switch. Built; not yet recorded.',
     },
     {
-      title: 'More households',
-      text: 'Today’s community is two fictional households.',
+      title: 'Call recordings',
+      text: 'Announced at the start of each call and playable in the dashboard. Built; no recording yet.',
     },
   ];
 
@@ -123,7 +143,7 @@ export class LandingPage {
     {
       q: 'Could someone copy my voice?',
       a: [
-        'Any audio played to another person can be recorded, including a voice assistant’s. That’s why FirstRing answers in its own distinct synthetic voice, not yours. Voice cloning is turned off in this prototype.',
+        'Any audio played to another person can be recorded, including a voice assistant’s. FirstRing uses its own synthetic voice unless you choose to record yours, with consent, and you can switch it off or delete it at any time.',
         'And because voices can be imitated, sounding familiar is never treated as permission to share a code, send money or give access.',
       ],
     },
@@ -137,21 +157,18 @@ export class LandingPage {
       q: 'What if a call is flagged incorrectly?',
       a: [
         'Every call in the dashboard shows what FirstRing heard and why it acted, word for word. A blocked call still leaves you a note, so you can call the organization back at a number you already know.',
-        'In this prototype, shared tactic warnings expire automatically after 24 hours. A way to report a mistake and correct a shared warning is designed but not connected yet.',
+        'Shared tactic warnings expire after 24 hours and number reports after 14 days. The server keeps an audit trail and supports correcting a number report.',
       ],
     },
     {
       q: 'What is available in this prototype?',
       a: [
-        'Working today on a demonstration line: answering calls, asking follow-up questions, blocking requests for codes, unusual payments or remote access, saving private summaries, editing the greeting, voice and timezone for new calls, and sharing expiring tactic warnings between two fictional households.',
-        'Not available yet: transferring a call to you or a family member, number reputation scores, report corrections, carrier-level blocking, mobile notifications and custom voices.',
+        'Working today on a demonstration line: answering calls, asking follow-up questions, blocking requests for codes, passwords, Social Security numbers, payments or remote access, saving private summaries, reporting numbers that ask for codes, and sharing expiring tactic warnings between two fictional households.',
+        'Built but not yet shown on a real call: ringing your phone first, trusted callers, your own assistant voice and call recordings. Not built: carrier-level blocking and mobile notifications.',
       ],
     },
   ];
 
-  /** One visible control pauses all continuous hero motion (video loop and ring pulse). */
-  private readonly heroChoice = signal<boolean | null>(null);
-  readonly heroPlaying = computed(() => this.heroChoice() ?? !this.motion.reduced());
   private readonly root = viewChild.required<ElementRef<HTMLElement>>('root');
   private readonly rendered = signal(false);
   private context?: gsap.Context;
@@ -162,10 +179,6 @@ export class LandingPage {
       if (!this.rendered()) return;
       const reduced = this.motion.reduced();
       untracked(() => this.animate(reduced));
-    });
-    effect(() => {
-      const playing = this.heroPlaying();
-      if (this.rendered()) untracked(() => this.syncPause(playing));
     });
     inject(DestroyRef).onDestroy(() => this.context?.revert());
   }
@@ -190,7 +203,15 @@ export class LandingPage {
       gsap.fromTo(
         '[data-hero-ring-pulse]',
         { scale: 1, opacity: 0.6 },
-        { scale: 1.5, opacity: 0, duration: 2.6, ease: 'sine.out', repeat: -1, stagger: 1.3 },
+        {
+          scale: 1.5,
+          opacity: 0,
+          duration: 2.6,
+          ease: 'sine.out',
+          repeat: 1,
+          stagger: 1.3,
+          delay: 0.8,
+        },
       );
 
       // Depth: separately prepared layers drift at different rates while the hero scrolls away.
@@ -223,17 +244,5 @@ export class LandingPage {
           '<0.15',
         );
     }, root);
-    this.syncPause(this.heroPlaying());
-  }
-
-  toggleHero() {
-    this.heroChoice.set(!this.heroPlaying());
-  }
-
-  private syncPause(playing: boolean) {
-    const root = this.root().nativeElement;
-    gsap
-      .getTweensOf(root.querySelectorAll('[data-hero-ring-pulse]'))
-      .forEach((tween) => (playing ? tween.resume() : tween.pause()));
   }
 }

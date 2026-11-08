@@ -175,8 +175,44 @@ pub fn local_console(req: &Request) -> bool {
     .any(|name| req.headers().contains_key(*name));
     loopback && !forwarded
 }
+/// Read-only paths the public site (CloudFront in front of the tunnel) may GET.
+/// Recordings, voice cloning, trusted callers and every write stay local or token-only.
+pub fn edge_readable(method: &axum::http::Method, path: &str) -> bool {
+    if method != axum::http::Method::GET && method != axum::http::Method::HEAD {
+        return false;
+    }
+    let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+    let id_ok = |s: &str| {
+        !s.is_empty()
+            && s.len() <= 128
+            && s.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    };
+    match parts.as_slice() {
+        ["api", "state"] | ["api", "events"] | ["api", "callers"] | ["api", "reputation"] => true,
+        ["api", "demo", "phone-demo"] => true,
+        ["api", "reputation", key] => id_ok(key),
+        ["api", "profile", household] => id_ok(household),
+        ["api", "session", id] => id_ok(id),
+        ["api", "session", id, "events" | "reputation"] => id_ok(id),
+        _ => false,
+    }
+}
+/// True when CloudFront presented the shared edge secret on a read-only path.
+pub fn edge_viewer(req: &Request, secret: &str) -> bool {
+    secret.len() >= 24
+        && req
+            .headers()
+            .get("x-firstring-edge")
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|v| bool::from(v.as_bytes().ct_eq(secret.as_bytes())))
+        && edge_readable(req.method(), req.uri().path())
+}
 async fn admin(State(app): State<App>, req: Request, next: Next) -> Response {
     if local_console(&req) {
+        return next.run(req).await;
+    }
+    if edge_viewer(&req, &std::env::var("EDGE_READ_SECRET").unwrap_or_default()) {
         return next.run(req).await;
     }
     let provided = req

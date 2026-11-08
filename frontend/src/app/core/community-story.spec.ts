@@ -37,7 +37,7 @@ describe('community story', () => {
       'pending',
       'pending',
     ]);
-    expect(story.headline).toBe('A shared warning is ready for Maya.');
+    expect(story.headline).toBe('A shared warning is ready for Maya and Jimmy.');
 
     ({ state, events } = play(state, events, 'maya', Date.UTC(2026, 10, 8, 14, 30)));
     stories = buildCommunityStories(
@@ -47,7 +47,7 @@ describe('community story', () => {
     );
     story = stories.find((s) => s.tacticId === 'staged-tactic-code')!;
     expect(story.stages.every((s) => s.status === 'done')).toBe(true);
-    expect(story.headline).toBe('Sarah spotted it. Maya was ready.');
+    expect(story.headline).toBe('Sarah spotted it. Maya and Jimmy were ready.');
     expect(story.stages.find((s) => s.id === 'consulted')!.detail).toContain(
       'not the same person or number',
     );

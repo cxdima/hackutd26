@@ -64,3 +64,63 @@ async fn loopback_console_needs_no_token_but_tunnelled_requests_do() {
         StatusCode::OK
     );
 }
+
+#[test]
+fn edge_viewer_reads_only_public_paths() {
+    use axum::http::Method;
+    use firstring::http::edge_readable;
+    for path in [
+        "/api/state",
+        "/api/events",
+        "/api/callers",
+        "/api/reputation",
+        "/api/reputation/88f51446ef92d0b4",
+        "/api/session/7e3cea7b-9f00-40df-be94-75e9fb9e9c37",
+        "/api/session/7e3cea7b-9f00-40df-be94-75e9fb9e9c37/events",
+        "/api/session/7e3cea7b-9f00-40df-be94-75e9fb9e9c37/reputation",
+        "/api/demo/phone-demo",
+        "/api/profile/sarah",
+    ] {
+        assert!(edge_readable(&Method::GET, path), "{path}");
+        assert!(
+            !edge_readable(&Method::POST, path),
+            "writes are never edge-readable: {path}"
+        );
+    }
+    for path in [
+        "/api/session/abc/recording",
+        "/api/session/abc/recording/info",
+        "/api/voice/clone",
+        "/api/voice/clone/preview",
+        "/api/trusted",
+        "/api/demo/phone-demo/arm",
+        "/api/demo/reset",
+        "/api/session/../state",
+        "/api/reputation/a/corrections",
+    ] {
+        assert!(!edge_readable(&Method::GET, path), "{path}");
+    }
+}
+
+#[test]
+fn edge_viewer_requires_the_exact_long_secret() {
+    use axum::{body::Body, http::Request};
+    use firstring::http::edge_viewer;
+    let secret = "fixture-edge-secret-0123456789";
+    let with = |value: &str| {
+        Request::get("/api/state")
+            .header("x-firstring-edge", value)
+            .body(Body::empty())
+            .unwrap()
+    };
+    assert!(edge_viewer(&with(secret), secret));
+    assert!(!edge_viewer(&with("wrong-secret-0123456789abcdef"), secret));
+    assert!(!edge_viewer(&with(secret), "short"));
+    let post = Request::post("/api/state")
+        .header("x-firstring-edge", secret)
+        .body(Body::empty())
+        .unwrap();
+    assert!(!edge_viewer(&post, secret));
+    let none = Request::get("/api/state").body(Body::empty()).unwrap();
+    assert!(!edge_viewer(&none, secret));
+}
