@@ -1,0 +1,14 @@
+{
+  "status": "deployed",
+  "recorded_at": "2026-11-08T09:06:56.778941+00:00",
+  "pid": 31371,
+  "command": ".tools/firstring-campaign-native-repair",
+  "backend": "brev_hosted",
+  "binary_sha256": "29bc029ce69206deb7c11bed7896da319de89f0190c6d3bbe7b1d8d0d062faac",
+  "supervisor_pid": 31381,
+  "public_base_url": "https://printers-saints-hay-camcorder.trycloudflare.com",
+  "handoff_calls_enabled": false,
+  "family_calls_enabled": false,
+  "calls_started": 0,
+  "database_backup": "local_only"
+}

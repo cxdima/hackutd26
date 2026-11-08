@@ -1,0 +1,49 @@
+{
+  "reviewed_at_utc": "2026-11-08T09:11:36.163015+00:00",
+  "scope": "fixed synthetic development cases, actual Brev inference/inert executor; not held-out accuracy",
+  "native_cycles_completed": 7,
+  "total": 7,
+  "semantic_passes": 5,
+  "cases": [
+    {
+      "id": "caller-experience-exact-appointment",
+      "verdict": "pass"
+    },
+    {
+      "id": "caller-experience-two-sentence-identity",
+      "verdict": "pass"
+    },
+    {
+      "id": "caller-experience-who-answering",
+      "verdict": "pass_verbose"
+    },
+    {
+      "id": "caller-experience-known-purpose-human-request",
+      "verdict": "fail_repeated_known_purpose"
+    },
+    {
+      "id": "caller-experience-declines-message",
+      "verdict": "pass"
+    },
+    {
+      "id": "caller-experience-corrected-unqualified-time",
+      "verdict": "pass"
+    },
+    {
+      "id": "caller-experience-pickup-recipient",
+      "verdict": "partial_redundant_recipient_question"
+    }
+  ],
+  "remaining": [
+    "Human preference still repeats known purpose and fails honest connection/message explanation.",
+    "Pickup asks who needs pickup even though caller already stated me.",
+    "The actual family phone test19 truncated both assessments despite clean-text cycles."
+  ],
+  "comparison_sixcase": {
+    "completed_outcomes": 5,
+    "total": 6,
+    "risk_case": "rejected readiness contradiction repaired once, then accepted native risk assessment and categorical incident outcome; erroneous requested missing secret never spoken because Rust protective phase disallows questions",
+    "warning_case": "not blocked as risky, but repeated rejected summaries exhausted action budget; failed message fidelity/outcome",
+    "delivery_case": "question asks destination preference unknown to caller; semantic failure"
+  }
+}

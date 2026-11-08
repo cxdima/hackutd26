@@ -57,6 +57,115 @@ fn ordinary_times_dates_quantities_and_prices_survive_message_storage() {
 }
 
 #[test]
+fn unspoken_meridiem_is_rejected_before_saved_message_or_action_changes() {
+    for summary in [
+        "Appointment updated to tomorrow at 5:04 PM.",
+        "Appointment updated to tomorrow at 5:04PM.",
+        "Appointment updated to tomorrow at 5:04 p.m.",
+        "Appointment updated to tomorrow at 5:04 AM.",
+    ] {
+        let (mut session, evidence) = assessed(
+            "Actually tomorrow, at 5:04.",
+            SpeechAct::Statement,
+            RequestedObject::RoutineInformation,
+            Direction::CallerSupplies,
+        );
+        session
+            .record_message(
+                "Appointment updated to tomorrow at 5:04.",
+                &evidence,
+                Utc::now(),
+            )
+            .unwrap();
+        let saved = serde_json::to_value(&session.message).unwrap();
+        let action = session.current_action.clone();
+        assert!(
+            session
+                .record_message(summary, &evidence, Utc::now())
+                .is_err(),
+            "Accepted unsupported qualifier: {summary}"
+        );
+        assert_eq!(serde_json::to_value(&session.message).unwrap(), saved);
+        assert_eq!(session.current_action, action);
+    }
+}
+
+#[test]
+fn spoken_morning_afternoon_and_explicit_meridiems_support_summary_qualifiers() {
+    for (text, summary) in [
+        ("Tomorrow at nine in the morning.", "Tomorrow at 9 AM."),
+        ("Tomorrow at five in the afternoon.", "Tomorrow at 5 PM."),
+        ("Pickup is at seven in the evening.", "Pickup is at 7pm."),
+        ("The appointment is at 9 a.m.", "Appointment at 9 AM."),
+        (
+            "The appointment is at 2:30PM on 11/09.",
+            "Appointment at 2:30 PM on 11/09.",
+        ),
+        (
+            "I am calling about 12 boxes, delivery on 11/09 at 14:30.",
+            "I am calling about 12 boxes, delivery on 11/09 at 14:30.",
+        ),
+    ] {
+        let (mut session, evidence) = assessed(
+            text,
+            SpeechAct::Statement,
+            RequestedObject::RoutineInformation,
+            Direction::CallerSupplies,
+        );
+        session
+            .record_message(summary, &evidence, Utc::now())
+            .unwrap();
+        assert_eq!(session.message.unwrap().summary, summary);
+    }
+}
+
+#[test]
+fn negated_or_assistant_period_words_do_not_license_added_meridiems() {
+    for text in [
+        "Tomorrow at five, not in the afternoon.",
+        "Tomorrow at five.",
+    ] {
+        let (mut session, evidence) = assessed(
+            text,
+            SpeechAct::Statement,
+            RequestedObject::RoutineInformation,
+            Direction::CallerSupplies,
+        );
+        session.turns.push(firstring::calls::state::Turn {
+            id: "assistant".into(),
+            speaker: "assistant".into(),
+            text: "Was that in the afternoon?".into(),
+        });
+        assert!(
+            session
+                .record_message("Tomorrow at 5 PM.", &evidence, Utc::now())
+                .is_err()
+        );
+        assert!(session.message.is_none());
+    }
+}
+
+#[test]
+fn a_clear_positive_meridiem_after_a_clause_boundary_is_not_negated() {
+    for text in [
+        "Not four, five PM.",
+        "Not four; five PM.",
+        "Not four. Five PM.",
+    ] {
+        let (mut session, evidence) = assessed(
+            text,
+            SpeechAct::Statement,
+            RequestedObject::RoutineInformation,
+            Direction::CallerSupplies,
+        );
+        session
+            .record_message("Appointment at five PM.", &evidence, Utc::now())
+            .unwrap();
+        assert_eq!(session.message.unwrap().summary, "Appointment at five PM.");
+    }
+}
+
+#[test]
 fn phone_and_email_literals_are_redacted_without_losing_adjacent_numeric_facts() {
     let text = "Visit 11/09 at 2:30 PM, allow 10 minutes, $25 copay. Reply at person@example.test or +15550123456.";
     let (mut session, evidence) = assessed(

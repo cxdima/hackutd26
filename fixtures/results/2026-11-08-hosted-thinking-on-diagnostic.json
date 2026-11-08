@@ -1,0 +1,51 @@
+{
+  "kind": "hosted_thinking_mode_diagnostic",
+  "recorded_at": "2026-11-08T08:16:30.033623+00:00",
+  "backend": "nvidia_hosted",
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "endpoint": "https://integrate.api.nvidia.com/v1/chat/completions",
+  "requests_submitted": 1,
+  "only_changed_fields": [
+    "chat_template_kwargs.enable_thinking"
+  ],
+  "baseline_request_sha256": "75b768c8552d5f8a8e2fabb117d37cb22f1f0786340f60ccabe670854783ed18",
+  "request_sha256": "095cc3d9b892e0b2183d2d744615758764c5b2fb549130e0355e7ad1d63b5c5c",
+  "messages_sha256": "b915f145b9d53c2004f97293897ce22f6ff678bd86cfdb08ba68d15525f5c122",
+  "tools_sha256": "c61f8ca752fb2456d093e3ebd646fd0e4c7090bd9df819f084920f79a2b27bfe",
+  "prefix_provenance": {
+    "binary_sha256": "7a65c5d18673376ffb8cd55304469e43808faaf3cae5d2ed8353a0bcfcdca504",
+    "preflight_source_sha256": "480aa2156ce269a07a56eb62c65e128fb827cf0ebac30af4f1363b949324b785",
+    "provider_source_sha256": "259a10f1f4e25ca457dc6b7372336f93ab2a8c3496623f6c419c331e5d03dd78",
+    "tools_source_sha256": "30e5198cbe97d3c6f9e2b894aded5a2d7b34b072995410f494a06042d15bf0f3",
+    "capture_external_requests": 0,
+    "synthetic_context": "fixed clinic assessment-only probe"
+  },
+  "scope": "captured historical synthetic clinic assessment schema; not a current full-cycle gate",
+  "max_output_tokens": 512,
+  "request_timeout_ms": 10000,
+  "enable_thinking": true,
+  "reasoning_budget": "omitted; documented hosted default16384; no additional parameter changed",
+  "native_validation_passed": false,
+  "phone_calls": 0,
+  "gpu_requests": 0,
+  "hidden_reasoning_retained": false,
+  "runtime_modified": false,
+  "sources": [
+    "https://github.com/NVIDIA-AI-Blueprints/nemotron-voice-agent/blob/main/docs/how-to/configure-llm.md#reasoning-thinking-onoff",
+    "https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-5-lightning-30b-a3b-infer"
+  ],
+  "http_status": 200,
+  "elapsed_ms": 5418,
+  "status": "response_received",
+  "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "finish_reason": "length",
+  "completion_tokens": 512,
+  "reasoning_tokens": 512,
+  "content_chars": 0,
+  "reasoning_chars": 2355,
+  "native_tool_count": 0,
+  "validator_request_matches_captured_baseline": true,
+  "native_validation_error": "Nemotron completion was truncated or incomplete",
+  "completed_at": "2026-11-08T08:16:35.996444+00:00",
+  "full_cycle_verified": false
+}

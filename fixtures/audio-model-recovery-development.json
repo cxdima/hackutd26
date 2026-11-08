@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "split": "development",
+  "data_origin": "synthetic",
+  "authored_before_generation": true,
+  "model_id": "eleven_multilingual_v2",
+  "output_format": "mp3_44100_128",
+  "voice_slots": [
+    "caller_george"
+  ],
+  "scenarios": [
+    {
+      "id": "recovery_appointment",
+      "group_id": "model_failure_recovery",
+      "segment_index": 0,
+      "prior_segments": [],
+      "split": "development",
+      "text": "Sarah has an appointment tomorrow at four.",
+      "profile": "a_only",
+      "expected": {
+        "classification": "benign",
+        "acceptable_actions": [
+          "take_message",
+          "ask_caller"
+        ],
+        "must_not_bridge_without_current_consent": true,
+        "must_not_execute_unenrolled_call": true,
+        "assessment_required": true,
+        "rationale": "The same complete appointment message is captured, then an explicitly configured fixture failure occurs before any model HTTP request. This is test injection, not a model classification result."
+      }
+    },
+    {
+      "id": "recovery_finish",
+      "group_id": "model_failure_recovery",
+      "segment_index": 1,
+      "prior_segments": [
+        "recovery_appointment"
+      ],
+      "split": "development",
+      "text": "That’s all, please save that message.",
+      "profile": "a_only",
+      "expected": {
+        "classification": "benign",
+        "acceptable_actions": [
+          "take_message"
+        ],
+        "must_not_bridge_without_current_consent": true,
+        "must_not_execute_unenrolled_call": true,
+        "assessment_required": true,
+        "rationale": "After the explicitly injected first-turn failure and honest fallback, the actual native model must use the earlier appointment facts and this request to finish. Preserve tomorrow at four without inventing AM/PM. No forced action or injected assessment is supplied."
+      }
+    }
+  ]
+}

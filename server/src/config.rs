@@ -26,6 +26,24 @@ impl RelaySpeechModel {
 // One startup snapshot for this single-process demo. Configuration is immutable
 // during a call; a different ASR experiment requires an explicit process restart.
 static RELAY_SPEECH_MODEL: OnceLock<RelaySpeechModel> = OnceLock::new();
+static RELAY_SPEECH_TIMEOUT_MS: OnceLock<u16> = OnceLock::new();
+fn parse_relay_speech_timeout(value: Option<&str>) -> anyhow::Result<u16> {
+    match value.unwrap_or("1000") {
+        "1000" => Ok(1000),
+        "600" => Ok(600),
+        _ => anyhow::bail!("RELAY_SPEECH_TIMEOUT_MS must be 600 or 1000"),
+    }
+}
+fn install_relay_speech_timeout(slot: &OnceLock<u16>, selected: u16) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        *slot.get_or_init(|| selected) == selected,
+        "RELAY_SPEECH_TIMEOUT_MS changed after startup; restart the process"
+    );
+    Ok(())
+}
+pub fn relay_speech_timeout_ms() -> u16 {
+    RELAY_SPEECH_TIMEOUT_MS.get().copied().unwrap_or(1000)
+}
 fn install_relay_speech_model(
     slot: &OnceLock<RelaySpeechModel>,
     selected: RelaySpeechModel,
@@ -154,6 +172,8 @@ impl Config {
         let model_settings = ModelSettings::from_env()?;
         let relay_model =
             RelaySpeechModel::parse(std::env::var("RELAY_SPEECH_MODEL").ok().as_deref())?;
+        let speech_timeout =
+            parse_relay_speech_timeout(std::env::var("RELAY_SPEECH_TIMEOUT_MS").ok().as_deref())?;
         let get = |k: &str, default: &str| std::env::var(k).unwrap_or_else(|_| default.into());
         let mode = match get("DEMO_EXECUTION_MODE", "replay").as_str() {
             "live" => ExecutionMode::Live,
@@ -229,6 +249,7 @@ impl Config {
             "MAX_CALL_SECONDS outside 15..600"
         );
         install_relay_speech_model(&RELAY_SPEECH_MODEL, relay_model)?;
+        install_relay_speech_timeout(&RELAY_SPEECH_TIMEOUT_MS, speech_timeout)?;
         Ok(Self {
             public_base_url,
             port: get("PORT", "8080").parse()?,
@@ -333,6 +354,20 @@ mod model_settings_tests {
         assert!(install_relay_speech_model(&slot, RelaySpeechModel::Nova3).is_err());
         assert_eq!(slot.get(), Some(&RelaySpeechModel::Flux));
     }
+    #[test]
+    fn speech_timeout_experiment_is_bounded_and_immutable() {
+        assert_eq!(parse_relay_speech_timeout(None).unwrap(), 1000);
+        assert_eq!(parse_relay_speech_timeout(Some("600")).unwrap(), 600);
+        for invalid in ["0", "599", "601", "-1", "10000", "600ms"] {
+            assert!(parse_relay_speech_timeout(Some(invalid)).is_err());
+        }
+        let slot = OnceLock::new();
+        install_relay_speech_timeout(&slot, 600).unwrap();
+        install_relay_speech_timeout(&slot, 600).unwrap();
+        assert!(install_relay_speech_timeout(&slot, 1000).is_err());
+        assert_eq!(slot.get(), Some(&600));
+    }
+
     fn settings(values: &[(&str, &str)]) -> anyhow::Result<ModelSettings> {
         ModelSettings::from_lookup(|key| {
             values

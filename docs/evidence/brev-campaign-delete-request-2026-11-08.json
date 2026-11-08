@@ -1,0 +1,12 @@
+{
+  "requested_at_utc": "2026-11-08T09:10:46.084558+00:00",
+  "instance_name": "firstring-nemotron-20261108-070043",
+  "exact_identity_bound": true,
+  "reason": "Fixed two-hour campaign completed; export and active-call reconciliation completed",
+  "cleanup_deadline_utc": "2026-11-08T09:39:50Z",
+  "existed_before_delete": true,
+  "cleanup_requested": true,
+  "cli_exit": 1,
+  "provider_delete_status": 202,
+  "deletion_verified": false
+}

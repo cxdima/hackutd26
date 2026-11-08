@@ -1,11 +1,217 @@
 use firstring::{
-    calls::state::Session,
-    config::ExecutionMode,
+    calls::{
+        actor::{App, Handle, Input},
+        state::Session,
+    },
+    config::{Config, ExecutionMode},
+    providers::nemotron::ModelToolCall,
     tools::{
         CallUnderstanding, Direction, EvidenceRef, GroundedFact, Observation, Readiness,
         RequestedObject, SpeechAct,
     },
 };
+use serde_json::{Value, json};
+use std::time::{Duration, Instant};
+
+async fn replay_actor() -> (App, Handle) {
+    let mut config = Config::from_env().unwrap();
+    config.mode = ExecutionMode::Replay;
+    config.database_url = "sqlite::memory:".into();
+    let app = App::new(config).await.unwrap();
+    let (handle, _) = app
+        .incoming("CA00000000000000000000000000000001")
+        .await
+        .unwrap();
+    (app, handle)
+}
+
+fn native_assessment(
+    turn_id: &Value,
+    text: &str,
+    readiness: &str,
+    purpose: &str,
+    action: &str,
+    missing: &[&str],
+) -> Value {
+    json!({
+        "observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},
+        "evidence_refs":[{"turn_id":turn_id,"quote":text}],
+        "understanding":{"version":1,"claimed_identity":null,"purpose":purpose,"requested_action":action,"supplied_facts":[{"turn_id":turn_id,"quote":text}],"missing_information":missing,"readiness":readiness}
+    })
+}
+
+async fn apply_native_assessment(
+    handle: &Handle,
+    snapshot: &Value,
+    arguments: Value,
+) -> anyhow::Result<Value> {
+    handle
+        .send(Input::ModelTool {
+            generation: snapshot["generation_id"].as_u64().unwrap(),
+            epoch: snapshot["policy_epoch"].as_u64().unwrap(),
+            version: snapshot["turn_version"].as_u64().unwrap(),
+            deadline: Instant::now() + Duration::from_secs(5),
+            tool: ModelToolCall {
+                id: "understanding-event-test".into(),
+                name: "record_assessment".into(),
+                arguments,
+                assistant_message: json!({}),
+            },
+        })
+        .await
+}
+
+#[tokio::test]
+async fn accepted_understanding_events_retain_both_turns_without_identity_or_full_facts() {
+    let (app, handle) = replay_actor().await;
+    let mut snapshots = vec![];
+    for (text, readiness, purpose, action, missing) in [
+        (
+            "I'm Alex. Please ask Sarah to pick me up.",
+            "needs_information",
+            "Arrange caller pickup",
+            "Ask Sarah to collect caller",
+            vec!["Pickup location"],
+        ),
+        (
+            "I'm at the north entrance.",
+            "ready",
+            "Arrange caller pickup at north entrance",
+            "Pass on caller pickup location",
+            vec![],
+        ),
+    ] {
+        let turn = handle
+            .send(Input::FinalPrompt { text: text.into() })
+            .await
+            .unwrap();
+        let snapshot = handle.send(Input::Snapshot).await.unwrap();
+        let mut arguments =
+            native_assessment(&turn["turn_id"], text, readiness, purpose, action, &missing);
+        arguments["understanding"]["claimed_identity"] = json!("Alex");
+        let result = apply_native_assessment(&handle, &snapshot, arguments)
+            .await
+            .unwrap();
+        assert_eq!(result["ok"], true, "{result}");
+        snapshots.push(snapshot);
+    }
+    let latest = handle.send(Input::Snapshot).await.unwrap();
+    assert_eq!(latest["understanding"]["turn_version"], 2);
+    assert_eq!(
+        latest["understanding"]["understanding"]["readiness"],
+        "ready"
+    );
+    let history = app
+        .store
+        .events_after(0)
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|event| event.kind == "call.understanding.accepted")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        history.len(),
+        2,
+        "Accepted interpretation history must survive a later turn"
+    );
+    assert!(history[0].sequence < history[1].sequence);
+    for (event, snapshot) in history.iter().zip(&snapshots) {
+        assert_eq!(event.session_id.as_deref(), Some(handle.id.as_str()));
+        assert_eq!(
+            event.policy_epoch,
+            snapshot["policy_epoch"].as_u64().unwrap()
+        );
+        assert_eq!(event.execution_mode, ExecutionMode::Replay);
+        assert_eq!(event.payload["generation_id"], snapshot["generation_id"]);
+        assert_eq!(event.payload["turn_version"], snapshot["turn_version"]);
+        let keys = event
+            .payload
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            keys,
+            [
+                "generation_id",
+                "turn_version",
+                "readiness",
+                "purpose",
+                "requested_action",
+                "missing_information"
+            ]
+            .into_iter()
+            .collect()
+        );
+        assert!(!event.payload.to_string().contains("Alex"));
+    }
+    assert_eq!(history[0].payload["readiness"], "needs_information");
+    assert_eq!(
+        history[0].payload["missing_information"],
+        json!(["Pickup location"])
+    );
+    assert_eq!(
+        history[0].payload["requested_action"],
+        "Ask Sarah to collect caller"
+    );
+    assert_eq!(history[1].payload["readiness"], "ready");
+    assert_eq!(history[1].payload["missing_information"], json!([]));
+    assert_eq!(
+        history[1].payload["purpose"],
+        "Arrange caller pickup at north entrance"
+    );
+    assert!(app.store.actions(&handle.id).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn rejected_or_obsolete_understanding_never_emits_accepted_history() {
+    let (app, handle) = replay_actor().await;
+    let text = "The delivery is at the gate.";
+    let turn = handle
+        .send(Input::FinalPrompt { text: text.into() })
+        .await
+        .unwrap();
+    let old = handle.send(Input::Snapshot).await.unwrap();
+    let arguments = native_assessment(
+        &turn["turn_id"],
+        text,
+        "ready",
+        "Delivery notice",
+        "Pass on delivery location",
+        &[],
+    );
+    let mut rejected = arguments.clone();
+    rejected["understanding"]["claimed_identity"] = json!("Unsupported identity");
+    let result = apply_native_assessment(&handle, &old, rejected)
+        .await
+        .unwrap();
+    assert_eq!(result["ok"], false);
+    assert!(result["error"].as_str().unwrap().contains("Identity claim"));
+    handle
+        .send(Input::Speech {
+            partial: Some("Actually".into()),
+        })
+        .await
+        .unwrap();
+    assert!(
+        apply_native_assessment(&handle, &old, arguments)
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("Obsolete")
+    );
+    assert!(handle.send(Input::Snapshot).await.unwrap()["understanding"].is_null());
+    assert!(
+        !app.store
+            .events_after(0)
+            .await
+            .unwrap()
+            .iter()
+            .any(|event| event.kind == "call.understanding.accepted")
+    );
+    assert!(app.store.actions(&handle.id).await.unwrap().is_empty());
+}
 
 fn assessed(text: &str, object: RequestedObject) -> (Session, EvidenceRef) {
     let mut session = Session::new(

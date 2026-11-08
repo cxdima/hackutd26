@@ -1,0 +1,10 @@
+{
+  "at": "2026-11-08T08:48:01.350173+00:00",
+  "binary_sha256": "111726530d82f09067ed280ffec85d5d44532ed62d3134ebb30aa1ab7073e550",
+  "fixture_sha256": "f7263735bc7eda2c53570d47d12a66c7ea8682b8016dba7f8ad5919e8b8ae165",
+  "exit_code": 1,
+  "backend": "brev_hosted",
+  "phone_calls": 0,
+  "mode": "inert_policy_executor_real_nvidia_inference",
+  "report_sha256": "479002cfc87e485d9bbcbc1e40489b4ca095506cab819caa76ea211b47d4fa8a"
+}

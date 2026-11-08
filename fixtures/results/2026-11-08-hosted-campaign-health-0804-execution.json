@@ -1,0 +1,9 @@
+{
+  "recorded_at": "2026-11-08T08:04:00.636980+00:00",
+  "backend": "nvidia_hosted",
+  "kind": "native",
+  "exit_code": 1,
+  "binary_sha256": "25516c29eb7a4702a7e01f020ac6a9356557f8b4563ef57ca3b1ad38761ce123",
+  "report_sha256": "26910c78c02be2dbe03ae13fede21e421105a9cb0657e300ffc828f9183f7b3a",
+  "phone_calls": 0
+}

@@ -121,6 +121,7 @@ fn validate(data: &Dataset) -> Result<()> {
                 && case.expected.acceptable_actions.iter().all(|a| [
                     "ask_caller",
                     "take_message",
+                    "end_call",
                     "offer_handoff",
                     "lookup_trusted_contact",
                     "start_trusted_callback"
@@ -588,6 +589,28 @@ mod tests {
         invalid.scenarios[2].split = "held_out".into();
         assert!(validate(&invalid).is_err());
     }
+    #[test]
+    fn authored_no_message_ending_is_valid_rubric_but_never_sent_to_tts() {
+        let data: Dataset = serde_json::from_str(include_str!(
+            "../../../fixtures/audio-identity-human-development.json"
+        ))
+        .unwrap();
+        let clips = plan(&data, &["JBFqnCBsd6RMkjVDRZzb".into()]).unwrap();
+        assert_eq!(clips.len(), 3);
+        assert!(
+            clips.iter().all(
+                |clip| clip.group_id == "identity_human_decline" && clip.split == "development"
+            )
+        );
+        assert_eq!(data.scenarios[2].expected.acceptable_actions, ["end_call"]);
+        let speech = payload(&data, &clips[2]);
+        assert_eq!(speech["text"], "I don't want to leave a message. Goodbye.");
+        assert!(!speech.to_string().contains("end_call") && speech.get("expected").is_none());
+        let mut invalid = data;
+        invalid.scenarios[2].expected.acceptable_actions = vec!["dial_arbitrary_number".into()];
+        assert!(plan(&invalid, &[]).is_err());
+    }
+
     #[test]
     fn selector_options_accept_small_authored_source_without_enabling_generation() {
         let args = [

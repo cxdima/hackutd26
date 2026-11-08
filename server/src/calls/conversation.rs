@@ -5,7 +5,7 @@ use crate::{
     providers::{
         nemotron::{
             ModelCapabilities, Nemotron, ToolPhase, append_tool_result, conversation_messages,
-            next_step_phase, system_prompt,
+            next_step_phase, rejected_assessment_for_repair, system_prompt,
         },
         twilio,
     },
@@ -58,7 +58,7 @@ impl Actor {
                             &self.session.household_id,
                         )?);
                 self.emit("caller", "relay.telemetry", json!({"event":event,"elapsed_ms":elapsed_ms,"characters":characters,"heard":false,
-                    "speech":{"source":"requested_profile_snapshot","provider":profile.tts_provider,"voice":profile.voice_id,"path":"conversation_relay","profile_version":profile.version,"transcription_provider":"Deepgram","transcription_model":crate::config::relay_speech_model().as_str()}})).await?;
+                    "speech":{"source":"requested_profile_snapshot","provider":profile.tts_provider,"voice":profile.voice_id,"path":"conversation_relay","profile_version":profile.version,"transcription_provider":"Deepgram","transcription_model":crate::config::relay_speech_model().as_str(),"speech_timeout_ms":crate::config::relay_speech_timeout_ms()}})).await?;
             }
             Input::ClosingResponse => {
                 use crate::providers::speech::StaticPhrase;
@@ -123,9 +123,11 @@ impl Actor {
                     .config
                     .external_url(&format!("/voice/closing?nonce={nonce}"));
                 let twiml = format!(
-                    "<Response><Gather input=\"speech\" speechTimeout=\"1\" timeout=\"2\" actionOnEmptyResult=\"true\" action=\"{}\" method=\"POST\">{prompt}</Gather><Hangup/></Response>",
+                    "<Response><Gather input=\"speech\" speechModel=\"deepgram_nova-3\" language=\"{}\" speechTimeout=\"1\" timeout=\"2\" actionOnEmptyResult=\"true\" action=\"{}\" method=\"POST\">{prompt}</Gather><Hangup/></Response>",
+                    twilio::escape(&profile.locale),
                     twilio::escape(&url),
                 );
+                self.emit("system", "closing.listen.configured", json!({"source":"requested_twiml_configuration","speech_model":"deepgram_nova-3","language":profile.locale,"speech_timeout_seconds":1,"timeout_seconds":2,"actual_asr_result_pending":true})).await?;
                 self.session
                     .gather_replies
                     .insert(response_key, twiml.clone());
@@ -176,7 +178,7 @@ impl Actor {
                             &self.session.household_id,
                         )?);
                 self.emit("caller", "voice.connected", json!({"transport":"relay","heard":false,
-                    "speech":{"source":"requested_profile_snapshot","provider":profile.tts_provider,"voice":profile.voice_id,"path":"conversation_relay","profile_version":profile.version,"transcription_provider":"Deepgram","transcription_model":crate::config::relay_speech_model().as_str()}}))
+                    "speech":{"source":"requested_profile_snapshot","provider":profile.tts_provider,"voice":profile.voice_id,"path":"conversation_relay","profile_version":profile.version,"transcription_provider":"Deepgram","transcription_model":crate::config::relay_speech_model().as_str(),"speech_timeout_ms":crate::config::relay_speech_timeout_ms()}}))
                     .await?;
                 if let Some(text) = self.pending_relay_prompt.take() {
                     return self.final_prompt(text).await;
@@ -276,7 +278,7 @@ impl Actor {
                     self.emit(
                         "system",
                         "dependency.failed",
-                        json!({"provider":"nemotron","detail":detail}),
+                        json!({"provider":if detail == crate::audio_fixture::INJECTED_MODEL_FAILURE {"fixture_injection"} else {"nemotron"},"detail":detail,"synthetic":detail == crate::audio_fixture::INJECTED_MODEL_FAILURE}),
                     )
                     .await?;
                     if self.session.blocked
@@ -875,12 +877,20 @@ impl Actor {
         self.model_task = Some(tokio::spawn(async move {
             let deadline = Instant::now() + Duration::from_secs(6);
             let future = async {
+                if let Some(action_id) =
+                    crate::audio_fixture::reserve_model_failure(&store, c.mode, &s).await?
+                {
+                    store.append(Some(&s), "system", "model.failure.injected", json!({"action_id":action_id,"synthetic":true,"requests_submitted":0,"generation_id":s.generation_id,"turn_version":s.turn_version,"source":"designated_fixture_pre_http_failure"}), s.execution_mode).await?;
+                    anyhow::bail!(crate::audio_fixture::INJECTED_MODEL_FAILURE);
+                }
                 let model =
                     Nemotron::new(c.nvidia_key.clone(), c.model_url.clone(), c.model.clone())
                         .with_backend(c.model_backend);
                 let mut messages = conversation_messages(&s, &ModelCapabilities::from_config(&c));
                 let mut epoch = s.policy_epoch;
                 let mut phase = ToolPhase::Assessment;
+                let mut last_denial: Option<String> = None;
+                let mut structural_repair_used = false;
                 for _ in 0..4 {
                     let observed = model.next_tool_observed_for(&messages, phase).await;
                     // A measured response is not an accepted decision or audible
@@ -888,7 +898,24 @@ impl Actor {
                     let mut observation_session = s.clone();
                     observation_session.policy_epoch = epoch;
                     let _ = store.append(Some(&observation_session), "system", "model.request.completed", json!({"generation_id":s.generation_id,"turn_version":s.turn_version,"boundary":"model_http","heard":false,"observation":observed.observation}), s.execution_mode).await;
-                    let tool = observed.result?;
+                    let tool = match observed.result {
+                        Ok(tool) => tool,
+                        Err(error) => {
+                            let Some((rejected, outcome)) = rejected_assessment_for_repair(
+                                &error,
+                                phase,
+                                epoch,
+                                &mut structural_repair_used,
+                            ) else {
+                                return Err(error);
+                            };
+                            // This malformed assessment never reaches actor authorization.
+                            // Preserve the original native call/result pair for one repair.
+                            append_tool_result(&mut messages, &rejected, &outcome);
+                            let _ = store.append(Some(&observation_session), "system", "model.assessment.repair_requested", json!({"generation_id":s.generation_id,"turn_version":s.turn_version,"validation_boundary":"native_structure","reason":outcome["error"],"accepted":false,"heard":false}), s.execution_mode).await;
+                            continue;
+                        }
+                    };
                     let outcome = h
                         .send(Input::ModelTool {
                             generation: s.generation_id,
@@ -903,6 +930,16 @@ impl Actor {
                         phase = serde_json::from_value(outcome["next_phase"].clone())?;
                     }
                     append_tool_result(&mut messages, &tool, &outcome);
+                    if outcome["ok"] == false {
+                        let reason = outcome["error"].as_str().unwrap_or("Native tool denied");
+                        anyhow::ensure!(
+                            last_denial.as_deref() != Some(reason),
+                            "Repeated native validation denial after one repair attempt: {reason}"
+                        );
+                        last_denial = Some(reason.to_string());
+                    } else {
+                        last_denial = None;
+                    }
                     if outcome["result"]["stop"] == true {
                         return Ok::<_, anyhow::Error>(());
                     }
@@ -943,6 +980,21 @@ impl Actor {
                 }
                 self.session = candidate;
                 self.emit("system",if self.session.blocked{"policy.denied"}else{"policy.allowed"},json!({"operation":"assessment","observation":observation,"quote":self.session.evidence_quote,"handoff_allowed":!self.session.blocked && !self.session.ambiguous})).await?;
+                if let Some(value) = self.session.current_understanding() {
+                    self.emit(
+                        "system",
+                        "call.understanding.accepted",
+                        json!({
+                            "generation_id": self.session.generation_id,
+                            "turn_version": self.session.turn_version,
+                            "readiness": value.readiness,
+                            "purpose": value.purpose,
+                            "requested_action": value.requested_action,
+                            "missing_information": value.missing_information,
+                        }),
+                    )
+                    .await?;
+                }
                 Ok(
                     json!({"blocked":self.session.blocked,"ambiguous":self.session.ambiguous,"assessed_version":self.session.assessed_version,"understanding":self.session.understanding}),
                 )
@@ -1286,6 +1338,37 @@ mod message_tests {
                 },
             })
             .await
+    }
+
+    #[tokio::test]
+    async fn closing_speech_gather_pins_documented_model_locale_and_reports_requested_config() {
+        let (app, handle, evidence) = prepared_message().await;
+        assert_eq!(send_tool(&handle, "take_message", json!({"summary":"Caller requests a changed clinic visit.","evidence_refs":evidence})).await.unwrap()["ok"], true);
+        let response = handle.send(Input::ClosingResponse).await.unwrap();
+        let xml = response["twiml"].as_str().unwrap();
+        assert!(
+            xml.contains("speechModel=\"deepgram_nova-3\""),
+            "Closing ASR must not use an implicit provider default: {xml}"
+        );
+        let profile = handle.send(Input::Snapshot).await.unwrap()["profile"].clone();
+        assert!(xml.contains(&format!(
+            "language=\"{}\"",
+            profile["locale"].as_str().unwrap()
+        )));
+        assert!(xml.contains("speechTimeout=\"1\"") && xml.contains("timeout=\"2\""));
+        assert!(!xml.contains("hints="));
+        let events = app.store.events_after(0).await.unwrap();
+        let configured = events
+            .iter()
+            .find(|event| event.kind == "closing.listen.configured")
+            .unwrap();
+        assert_eq!(configured.payload["speech_model"], "deepgram_nova-3");
+        assert_eq!(configured.payload["language"], profile["locale"]);
+        assert_eq!(
+            configured.payload["source"],
+            "requested_twiml_configuration"
+        );
+        assert_eq!(configured.payload["actual_asr_result_pending"], true);
     }
 
     #[tokio::test]

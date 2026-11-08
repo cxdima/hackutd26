@@ -1,0 +1,7 @@
+{
+  "frozen_at_utc": "2026-11-08T08:31:51.000225+00:00",
+  "file": "fixtures/caller-experience-development.json",
+  "sha256": "f7263735bc7eda2c53570d47d12a66c7ea8682b8016dba7f8ad5919e8b8ae165",
+  "case_count": 7,
+  "scope": "Synthetic development only; labels authored before first inference run. Frozen held-out data unchanged."
+}

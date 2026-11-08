@@ -214,6 +214,10 @@ export function ConsoleView({
   const modelHttp = active
     ? modelHttpEvidence(active, sessionEvents)
     : undefined;
+  const earlierMessage =
+    !!active?.message &&
+    active.turn_version !== undefined &&
+    active.message.turn_version < active.turn_version;
   const acceptedUnderstanding = active?.understanding;
   const understanding = acceptedUnderstanding?.understanding;
   const understandingCurrent =
@@ -769,8 +773,21 @@ export function ConsoleView({
           </div>
           {active?.message && (
             <article className="offer" aria-label="Private saved message">
-              <h3>Saved message for {name}</h3>
+              <h3>
+                {earlierMessage ? "Earlier saved message" : "Saved message"} for{" "}
+                {name}
+              </h3>
               <blockquote>{active.message.summary}</blockquote>
+              <p className="offer-note">
+                Saved from caller turn {active.message.turn_version}.
+                {earlierMessage && (
+                  <>
+                    {" "}
+                    Latest caller turn {active.turn_version} is not included;
+                    its update has not been saved here.
+                  </>
+                )}
+              </p>
               <p className="offer-note">
                 Caller identity unverified. Saved for review; not a delivery
                 receipt.

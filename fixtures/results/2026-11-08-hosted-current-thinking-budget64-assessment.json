@@ -1,0 +1,125 @@
+{
+  "kind": "current_schema_hosted_assessment_diagnostic",
+  "recorded_at": "2026-11-08T08:20:31.235735+00:00",
+  "actual_upstream_backend": "nvidia_hosted",
+  "actual_upstream_endpoint": "https://integrate.api.nvidia.com/v1/chat/completions",
+  "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "local_adapter_label": "diagnostic_not_GPU",
+  "metadata_import_authorized": false,
+  "assessment_only": true,
+  "full_cycle_verified": false,
+  "phone_calls": 0,
+  "gpu_requests": 0,
+  "hidden_reasoning_retained": false,
+  "runtime_modified": false,
+  "provenance": {
+    "copied_binary_sha256": "04e5870d03f238291dc40f8691ff86757a252f01043c68baa0e55985c4730d93",
+    "source_binary_modified_at": "2026-11-08T08:13:09.110776+00:00",
+    "root_build_log_sha256": "c47318e12159acf74a5c064df3e046655bf69dacba3a49bc3dc8b25b4b74d390",
+    "working_source_sha256": {
+      "server/src/providers/nemotron.rs": "51ff7066b063329724ec184e8c20d029d5c9ebab3d601646eca238fa268d4b5c",
+      "server/src/tools.rs": "49d698900168491c8e7d03ab2362ed2042506110c53b80db4eea3aa115f001e3",
+      "server/src/bin/preflight.rs": "480aa2156ce269a07a56eb62c65e128fb827cf0ebac30af4f1363b949324b785",
+      "server/src/calls/state.rs": "178ba68403060453802c9a149a00fdfaae5e2435a49dcbe61dc57cd16aab7a0d"
+    },
+    "working_source_build_binding_verified": false,
+    "note": "Root reported binary copied after08:13 full build; contemporaneous working files may have changed. Effective schema/prompt hashes captured per request."
+  },
+  "requests_submitted": 2,
+  "upstream_requests": [
+    {
+      "started_at": "2026-11-08T08:20:16.687726+00:00",
+      "upstream_backend": "nvidia_hosted",
+      "request_timeout_ms": 3500,
+      "baseline_payload_sha256": "d83a2a02634905c8b811579fd2c217e99423b9048b6a0415ce40c70f56aeb036",
+      "effective_payload_sha256": "7c804fa44425962b86326b5ce02aa3fb4b9bb1fa8af40fccdc6b58430aa13087",
+      "messages_sha256": "3b3e3dccd1b947df017eb8d18eb08a650756902e89c03e30772fa810751cfe12",
+      "tools_sha256": "e266a25a8dad59ca554bd7fd408d91a98910c1be565b704a032fa6edc75348f5",
+      "changed_fields": [
+        "chat_template_kwargs.enable_thinking",
+        "reasoning_budget"
+      ],
+      "enable_thinking": true,
+      "reasoning_budget": 64,
+      "max_output_tokens": 512,
+      "brev_stop_fields_absent": true,
+      "status": "timeout",
+      "error_type": "TimeoutError",
+      "elapsed_ms": 3637
+    },
+    {
+      "started_at": "2026-11-08T08:20:20.716827+00:00",
+      "upstream_backend": "nvidia_hosted",
+      "request_timeout_ms": 10000,
+      "baseline_payload_sha256": "d83a2a02634905c8b811579fd2c217e99423b9048b6a0415ce40c70f56aeb036",
+      "effective_payload_sha256": "7c804fa44425962b86326b5ce02aa3fb4b9bb1fa8af40fccdc6b58430aa13087",
+      "messages_sha256": "3b3e3dccd1b947df017eb8d18eb08a650756902e89c03e30772fa810751cfe12",
+      "tools_sha256": "e266a25a8dad59ca554bd7fd408d91a98910c1be565b704a032fa6edc75348f5",
+      "changed_fields": [
+        "chat_template_kwargs.enable_thinking",
+        "reasoning_budget"
+      ],
+      "enable_thinking": true,
+      "reasoning_budget": 64,
+      "max_output_tokens": 512,
+      "brev_stop_fields_absent": true,
+      "status": "timeout",
+      "error_type": "TimeoutError",
+      "elapsed_ms": 10263
+    }
+  ],
+  "native_validation_runs": [
+    {
+      "request_timeout_ms": 3500,
+      "preflight_exit_code": 1,
+      "preflight_status": "model_probe_failed",
+      "native_validation_passed": false,
+      "native_result_roundtrips": 0,
+      "requests_submitted": 1,
+      "native_validation_error": "Nemotron request timed out",
+      "request_observations": [
+        {
+          "backend": "diagnostic_local_adapter_not_GPU",
+          "completion_tokens": null,
+          "content_chars": null,
+          "elapsed_ms": 3504,
+          "error": "Nemotron request timed out",
+          "finish_reason": null,
+          "outcome": "timeout",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": null
+        }
+      ],
+      "native_argument_diagnostics_scope": "synthetic clinic only",
+      "retained_assessment_count": 0
+    },
+    {
+      "request_timeout_ms": 10000,
+      "preflight_exit_code": 1,
+      "preflight_status": "model_probe_failed",
+      "native_validation_passed": false,
+      "native_result_roundtrips": 0,
+      "requests_submitted": 1,
+      "native_validation_error": "Nemotron request timed out",
+      "request_observations": [
+        {
+          "backend": "diagnostic_local_adapter_not_GPU",
+          "completion_tokens": null,
+          "content_chars": null,
+          "elapsed_ms": 10003,
+          "error": "Nemotron request timed out",
+          "finish_reason": null,
+          "outcome": "timeout",
+          "reasoning_chars": null,
+          "reasoning_tokens": null,
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": null
+        }
+      ],
+      "native_argument_diagnostics_scope": "synthetic clinic only",
+      "retained_assessment_count": 0
+    }
+  ]
+}

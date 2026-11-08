@@ -1,5 +1,29 @@
 # Verification
 
+## Campaign closeout — 2026-11-08
+
+Fresh final implementation checks: `cargo fmt --all -- --check`, workspace/all-targetClippy(`-D warnings`), workspacebuild and **324Rusttests passed;2explicitignored**. Frontend53tests pluslint/typecheck/build passed; prior focusedbrowser render verified savedmessage sourceversion display. These are localchecks, not phoneproof.
+
+The additional structural retry preserves nativecallID and returns a rejected toolresult for exactly two readiness contradictions. One retry consumes the existing4step/6sbudget. Truncated/malformed/unknown/ungrounded outputs remain rejected; no invalid proposal reaches actor authorization. Actual development riskcase used3requests(1041schema-rejected,1146correctedassessment,531action ms), completed a categoricalnote. Corrected model readiness still wrongly sought a secret; Rust's blockedphase prevented asking it. Warning summary and human preference remain failures.
+
+**Attempt19 failed:** both production transcripts reached Rust, but assessment responses ended`length`at512tokens,2305/2458ms. No accepted assessment/message/protection. Recording and actualrecoveryspeech retained. Do not advertise the generalfamilybranch as phoneverified.19attemptsused,7remaining,0Sarahprobeconsumed. Finalappmode is transport-only afterscheduledGPUdeletion, not a healthy hostedAI fallback.
+
+
+## Distinct-origin phone checks — 2026-11-08 08:50 UTC
+
+Attempts16–18 used the newly owned858origin to the existing972FirstRing target, with matching persisted origin bindings and no Sarah/family call.16/17both saved the actual appointment transcript and produced caller-side recognition of saved-message goodbye. Samebinary/voice/clip comparison1000→600ms ASR finalization measured energy-based audible gaps4873→4553ms, while modelHTTPsums1722→1760ms. One pair; no generalized noise/speed claim. [Timing receipt](evidence/speech-timeout-pair-2026-11-08.json).
+
+Attempt18 delivered the deliberate closing interruption. Production closing ASR preserved “Actually, tomorrow at five, not four”; the new saved message uses turn2 at five, without inventedAM/PM or another time question. Caller-side ASR recognized final goodbye; both legs completed and recording was retained. This repairs attempt13’s observed redundant clarification. The source of callback timing is a scripted runner, not an autonomous listening caller.
+
+## Campaign caller-experience update — 2026-11-08 08:40 UTC
+
+Actual Brev evaluation completed all seven native assessment/result/action cycles,1207–1934ms per whole turn, zeroAPIerrors. Fixed automated composite score3/7; separate trace review4/7 behavioral passes. Failures: identity answer replaced by caller-identity question; unavailable human request not answered honestly; incomplete pickup opening saved too early. The complete fixture and immutable results are in `fixtures/caller-experience-development.json` and `fixtures/results/2026-11-08-caller-experience-candidate1*.json`. These are real GPU inference with inert policy execution, not phone or held-out results.
+
+Phone attempts9–15 added Flux, correction, matched MP3/WAV, controlled failure recovery and family-message evidence. See the campaign receipt for each actual verdict; correction and pickup question remain failures. Failure injection is explicitly synthetic and precedes HTTP; subsequent successful save used real NVIDIA inference. Claimed relationship remains unverified. Cached recordings are retained locally; subjective voice quality is not inferred from ASR success.
+
+A distinct owned Photon source is configured for new fixtures. New reservations validate source before dialing, bind callbacks to its persisted value, and preserve old same-line callback/idempotency compatibility. Provider account readback is ready but distinct-line phone proof is pending. Photon clarified permitted self-calls still have carrier spam/history limitations; repetitive dialing is not the main iteration method.
+
+
 **Current campaign:** one active Brev H100 with verified hard cleanup09:39:50UTC; work stops09:09:50UTC. The previous$50reserve and six-call ceiling are superseded: original$60total credit budget, one durable20additional-call grant,26totalreservationsmaximum. Historical rows below retain their original outcomes. Optional training is paused; no weight updates occurred.
 
 ## Caller-experience repair — Nov8 01:47Central
