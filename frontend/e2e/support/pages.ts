@@ -5,7 +5,7 @@ export class LandingPage {
   constructor(readonly page: Page) {
     this.hero = page.getByRole('heading', {
       level: 1,
-      name: 'Before you answer, FirstRing checks.',
+      name: /Kind to every caller\.\s*Firm about codes\./,
     });
   }
   goto() {

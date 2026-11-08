@@ -257,7 +257,7 @@ Landing content sits in a 12-column grid inside an 86rem container (console: 90r
 
 The hero splits copy left (6 of 12) from a 16:9 art stage anchored right that bleeds off the right edge by 12vw, sized to min(60vw, viewport height minus header, 64rem). The lower-third caption overlaps the art's lower left. Below lg (1024px) the art becomes a square crop under the copy, feathered on all four edges, with the lower third pulled up over its bottom edge.
 
-Navigation collapses below lg on both surfaces: landing to a Menu button with a full-width list; console to a four-up tab row under the top bar. The calls page at lg is a 5/7 split with the list sticky (top 5.5rem, max height viewport minus 6.5rem) and independently scrollable, signalled by a bottom fade to paper and a visible thin scrollbar.
+Navigation collapses below lg on both surfaces: landing to a Menu button with a full-width list; console to a five-up icon tab row under a slim top bar. From lg the console is a 16.5rem rail plus a content column (max 96rem, 3rem side padding). Tables that cannot fit a phone switch to stacked rundown rows below md instead of scrolling the page sideways.
 
 The rundown is the default list shape: rows of time · outcome chip · bulletin with a chevron, hairline-separated or hover-tinted, never boxed individually. Progressions and comparisons render as ruled rows (top rule 2px ink, dl grids) rather than cards inside cards.
 
@@ -312,7 +312,7 @@ A charcoal band, paper text, 0.875rem corners. Speaker changes use `>> CALLER` /
 - **Error:** magenta-ink border, with a magenta-wash notice carrying words.
 
 ### Navigation
-Landing: sticky paper header, 4.5rem tall, a rule border appears after scroll; links are pill-hover text links in ink-3 at 1.0625rem; "Open dashboard" is an ink button. Console: a charcoal top bar with the wordmark, pill nav (active = paper fill, ink text), the station bug at the right, then quiet buttons. Below 1024px both collapse (Menu list with 3.5rem rows on landing; four-up tab row with lime active tab in the console).
+Landing: sticky paper header, 4.5rem tall, a rule border appears after scroll; links are pill-hover text links in ink-3 at 1.0625rem; "Open dashboard" is an ink button. Console: see Console Rail below. Below 1024px both collapse (Menu list with 3.5rem rows on landing; a five-up icon-over-label tab row with a lime underline on the active tab in the console).
 
 ### Rundown Row
 One link per call: a 8.5rem time column (bold time, muted age and duration), then the outcome chip, "for {name}", and a two-line bulletin, then a chevron that nudges right on hover. Hover tints paper-2; selected is paper-3.
@@ -342,11 +342,26 @@ A rundown of evidence-backed stages: 0.5rem corners, 1rem/750 type, a 0.7rem sha
 - Only the last seven show, behind "+N earlier".
 
 ### Community Story
+The presentation screen keeps the large version below. The dashboard uses a compact warning trail instead: the headline, a 320×72 line of two 22px-radius rings joined to the shared-warning capsule (same solid-when-receipted rule), and the five stages as a ruled rundown with times.
+
 Two household rings (lime, 20px stroke) and a capsule-shaped shared warning (magenta-ink outline, magenta triangle). Concentric arcs sit behind each ring.
 - A connector is drawn solid lime only when its stage has a receipt; it is dotted otherwise.
 - A magenta ring segment marks "spotted" on the source ring and "matched" on the receiving ring.
 - Below it, a ruled list of five stages, each marked receipt observed, not yet, or not available.
 - GSAP draws a connector, or pulses the ring once, only when a stage newly completes.
+
+### Console Rail
+The console's navigation wireframe, top to bottom: wordmark; the line it answers for ("Sarah’s line", the number, and the live state in words: "Live, updated 11:20 AM." plus "View only." on the public copy); three groups split by hairlines (Overview · Calls · Callers, then Community, then Settings) with tabular counts at the right; Present (lime) and Operator detail (quiet) at the foot; then the rail art. The ground runs from ink to ink-deep (#0f1612) so the art joins without a seam. The art is a Higgsfield illustration of Ringo floating in night water with the lime ring balanced on his nose (`public/media/console-sidebar-*`), masked in from the top, with three thin lime ripple ellipses that expand every 9s (removed under reduced motion, hidden below 760px of height). Active item: paper fill, ink text, soft lift.
+
+### Dashboard Patterns
+- **Overview hierarchy:** one bordered bulletin (the most important call) is the largest element; beside it a calm outcome summary; below, a six-row recent-calls table; everything else (callers to watch, shared warnings, trusted callers, how the line runs) sits behind one tab row. Never all at once.
+- **Outcome proportion bar:** 0.875rem tall, 2px paper gaps, 4px rounded ends, fixed order blocked (#b3005c) · needs review (#d39b2a) · put through (#3a6300) · message saved (#76b900) · no message or incomplete (#b8bfb6), validated for adjacent CVD separation. It always sits on a ruled table with icon, words and count, so colour is never alone.
+- **Segmented switch:** paper-3 pill track, ink thumb, 2.25rem buttons (Today / All).
+- **Tabs:** 3rem tabs on a 2px ink rule; the selected tab is an ink tab with paper text; arrow keys move between tabs.
+- **Disclosure:** a 2px ink top rule, a 3.25rem summary row in 800 weight, and a chevron that turns on open. Used for details one click away (comparison tables, every receipt, technical details).
+- **Settings rows:** a sticky pill index of sections, then label-left (20rem) / content-right rows separated by 2px ink rules.
+- **Trusted callers:** a ruled list with a lime-wash person-check disc, name, relation and "ending 1234"; removing needs a second, named confirmation. The caller-ID warning is always shown in amber-ink words.
+- **Read-only public view:** off localhost (or with `?view=public`) every write control is removed, never merely greyed, and one muted line says "View only. Changes are made on the presenting laptop."
 
 ### Disabled Buttons
 Disabled controls keep full-contrast text: a paper-3 fill with muted text (on ink: transparent with muted-on-ink text). They no longer fade with opacity.

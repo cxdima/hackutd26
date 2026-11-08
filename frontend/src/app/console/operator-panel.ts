@@ -1,3 +1,4 @@
+import { Access, ReadOnlyNote } from '../core/access';
 import {
   afterNextRender,
   Component,
@@ -24,7 +25,7 @@ import type { FixtureStatus } from '../core/schemas';
  */
 @Component({
   selector: 'app-operator-panel',
-  imports: [FormsModule, LucideX, LucideRefreshCw],
+  imports: [FormsModule, LucideX, LucideRefreshCw, ReadOnlyNote],
   host: { class: 'contents' },
   template: `
     <div class="fixed inset-0 z-40 bg-ink/40" aria-hidden="true" (click)="closed.emit()"></div>
@@ -179,7 +180,9 @@ import type { FixtureStatus } from '../core/schemas';
           </section>
         }
 
-        @if (store.source() === 'live') {
+        @if (store.source() === 'live' && access.readOnly) {
+          <app-read-only-note />
+        } @else if (store.source() === 'live') {
           <section aria-labelledby="op-controls">
             <h3 id="op-controls" class="text-[1.1875rem] font-extrabold">Test controls</h3>
             @if (state.execution_mode === 'replay') {
@@ -374,6 +377,7 @@ import type { FixtureStatus } from '../core/schemas';
 })
 export class OperatorPanel {
   readonly store = inject(ConsoleStore);
+  readonly access = inject(Access);
   readonly closed = output<void>();
   private readonly panel = viewChild.required<ElementRef<HTMLElement>>('panel');
   readonly filter = signal('');

@@ -179,11 +179,13 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
         </details>
         <ng-template #showing>
           <div class="flex min-w-0 flex-1 items-center gap-2">
-            <span class="text-[0.95rem] font-bold text-muted-on-ink" aria-hidden="true"
+            <span
+              class="text-[0.95rem] font-bold text-muted-on-ink sm:max-2xl:hidden"
+              aria-hidden="true"
               >Showing</span
             >
             <app-select-menu
-              class="flex-1 sm:w-[19rem] sm:flex-none"
+              class="flex-1 sm:w-[15.5rem] sm:flex-none 2xl:w-[19rem]"
               tone="ink"
               ariaLabel="Showing"
               describedBy="follow-help"
@@ -276,14 +278,7 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
               aria-labelledby="waiting-heading"
             >
               <div class="lg:col-span-6">
-                <p class="flex items-center gap-3 text-[1.25rem] font-bold">
-                  <span class="relative flex size-4" aria-hidden="true">
-                    <span
-                      class="absolute inset-0 rounded-full bg-lime"
-                      [class.waiting-ping]="!motion.reduced()"
-                    ></span>
-                    <span class="relative size-4 rounded-full bg-lime"></span>
-                  </span>
+                <p class="text-[1.25rem] font-bold">
                   {{
                     store.isDemo()
                       ? 'Rehearsal ready. Play a fictional call above.'

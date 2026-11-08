@@ -1,5 +1,6 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { LucideLoader, LucidePhoneForwarded } from '@lucide/angular';
+import { Access } from '../core/access';
 import { ConsoleStore, PHONE_DEMO_ARM, PHONE_DEMO_DISARM } from '../core/console-store';
 import { formatTime } from '../core/format';
 
@@ -64,8 +65,12 @@ export class PhoneDemoControl {
   readonly disarmPath = PHONE_DEMO_DISARM;
   readonly failed = signal('');
 
+  private readonly access = inject(Access);
+  /** Arming writes to the server, so the public read-only copy shows nothing here. */
   readonly status = computed(() =>
-    this.store.source() === 'live' ? this.store.state()?.phone_demo : undefined,
+    this.store.source() === 'live' && !this.access.readOnly
+      ? this.store.state()?.phone_demo
+      : undefined,
   );
   readonly armed = computed(() => {
     const s = this.status();

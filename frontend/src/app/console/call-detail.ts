@@ -1,3 +1,4 @@
+import { Access } from '../core/access';
 import { Component, computed, inject, input, signal } from '@angular/core';
 import {
   LucideCheck,
@@ -75,7 +76,12 @@ import { ReputationPanel } from './reputation-panel';
           <div>
             <dt class="text-[0.95rem] font-semibold text-muted">Caller</dt>
             <dd class="font-bold">
-              @if (caller(); as who) {
+              @if (c.trusted; as t) {
+                {{ t.name }}
+                <span class="block text-[0.95rem] font-semibold text-lime-ink"
+                  >Trusted{{ t.numberLabel ? ' · ' + t.numberLabel : '' }}</span
+                >
+              } @else if (caller(); as who) {
                 @if (who.captured) {
                   <a
                     [routerLink]="['/console/callers', who.id]"
@@ -157,7 +163,12 @@ import { ReputationPanel } from './reputation-panel';
               </li>
             } @empty {
               <li class="py-4 text-[1.0625rem] text-ink-3">
-                No words were transcribed on this call.
+                @if (call().trusted; as t) {
+                  Not screened. {{ t.name }} is on the trusted list, so FirstRing did not listen,
+                  record or assess this call; it rang straight through.
+                } @else {
+                  No words were transcribed on this call.
+                }
               </li>
             }
             @if (partial(); as text) {
@@ -239,7 +250,9 @@ import { ReputationPanel } from './reputation-panel';
             </section>
           }
 
-          <app-reputation-panel [sessionId]="c.id" />
+          @if (!c.trusted) {
+            <app-reputation-panel [sessionId]="c.id" />
+          }
         </aside>
       </div>
 
@@ -253,7 +266,7 @@ import { ReputationPanel } from './reputation-panel';
           payment or call anyone on its own.
         </p>
         <div class="table-scroll mt-4">
-          <table class="data-table min-w-[64rem]">
+          <table class="data-table stack-table min-w-[64rem]">
             <thead>
               <tr>
                 <th scope="col" class="num">#</th>
@@ -267,15 +280,15 @@ import { ReputationPanel } from './reputation-panel';
             <tbody>
               @for (t of turns(); track t.index) {
                 <tr>
-                  <td class="num font-bold">{{ t.index || '—' }}</td>
-                  <td>
+                  <td data-label="Turn" class="num font-bold">{{ t.index || '—' }}</td>
+                  <td data-label="Caller said">
                     @if (t.said) {
                       <q class="text-[1rem]">{{ t.said }}</q>
                     } @else {
                       <span class="text-muted">Call answered</span>
                     }
                   </td>
-                  <td>
+                  <td data-label="AI understood">
                     @for (line of t.understood; track line) {
                       <p class="text-[1rem]">{{ line }}</p>
                     } @empty {
@@ -287,7 +300,7 @@ import { ReputationPanel } from './reputation-panel';
                       </p>
                     }
                   </td>
-                  <td>
+                  <td data-label="Safety rule">
                     @if (t.decision; as d) {
                       <p
                         class="text-[1rem] font-bold"
@@ -311,7 +324,7 @@ import { ReputationPanel } from './reputation-panel';
                       <span class="text-muted">—</span>
                     }
                   </td>
-                  <td>
+                  <td data-label="FirstRing did">
                     @for (line of t.did; track line) {
                       <p class="text-[1rem]">{{ line }}</p>
                     }
@@ -325,7 +338,7 @@ import { ReputationPanel } from './reputation-panel';
                       <span class="text-muted">—</span>
                     }
                   </td>
-                  <td class="num">
+                  <td data-label="AI time" class="num">
                     @if (t.modelRequests) {
                       {{ ms(t.modelMs) }}
                       <span class="block text-[0.95rem] text-muted"
@@ -339,7 +352,11 @@ import { ReputationPanel } from './reputation-panel';
               } @empty {
                 <tr>
                   <td colspan="6" class="!py-6 text-[1.0625rem] text-ink-3">
-                    No turns were recorded for this call.
+                    {{
+                      call().trusted
+                        ? 'No turns: trusted callers skip the AI entirely.'
+                        : 'No turns were recorded for this call.'
+                    }}
                   </td>
                 </tr>
               }
@@ -424,22 +441,14 @@ import { ReputationPanel } from './reputation-panel';
         </section>
       }
 
-      <details class="mt-12 rounded-[var(--radius-card)] border-2 border-paper-3">
-        <summary
-          class="flex min-h-14 cursor-pointer items-center justify-between gap-4 px-5 text-[1.125rem] font-extrabold"
-        >
-          Every receipt, in order
-        </summary>
-        <div class="px-5 pb-6"><app-decision-spine [call]="c" /></div>
+      <details class="disclosure mt-12">
+        <summary>Every receipt, in order</summary>
+        <div class="pb-4"><app-decision-spine [call]="c" /></div>
       </details>
 
-      <details class="mt-4 rounded-[var(--radius-card)] border-2 border-paper-3">
-        <summary
-          class="flex min-h-14 cursor-pointer items-center justify-between gap-4 px-5 text-[1.125rem] font-extrabold"
-        >
-          Technical details
-        </summary>
-        <section class="px-5 pb-8" aria-labelledby="nvidia-heading">
+      <details class="disclosure mt-0 !border-t-0">
+        <summary>Technical details</summary>
+        <section class="pb-6" aria-labelledby="nvidia-heading">
           <h3 id="nvidia-heading" class="text-[1.125rem] font-extrabold">NVIDIA decision model</h3>
           <div class="mt-2"><app-model-evidence [call]="c" /></div>
         </section>
@@ -592,6 +601,8 @@ export class CallDetail {
   });
   readonly requestSentence = computed(() => {
     const c = this.call();
+    if (c.trusted)
+      return `Not asked. ${c.trusted.name} is on the trusted list, so the call was not screened.`;
     const u = this.understanding();
     const observation = c.protectedRequest ?? c.session.assessments?.at(-1)?.observation;
     const plain = observation
@@ -602,6 +613,8 @@ export class CallDetail {
   readonly didSentence = computed(() => {
     const c = this.call();
     switch (c.outcome) {
+      case 'trusted':
+        return c.headline;
       case 'blocked':
         return 'Declined the protected request and ended the call politely. Nothing private was shared.';
       case 'connected':
@@ -644,7 +657,9 @@ export class CallDetail {
         : 'Replay',
   );
 
-  readonly canOperate = computed(() => this.store.source() === 'live');
+  private readonly access = inject(Access);
+  /** Operator actions write to the server: live and on the presenting laptop only. */
+  readonly canOperate = computed(() => this.store.source() === 'live' && !this.access.readOnly);
   readonly disabled = computed(() => !!this.store.busy() || this.store.stale());
   readonly allEnded = computed(() => {
     const s = this.call().session;

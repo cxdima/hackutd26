@@ -1,3 +1,4 @@
+import { Access, ReadOnlyNote } from '../../core/access';
 import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucidePhone, LucidePlay, LucideTrash2 } from '@lucide/angular';
@@ -25,7 +26,7 @@ const CONSENT = [
  */
 @Component({
   selector: 'app-voice-enrollment',
-  imports: [FormsModule, LucidePhone, LucidePlay, LucideTrash2],
+  imports: [FormsModule, LucidePhone, LucidePlay, LucideTrash2, ReadOnlyNote],
   template: `
     <section
       class="rounded-[var(--radius-card)] border-2 border-paper-3 p-5 sm:p-7"
@@ -41,6 +42,17 @@ const CONSENT = [
         <p class="mt-4 text-[1.0625rem] text-muted">
           Available when the FirstRing server is running.
         </p>
+      } @else if (access.readOnly) {
+        <p class="mt-4 text-[1.0625rem] font-semibold">
+          {{
+            status()?.voice_ready
+              ? status()?.active
+                ? 'FirstRing answers calls in the owner’s voice.'
+                : 'An owner voice is ready but not in use.'
+              : 'No owner voice is in use. Calls use a preset voice.'
+          }}
+        </p>
+        <app-read-only-note class="mt-1 block" />
       } @else {
         @switch (phase()) {
           @case ('start') {
@@ -161,6 +173,7 @@ const CONSENT = [
 })
 export class VoiceEnrollment {
   readonly store = inject(ConsoleStore);
+  readonly access = inject(Access);
   readonly consent = CONSENT;
   readonly agreed = signal(CONSENT.map(() => false));
   readonly speaker = signal('');

@@ -820,6 +820,11 @@ export function personAction(record: CallRecord): { needed: boolean; text: strin
       };
     case 'connected':
       return { needed: false, text: `No. ${who} already chose to talk with the caller.` };
+    case 'trusted':
+      return {
+        needed: false,
+        text: 'No. The number is on the trusted list, so the call rang straight through.',
+      };
     case 'message_saved':
       return {
         needed: true,

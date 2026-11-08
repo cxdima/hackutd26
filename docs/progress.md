@@ -1,3 +1,19 @@
+## Launch state — Nov 8, 12:00 Central
+
+- **Inference:** Brev run `firstring-nemotron-20261108-132357` now runs under budget policy v3 (presentation day, at most ten hours, every v2 spend bound unchanged). Both guards end it at **23:05 UTC / 17:05 Central**. The projected run cost is $40.23 including cleanup; the $60 lifetime cap and the $51.12 credit are both respected. Current-model availability comes from `production_probe --conversation` with `RECORD_CURRENT_MODEL_PROOF=1` (2/2 real native cycles, `fixtures/results/2026-11-08-current-model-conversation-1023.json`).
+- **Live server:**
+  - `/api/callers` groups calls by HMAC caller identity with current reputation.
+  - Trusted callers (`/api/trusted`) skip AI screening, recording and reputation, and dial the enrolled phone directly. This is integration-tested only, not yet exercised on a real call.
+  - The second household is "Maya and Jimmy".
+- **Public site:** https://firstring.life is S3 + CloudFront, and `/api/*` is proxied read-only to the live server. CloudFront allows only GET/HEAD; the server accepts the edge secret only on allowlisted read paths. Recordings, voice cloning, trusted callers and every write stay on the presenting laptop.
+- **Console and landing:**
+  - Dashboard redesign with a sidebar, calls and callers tables, a turn-by-turn decision table, a compact community trail, trusted callers and a read-only public view.
+  - Cinematic video hero and a new animated mark and favicon.
+- **Verification:**
+  - Rust: 376 tests passed; fmt and clippy clean.
+  - Frontend: Prettier, lint and typecheck clean; 59 unit and 52 Playwright tests passed.
+- **Still not shown on a real call:** private handoff bridge, trusted pass-through, owner voice clone, call recordings.
+
 ## Post-campaign demo readiness — Nov 8, 08:40 Central
 
 The new H100 has completed fresh native assessment → Rust result → action cycles. The exact attempt19 failure was unfinished tool markup followed by unbounded formatting whitespace; the pinned serving adapter bounds formatting whitespace only and inherits native extraction unchanged. Strict truncation/evidence rejection remains. Warm exact contexts took2.975/2.668s; a consecutive real-model/inert-actor branch took2.770/2.658s. No new phone proof yet. Quoted-report actions still intermittently exceed3.5s; pickup questions can repeat the known person. These remain failures, not a general behavioral pass.

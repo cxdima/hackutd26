@@ -10,10 +10,14 @@ test.describe('landing page', () => {
     const landing = new LandingPage(page);
     await landing.goto();
     await expect(landing.hero).toBeVisible();
-    await expect(page.getByText('A calm voice answers unfamiliar callers')).toBeVisible();
-    await expect(page.getByLabel('Example of a screened call')).toContainText('FirstRing declined');
-    await page.getByRole('link', { name: 'See how it works' }).click();
-    await expect(page.getByRole('heading', { name: 'How it works' })).toBeInViewport();
+    await expect(page.getByText('FirstRing answers your calls first.')).toBeVisible();
+    await expect(page.getByLabel('Example of a screened call')).toContainText(
+      'I can’t share that. Goodbye.',
+    );
+    await page.getByRole('link', { name: 'See a screened call' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Two calls. Two very different requests.' }),
+    ).toBeInViewport();
     expect(apiCalls).toEqual([]);
   });
 
@@ -48,7 +52,7 @@ test.describe('landing page', () => {
     ).toBeVisible();
     await page.getByText('What is available in this prototype?').click();
     await expect(
-      page.getByText('Not available yet: transferring a call', { exact: false }),
+      page.getByText('Built but not yet shown on a real call', { exact: false }),
     ).toBeVisible();
     await expect(
       page.getByText(
@@ -67,7 +71,7 @@ test.describe('landing page', () => {
     const page = await context.newPage();
     await page.route('**/api/**', (r) => r.abort());
     await page.goto('/');
-    const toggle = page.getByRole('button', { name: 'Play animation' }).first();
+    const toggle = page.getByRole('button', { name: 'Play hero animation' });
     await expect(toggle).toBeVisible();
     const paused = await page
       .locator('[data-hero-art] video')
@@ -87,9 +91,9 @@ test.describe('landing page', () => {
     await expect
       .poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused), { timeout: 10000 })
       .toBe(true);
-    await page.getByRole('button', { name: 'Pause animation' }).first().click();
+    await page.getByRole('button', { name: 'Pause hero animation' }).click();
     await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
-    await expect(page.getByRole('button', { name: 'Play animation' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Play hero animation' })).toBeVisible();
   });
 
   test('keyboard users reach the skip link first and see focus', async ({ page }) => {

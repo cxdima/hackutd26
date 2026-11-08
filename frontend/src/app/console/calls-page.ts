@@ -16,6 +16,7 @@ type Filter = 'all' | Outcome;
 const ORDER: Outcome[] = [
   'in_progress',
   'blocked',
+  'trusted',
   'connected',
   'message_saved',
   'needs_review',
@@ -59,14 +60,6 @@ const ORDER: Outcome[] = [
             decided and why.
           </p>
         </div>
-        <dl class="flex flex-wrap gap-x-8 gap-y-2">
-          @for (s of summary(); track s.label) {
-            <div>
-              <dt class="text-[0.95rem] font-semibold text-muted">{{ s.label }}</dt>
-              <dd class="tabular text-[1.5rem] font-extrabold" [class]="s.cls">{{ s.value }}</dd>
-            </div>
-          }
-        </dl>
       </header>
 
       <div class="mt-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_14rem_14rem]">
@@ -113,7 +106,32 @@ const ORDER: Outcome[] = [
         Showing {{ visible().length }} of {{ store.calls().length }} calls
       </p>
 
-      <div class="table-scroll mt-2">
+      <ul class="mt-2 divide-y divide-paper-3 border-t-2 border-ink md:hidden" aria-label="Calls">
+        @for (call of visible(); track call.id) {
+          <li>
+            <a
+              [routerLink]="['/console/calls', call.id]"
+              queryParamsHandling="preserve"
+              class="block py-3.5 text-ink no-underline"
+            >
+              <span class="flex items-baseline justify-between gap-3">
+                <app-outcome-text [outcome]="call.outcome" />
+                <span class="tabular text-[0.95rem] font-semibold text-muted">{{
+                  when(call)
+                }}</span>
+              </span>
+              <span class="mt-1 line-clamp-2 block text-[1.0625rem]">{{ call.request }}</span>
+              <span class="block text-[0.95rem] text-muted"
+                >{{ call.name }}’s line · {{ duration(call) }}</span
+              >
+            </a>
+          </li>
+        } @empty {
+          <li class="py-6 text-[1.0625rem] text-ink-3">No calls match.</li>
+        }
+      </ul>
+
+      <div class="table-scroll mt-2 hidden md:block">
         <table class="data-table min-w-[56rem]">
           <caption class="visually-hidden">
             Calls answered by FirstRing
@@ -144,7 +162,10 @@ const ORDER: Outcome[] = [
                 </td>
                 <td class="whitespace-nowrap">{{ call.name }}</td>
                 <td class="whitespace-nowrap">
-                  @if (caller(call.id); as c) {
+                  @if (call.trusted; as t) {
+                    <span class="font-semibold">{{ t.name }}</span>
+                    <span class="block text-[0.95rem] text-lime-ink">On the trusted list</span>
+                  } @else if (caller(call.id); as c) {
                     <span class="font-semibold">{{ c.captured ? c.label : 'Not captured' }}</span>
                     @if (c.captured) {
                       <span

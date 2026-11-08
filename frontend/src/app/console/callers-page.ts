@@ -15,6 +15,7 @@ import type { CallRecord } from '../core/calls';
 import { ConsoleStore } from '../core/console-store';
 import { formatDateTime, formatDuration, relativeAge, relativeUntil } from '../core/format';
 import { household } from '../core/household';
+import { TrustedDirectory } from '../core/trusted';
 import { OutcomeText } from './outcome-chip';
 
 @Component({
@@ -74,7 +75,7 @@ import { OutcomeText } from './outcome-chip';
               </p>
             }
             <div class="table-scroll mt-4">
-              <table class="data-table min-w-[44rem]">
+              <table class="data-table stack-table min-w-[44rem]">
                 <thead>
                   <tr>
                     <th scope="col">Reported</th>
@@ -87,11 +88,20 @@ import { OutcomeText } from './outcome-chip';
                 <tbody>
                   @for (r of detail()?.reports ?? []; track r.report_id) {
                     <tr>
-                      <td class="whitespace-nowrap">{{ dateTime(r.created_at) }}</td>
-                      <td>{{ lineName(r.household_id) }}</td>
-                      <td>{{ r.scam_category ? category(r.scam_category) : 'Not recorded' }}</td>
-                      <td class="whitespace-nowrap">{{ until(r.expires_at) }}</td>
-                      <td [class]="r.retracted ? 'text-muted' : 'font-bold text-magenta-ink'">
+                      <td data-label="Reported" class="whitespace-nowrap">
+                        {{ dateTime(r.created_at) }}
+                      </td>
+                      <td data-label="By the line of">{{ lineName(r.household_id) }}</td>
+                      <td data-label="Why">
+                        {{ r.scam_category ? category(r.scam_category) : 'Not recorded' }}
+                      </td>
+                      <td data-label="Expires" class="whitespace-nowrap">
+                        {{ until(r.expires_at) }}
+                      </td>
+                      <td
+                        data-label="Status"
+                        [class]="r.retracted ? 'text-muted' : 'font-bold text-magenta-ink'"
+                      >
                         {{ r.retracted ? 'Withdrawn' : 'Active' }}
                       </td>
                     </tr>
@@ -171,33 +181,14 @@ import { OutcomeText } from './outcome-chip';
         </p>
       </header>
 
-      <ol
-        class="mt-8 grid gap-x-8 gap-y-5 border-y-2 border-ink py-6 md:grid-cols-3"
-        aria-label="How caller reputation works"
-      >
-        @for (step of steps; track step.title; let i = $index) {
-          <li class="flex gap-4">
-            <span
-              class="tabular flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-ink text-[1rem] font-extrabold"
-              aria-hidden="true"
-              >{{ i + 1 }}</span
-            >
-            <div>
-              <p class="text-[1.125rem] font-extrabold">{{ step.title }}</p>
-              <p class="mt-1 text-[1rem] text-ink-3">{{ step.text }}</p>
-            </div>
-          </li>
+      <p class="mt-4 text-[1.0625rem] font-semibold" role="status">
+        @for (s of summary(); track s.label; let last = $last) {
+          <span [class]="s.cls">{{ s.value }} {{ s.label }}</span>
+          @if (!last) {
+            <span class="text-muted"> · </span>
+          }
         }
-      </ol>
-
-      <dl class="mt-8 flex flex-wrap gap-x-10 gap-y-3">
-        @for (s of summary(); track s.label) {
-          <div>
-            <dt class="text-[0.95rem] font-semibold text-muted">{{ s.label }}</dt>
-            <dd class="stat-figure" [class]="s.cls">{{ s.value }}</dd>
-          </div>
-        }
-      </dl>
+      </p>
 
       @if (directory.error()) {
         <p class="mt-6 text-[1rem] font-semibold text-magenta-ink" role="alert">
@@ -205,7 +196,36 @@ import { OutcomeText } from './outcome-chip';
         </p>
       }
 
-      <div class="table-scroll mt-6">
+      <ul class="mt-4 divide-y divide-paper-3 border-t-2 border-ink md:hidden" aria-label="Callers">
+        @for (c of directory.callers(); track c.id) {
+          <li>
+            <a
+              [routerLink]="['/console/callers', c.id]"
+              queryParamsHandling="preserve"
+              class="flex items-center gap-3 py-3.5 text-ink no-underline"
+            >
+              <span class="min-w-0 flex-1">
+                <span class="block text-[1.0625rem] font-bold">{{ c.label }}</span>
+                <span
+                  class="block text-[0.95rem]"
+                  [class]="flagged(c.standing) ? 'font-bold text-magenta-ink' : 'text-muted'"
+                  >{{ c.captured ? standing(c.standing) : 'Calls before numbers were kept' }} ·
+                  {{ c.calls.length }} {{ c.calls.length === 1 ? 'call' : 'calls' }} ·
+                  {{ age(c.lastAt) }}</span
+                >
+              </span>
+              <svg
+                lucideChevronRight
+                [size]="18"
+                class="shrink-0 text-muted"
+                aria-hidden="true"
+              ></svg>
+            </a>
+          </li>
+        }
+      </ul>
+
+      <div class="table-scroll mt-6 hidden md:block">
         <table class="data-table min-w-[60rem]">
           <caption class="visually-hidden">
             Callers and their reported history
@@ -272,12 +292,70 @@ import { OutcomeText } from './outcome-chip';
           </tbody>
         </table>
       </div>
+
+      <section class="mt-12" aria-labelledby="trusted-heading">
+        <div class="flex flex-wrap items-baseline justify-between gap-3 border-b-2 border-ink pb-2">
+          <h2 id="trusted-heading" class="text-[1.375rem] font-extrabold">Trusted callers</h2>
+          <a
+            routerLink="/console/settings"
+            fragment="trusted"
+            queryParamsHandling="preserve"
+            class="inline-flex items-center gap-1 text-[1rem] font-bold text-ink"
+            >Manage<svg lucideChevronRight [size]="17" aria-hidden="true"></svg
+          ></a>
+        </div>
+        <p class="mt-3 max-w-[70ch] text-[1rem] text-ink-3">
+          These numbers skip screening, recording and reputation, so they never appear in the list
+          above. Caller ID can be faked, so the list holds only numbers the family would answer
+          anyway.
+        </p>
+        @if (trusted.unavailable()) {
+          <p class="py-3 text-[1rem] text-muted">This server does not offer trusted callers yet.</p>
+        } @else {
+          <ul class="mt-2 flex flex-wrap gap-x-10 gap-y-2" aria-label="Trusted callers">
+            @for (t of trusted.items(); track t.id) {
+              <li class="py-1 text-[1.0625rem]">
+                <strong>{{ t.name }}</strong>
+                @if (t.relation) {
+                  <span class="text-ink-3"> · {{ t.relation }}</span>
+                }
+                <span class="tabular block text-[0.95rem] text-muted">{{ t.number_label }}</span>
+              </li>
+            } @empty {
+              <li class="py-2 text-[1rem] text-muted">No trusted callers on this line.</li>
+            }
+          </ul>
+        }
+      </section>
+
+      <details class="disclosure mt-12">
+        <summary>How caller reputation works</summary>
+        <ol
+          class="mt-2 grid gap-x-8 gap-y-5 md:grid-cols-3"
+          aria-label="How caller reputation works"
+        >
+          @for (step of steps; track step.title; let i = $index) {
+            <li class="flex gap-4">
+              <span
+                class="tabular flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-ink text-[1rem] font-extrabold"
+                aria-hidden="true"
+                >{{ i + 1 }}</span
+              >
+              <div>
+                <p class="text-[1.125rem] font-extrabold">{{ step.title }}</p>
+                <p class="mt-1 text-[1rem] text-ink-3">{{ step.text }}</p>
+              </div>
+            </li>
+          }
+        </ol>
+      </details>
     }
   `,
 })
 export class CallersPage {
   readonly store = inject(ConsoleStore);
   readonly directory = inject(CallerDirectory);
+  readonly trusted = inject(TrustedDirectory);
   private readonly router = inject(Router);
   readonly id = input<string>();
   readonly detail = signal<CallerDetail | null>(null);
@@ -302,15 +380,16 @@ export class CallersPage {
   readonly selected = computed(() => this.directory.byId(this.id()));
   readonly summary = computed(() => {
     const callers = this.directory.callers().filter((c) => c.captured);
+    const seen = callers.length;
     return [
-      { label: 'Numbers seen', value: callers.length, cls: '' },
+      { label: seen === 1 ? 'number seen' : 'numbers seen', value: seen, cls: '' },
       {
-        label: 'Reported',
+        label: 'reported',
         value: callers.filter((c) => this.flagged(c.standing)).length,
         cls: 'text-magenta-ink',
       },
       {
-        label: 'Called more than once',
+        label: 'called more than once',
         value: callers.filter((c) => c.calls.length > 1).length,
         cls: '',
       },

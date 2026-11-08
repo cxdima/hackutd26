@@ -2,9 +2,12 @@ import { Component, computed, DestroyRef, effect, inject, signal, untracked } fr
 import { FormsModule } from '@angular/forms';
 import { LucideCheck, LucideLoader, LucideRotateCw } from '@lucide/angular';
 import { ConsoleStore } from '../core/console-store';
+import { household } from '../core/household';
 import type { Profile } from '../core/schemas';
 import { SelectMenu, type SelectOption } from '../shared/select-menu';
+import { Access, ReadOnlyNote } from '../core/access';
 import { HandoffSetup } from './setup/handoff-setup';
+import { TrustedCallers } from './trusted-callers';
 import { VoiceEnrollment } from './setup/voice-enrollment';
 
 type Status = 'idle' | 'loading' | 'saving' | 'saved' | 'error';
@@ -50,22 +53,70 @@ const LINK_OR_NUMBER = /(https?:\/\/|www\.|\b\d{3}[\s.-]?\d{3}[\s.-]?\d{4}\b)/i;
     LucideRotateCw,
     HandoffSetup,
     VoiceEnrollment,
+    TrustedCallers,
+    ReadOnlyNote,
   ],
   template: `
     @let state = store.state()!;
-    <div class="grid gap-10 lg:grid-cols-12">
-      <div class="lg:col-span-7">
-        <h1
-          class="text-[clamp(2rem,1.6rem+1.6vw,2.9rem)] leading-[1.05] font-extrabold tracking-[-0.03em]"
-        >
-          Settings
-        </h1>
-        <p class="mt-3 max-w-[56ch] text-lede text-ink-3">
-          How FirstRing greets callers and which voice it uses. Changes apply to new calls; a call
-          in progress keeps the settings it started with.
-        </p>
+    <header>
+      <h1
+        class="text-[clamp(2rem,1.6rem+1.4vw,2.75rem)] leading-[1.05] font-extrabold tracking-[-0.03em]"
+      >
+        Settings
+      </h1>
+      <p class="mt-2 max-w-[64ch] text-[1.0625rem] text-ink-3">
+        How FirstRing greets callers, who skips screening, and whose phone rings. Changes apply to
+        new calls; a call in progress keeps the settings it started with.
+      </p>
+      @if (access.readOnly) {
+        <app-read-only-note class="mt-2 block" />
+      }
+    </header>
 
-        <div class="mt-8 flex flex-wrap gap-2" role="group" aria-label="Choose a profile to edit">
+    <nav class="settings-index" aria-label="Settings sections">
+      @for (link of sections; track link.id) {
+        <a [href]="'#' + link.id" (click)="jump($event, link.id)">{{ link.label }}</a>
+      }
+    </nav>
+
+    <section id="profile" class="settings-section" aria-labelledby="profile-heading">
+      <div class="settings-aside">
+        <h2 id="profile-heading" class="text-[1.375rem] font-extrabold">Call profile</h2>
+        <p class="mt-1 text-[1rem] text-ink-3">
+          The name and greeting FirstRing uses, per line. FirstRing never pretends to be the person
+          it answers for.
+        </p>
+        <label id="next-call-label" for="next-call" class="field-label mt-6"
+          >Next call is answered for</label
+        >
+        <app-select-menu
+          inputId="next-call"
+          labelledBy="next-call-label"
+          describedBy="next-call-help"
+          [options]="lineOptions()"
+          [value]="state.selected_household"
+          [disabled]="store.isDemo() || access.readOnly || !!store.busy() || store.stale()"
+          (valueChange)="selectNext($event)"
+        />
+        <p id="next-call-help" class="field-help">
+          {{
+            store.isDemo()
+              ? 'Available when connected to a server.'
+              : 'Applies to the next incoming call only.'
+          }}
+        </p>
+        <dl class="mt-6 space-y-3 text-[1rem]">
+          <div>
+            <dt class="font-bold">Familiar voices</dt>
+            <dd class="text-ink-3">
+              Never treated as permission to share a code, send money or give access.
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="min-w-0">
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Choose a profile to edit">
           @for (h of state.community; track h.household_id) {
             <button
               type="button"
@@ -82,12 +133,7 @@ const LINK_OR_NUMBER = /(https?:\/\/|www\.|\b\d{3}[\s.-]?\d{3}[\s.-]?\d{4}\b)/i;
             </button>
           }
         </div>
-
-        <section
-          class="mt-6 rounded-[var(--radius-card)] border-2 border-ink p-5 sm:p-8"
-          aria-labelledby="profile-heading"
-        >
-          <h2 id="profile-heading" class="text-[1.5rem] font-extrabold">Call profile</h2>
+        <div class="mt-5">
           @if (status() === 'loading' && !draft()) {
             <p class="mt-4 flex items-center gap-2 text-[1.0625rem]" role="status">
               <svg lucideLoader [size]="18" class="animate-spin" aria-hidden="true"></svg> Loading
@@ -205,7 +251,9 @@ const LINK_OR_NUMBER = /(https?:\/\/|www\.|\b\d{3}[\s.-]?\d{3}[\s.-]?\d{4}\b)/i;
                 <button
                   type="submit"
                   class="btn btn-primary !min-h-14 !px-7 text-[1.125rem]"
-                  [disabled]="status() === 'saving' || !dirty() || store.isDemo()"
+                  [disabled]="
+                    status() === 'saving' || !dirty() || store.isDemo() || access.readOnly
+                  "
                 >
                   @if (status() === 'saving') {
                     <svg lucideLoader [size]="18" class="animate-spin" aria-hidden="true"></svg>
@@ -232,73 +280,52 @@ const LINK_OR_NUMBER = /(https?:\/\/|www\.|\b\d{3}[\s.-]?\d{3}[\s.-]?\d{4}\b)/i;
               }
             </form>
           }
-        </section>
+        </div>
       </div>
+    </section>
 
-      <aside class="space-y-6 lg:col-span-5 lg:pt-[7.5rem]" aria-label="Call routing and voice">
-        <section
-          class="rounded-[var(--radius-card)] bg-paper-2 p-5 sm:p-6"
-          aria-labelledby="next-call-heading"
-        >
-          <h2 id="next-call-heading" class="text-[1.1875rem] font-extrabold">
-            Who answers the next call
-          </h2>
-          <p class="mt-1 text-[1rem] text-ink-3">
-            Selects the profile for the next incoming call only. Calls already in progress are not
-            changed.
-          </p>
-          <div class="mt-4 flex flex-wrap gap-2">
-            @for (h of state.community; track h.household_id) {
-              <button
-                type="button"
-                class="min-h-12 rounded-full border-2 px-5 text-[1.0625rem] font-bold disabled:cursor-not-allowed"
-                [class]="
-                  state.selected_household === h.household_id
-                    ? 'border-ink bg-lime text-ink'
-                    : 'border-rule bg-paper hover:border-ink'
-                "
-                [attr.aria-pressed]="state.selected_household === h.household_id"
-                [disabled]="store.isDemo() || !!store.busy() || store.stale()"
-                (click)="selectNext(h.household_id)"
-              >
-                {{ h.display_name }}
-              </button>
-            }
-          </div>
-          @if (store.isDemo()) {
-            <p class="mt-3 text-[1rem] text-muted">Available when connected to a server.</p>
-          }
-        </section>
-        <section
-          class="rounded-[var(--radius-card)] border-2 border-paper-3 p-5 sm:p-6"
-          aria-labelledby="voice-privacy-heading"
-        >
-          <h2 id="voice-privacy-heading" class="text-[1.1875rem] font-extrabold">
-            Voice and privacy
-          </h2>
-          <dl class="mt-3 space-y-3 text-[1.0625rem]">
-            <div>
-              <dt class="font-bold">Custom voice cloning</dt>
-              <dd class="text-ink-3">{{ cloneStatus() }}</dd>
-            </div>
-            <div>
-              <dt class="font-bold">Familiar voices</dt>
-              <dd class="text-ink-3">
-                Never treated as permission to share a code, send money or give access.
-              </dd>
-            </div>
-          </dl>
-        </section>
-      </aside>
-    </div>
-    <div class="mt-14 space-y-8">
+    <section id="trusted" class="settings-section" aria-labelledby="trusted-heading">
+      <div class="settings-aside">
+        <h2 id="trusted-heading" class="text-[1.375rem] font-extrabold">Trusted callers</h2>
+        <p class="mt-1 text-[1rem] text-ink-3">
+          Calls from these numbers skip AI screening, recording and reputation and ring straight
+          through to {{ ringsFirst() }}’s enrolled phone.
+        </p>
+        <p class="mt-3 text-[1rem] font-semibold text-amber-ink">
+          Caller ID can be faked. Only add numbers you would answer anyway.
+        </p>
+      </div>
+      <div class="min-w-0">
+        <app-trusted-callers />
+      </div>
+    </section>
+
+    <div id="handoff" class="settings-block">
       <app-handoff-setup />
+    </div>
+    <div id="voice" class="settings-block">
       <app-voice-enrollment />
     </div>
   `,
 })
 export class SettingsPage {
   readonly store = inject(ConsoleStore);
+  readonly access = inject(Access);
+  readonly sections = [
+    { id: 'profile', label: 'Call profile' },
+    { id: 'trusted', label: 'Trusted callers' },
+    { id: 'handoff', label: 'Ring the phone' },
+    { id: 'voice', label: 'Owner voice' },
+  ];
+  readonly lineOptions = computed<SelectOption[]>(() =>
+    (this.store.state()?.community ?? []).map((h) => ({
+      value: h.household_id,
+      label: `${h.display_name}’s line`,
+    })),
+  );
+  readonly ringsFirst = computed(
+    () => household(this.store.state()?.selected_household)?.ringsFirst.name ?? 'the owner',
+  );
   readonly household = signal(this.store.state()?.selected_household ?? 'sarah');
   readonly draft = signal<Profile | null>(null);
   private readonly original = signal<Profile | null>(null);
@@ -317,13 +344,6 @@ export class SettingsPage {
     if (LINK_OR_NUMBER.test(greeting)) return 'Remove links and phone numbers from the greeting.';
     return '';
   });
-  readonly cloneStatus = computed(() => {
-    const clone = this.store.state()?.capabilities.find((c) => c.id === 'voice_clone');
-    return clone && clone.status !== 'disabled'
-      ? `Status: ${clone.status}. ${clone.detail}`
-      : 'Off. Not available in this prototype; FirstRing uses preset synthetic voices.';
-  });
-
   constructor() {
     effect(() => {
       const household = this.household();
@@ -414,7 +434,19 @@ export class SettingsPage {
     }
   }
 
-  selectNext(id: string) {
+  jump(event: Event, id: string) {
+    event.preventDefault();
+    const target = document.getElementById(id);
+    if (!target) return;
+    target.scrollIntoView({
+      behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'start',
+    });
+    history.replaceState(history.state, '', `${location.pathname}${location.search}#${id}`);
+  }
+
+  selectNext(id: string | null) {
+    if (!id || id === this.store.state()?.selected_household) return;
     void this.store.action('/api/demo/household', { household_id: id });
   }
 }
