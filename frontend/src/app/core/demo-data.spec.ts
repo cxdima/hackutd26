@@ -15,6 +15,6 @@ it('builds a demo that satisfies the real server contract and is labeled as demo
   expect(state.capabilities.find((c) => c.id === 'voice_clone')?.status).toBe('disabled');
   const outcomes = buildCallRecords(state, events, now).map((r) => r.outcome);
   expect(new Set(outcomes)).toEqual(
-    new Set(['blocked', 'message_saved', 'needs_review', 'incomplete']),
+    new Set(['blocked', 'message_saved', 'needs_review', 'incomplete', 'trusted']),
   );
 });

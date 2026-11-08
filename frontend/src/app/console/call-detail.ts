@@ -76,7 +76,12 @@ import { ReputationPanel } from './reputation-panel';
           <div>
             <dt class="text-[0.95rem] font-semibold text-muted">Caller</dt>
             <dd class="font-bold">
-              @if (caller(); as who) {
+              @if (c.trusted; as t) {
+                {{ t.name }}
+                <span class="block text-[0.95rem] font-semibold text-lime-ink"
+                  >Trusted{{ t.numberLabel ? ' · ' + t.numberLabel : '' }}</span
+                >
+              } @else if (caller(); as who) {
                 @if (who.captured) {
                   <a
                     [routerLink]="['/console/callers', who.id]"
@@ -158,7 +163,12 @@ import { ReputationPanel } from './reputation-panel';
               </li>
             } @empty {
               <li class="py-4 text-[1.0625rem] text-ink-3">
-                No words were transcribed on this call.
+                @if (call().trusted; as t) {
+                  Not screened. {{ t.name }} is on the trusted list, so FirstRing did not listen,
+                  record or assess this call; it rang straight through.
+                } @else {
+                  No words were transcribed on this call.
+                }
               </li>
             }
             @if (partial(); as text) {
@@ -240,7 +250,9 @@ import { ReputationPanel } from './reputation-panel';
             </section>
           }
 
-          <app-reputation-panel [sessionId]="c.id" />
+          @if (!c.trusted) {
+            <app-reputation-panel [sessionId]="c.id" />
+          }
         </aside>
       </div>
 
@@ -340,7 +352,11 @@ import { ReputationPanel } from './reputation-panel';
               } @empty {
                 <tr>
                   <td colspan="6" class="!py-6 text-[1.0625rem] text-ink-3">
-                    No turns were recorded for this call.
+                    {{
+                      call().trusted
+                        ? 'No turns: trusted callers skip the AI entirely.'
+                        : 'No turns were recorded for this call.'
+                    }}
                   </td>
                 </tr>
               }
@@ -585,6 +601,8 @@ export class CallDetail {
   });
   readonly requestSentence = computed(() => {
     const c = this.call();
+    if (c.trusted)
+      return `Not asked. ${c.trusted.name} is on the trusted list, so the call was not screened.`;
     const u = this.understanding();
     const observation = c.protectedRequest ?? c.session.assessments?.at(-1)?.observation;
     const plain = observation
@@ -595,6 +613,8 @@ export class CallDetail {
   readonly didSentence = computed(() => {
     const c = this.call();
     switch (c.outcome) {
+      case 'trusted':
+        return c.headline;
       case 'blocked':
         return 'Declined the protected request and ended the call politely. Nothing private was shared.';
       case 'connected':

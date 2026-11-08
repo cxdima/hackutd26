@@ -169,14 +169,14 @@ type Tab = 'watch' | 'warnings' | 'trusted' | 'system';
             <button
               type="button"
               [attr.aria-pressed]="period() === 'today'"
-              (click)="period.set('today')"
+              (click)="chosenPeriod.set('today')"
             >
               Today
             </button>
             <button
               type="button"
               [attr.aria-pressed]="period() === 'all'"
-              (click)="period.set('all')"
+              (click)="chosenPeriod.set('all')"
             >
               All
             </button>
@@ -472,7 +472,9 @@ export class OverviewPage {
   readonly calls = computed(() =>
     this.store.calls().filter((c) => c.session.household_id === this.householdId()),
   );
-  readonly period = signal<'today' | 'all'>('today');
+  /** Today when there are calls today, otherwise everything on record. */
+  private readonly chosenPeriod = signal<'today' | 'all' | null>(null);
+  readonly period = computed(() => this.chosenPeriod() ?? (this.todayCount() ? 'today' : 'all'));
   readonly tab = signal<Tab>('watch');
 
   readonly today = computed(() =>
@@ -544,6 +546,12 @@ export class OverviewPage {
       .slice(0, 6),
   );
 
+  private readonly todayCount = computed(() => {
+    const tz = this.store.state()?.profile?.timezone;
+    const today = formatDay(this.store.now(), tz);
+    return this.calls().filter((c) => formatDay(c.startedAt ?? c.lastActivityAt, tz) === today)
+      .length;
+  });
   private readonly periodCalls = computed(() => {
     const calls = this.calls();
     if (this.period() === 'all') return calls;

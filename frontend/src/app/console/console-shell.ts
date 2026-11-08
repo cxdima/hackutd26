@@ -241,9 +241,13 @@ type NavIcon = 'overview' | 'calls' | 'callers' | 'community' | 'settings';
         <main id="console-main" tabindex="-1" class="min-w-0 outline-none">
           <div class="mx-auto max-w-[96rem] px-4 pt-6 pb-16 sm:px-6 sm:pt-8 lg:px-12 lg:pt-11">
             @if (connected()) {
-              @if (store.connection() === 'paused') {
-                <p class="mb-4 text-[1rem] font-semibold text-amber-ink lg:hidden" role="status">
-                  Reconnecting…
+              @if (store.connection() !== 'live') {
+                <p
+                  class="mb-4 text-[1rem] font-semibold lg:hidden"
+                  [class]="store.connection() === 'paused' ? 'text-amber-ink' : 'text-muted'"
+                  role="status"
+                >
+                  {{ connectionText() }}
                 </p>
               }
               <router-outlet />

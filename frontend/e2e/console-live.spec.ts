@@ -59,7 +59,9 @@ test.describe('connected dashboard (mocked server)', () => {
     await page.goto('/console');
     const console = new ConsolePage(page);
     await console.connected();
-    await expect(page.getByText('Reconnecting. The last snapshot stays on screen.')).toBeVisible();
+    await expect(
+      page.getByText('Reconnecting. The last snapshot stays on screen.').filter({ visible: true }),
+    ).toBeVisible();
     await console.nav('Calls').click();
     await page.locator('table.data-table tbody tr.row-link a').first().click();
     await page.getByText('Every receipt, in order').click();

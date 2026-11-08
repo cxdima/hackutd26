@@ -959,6 +959,63 @@ export function buildDemo(now = Date.now()): { state: ConsoleState; events: Call
     data_origin: DEMO_ORIGIN,
   });
 
+  // 6. Trusted caller: Jimmy is on Sarah's trusted list, so the call skips screening.
+  scripts.push({
+    id: 'demo-call-trusted',
+    minutesAgo: 95,
+    profile: SARAH,
+    steps: [
+      [
+        0,
+        'call.inbound.received',
+        { caller_identity: 'unverified', transport: 'relay', requested_profile: SARAH },
+        'caller',
+      ],
+      [
+        400,
+        'trusted.passthrough',
+        {
+          name: 'Jimmy',
+          relation: 'Son',
+          number_label: 'ending 4471',
+          outcome: 'dialing',
+          screened: false,
+        },
+      ],
+      [
+        186000,
+        'trusted.passthrough.completed',
+        { dial_status: 'completed', duration_seconds: 184 },
+      ],
+      [186100, 'call.ended', {}, 'caller'],
+    ],
+  });
+  sessions.push({
+    id: 'demo-call-trusted',
+    household_id: 'sarah',
+    profile: SARAH,
+    state: 'ended',
+    policy_epoch: 0,
+    generation_id: 0,
+    speech_pending: false,
+    inbound_ended: true,
+    closing_reason: 'trusted_passthrough',
+    current_action: 'Put straight through to Sarah',
+    evidence_quote: null,
+    turn_version: 0,
+    assessed_version: 0,
+    blocked: false,
+    ambiguous: false,
+    assessments: [],
+    understanding: null,
+    message: null,
+    turns: [],
+    offer: null,
+    legs: [],
+    execution_mode: 'replay',
+    data_origin: DEMO_ORIGIN,
+  });
+
   const allEvents = scripts.flatMap((script) => events(script, now));
   const capsuleExpiry = new Date(now + 20 * 3600000).toISOString();
   allEvents.push(
