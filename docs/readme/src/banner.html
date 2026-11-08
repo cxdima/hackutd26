@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<style>
+  #frame { width: 1280px; height: 340px; background: #0c1110; border-radius: 22px; }
+  .art { position: absolute; top: 0; height: 100%; width: auto; }
+  .art.right { right: 0; }
+  .art.left { left: 0; }
+  .fade { position: absolute; top: 0; bottom: 0; width: 240px; }
+  .copy { position: absolute; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; width: 470px; }
+  .copy.left { left: 64px; }
+  .copy.right { right: 56px; }
+  .eyebrow { display: flex; align-items: center; gap: 12px; color: var(--lime); }
+  .eyebrow i { width: 28px; height: 2px; background: var(--lime); display: block; }
+  h1 { margin-top: 14px; font-size: 46px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.02; }
+  p { margin-top: 14px; font-family: var(--mono); font-size: 14.5px; line-height: 1.6; color: var(--muted); }
+  p b { color: var(--paper); font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="frame"></div>
+<script>
+  const banners = {
+    voice: {
+      art: 'voice', side: 'left', n: '02', label: 'Voice pipeline',
+      title: 'Ears, voice and a phone line.',
+      sub: 'Photon SIP → Twilio <b>ConversationRelay</b><br>Deepgram STT · ElevenLabs TTS<br>owner voice cloning · barge-in · DTMF',
+    },
+    nvidia: {
+      art: 'gpu', side: 'right', n: '03', label: 'NVIDIA inference',
+      title: 'Nemotron,<br>self-hosted on H100.',
+      sub: '<b>Nemotron 3.5 Lightning 30B‑A3B</b> · NVFP4<br>vLLM 0.27.1 on a Brev GPU instance<br>native tool calls · hosted API fallback',
+    },
+    safety: {
+      art: 'shield', side: 'right', n: '05', label: 'Policy & safety',
+      title: 'The model proposes. Rust decides.',
+      sub: 'evidence-quoted assessments · policy epochs<br>revocable offers · reserved side effects<br>signed webhooks · minimized storage',
+    },
+    community: {
+      art: 'community', side: 'right', n: '06', label: 'Neighborhood Firebreak',
+      title: 'Share the tactic, never the person.',
+      sub: 'expiring categorical tactic capsules<br>HMAC-keyed number reputation<br>scoped, correctable, audited',
+    },
+  };
+  const k = new URLSearchParams(location.search).get('k');
+  const b = banners[k];
+  const f = document.getElementById('frame');
+  const textSide = b.side === 'right' ? 'left' : 'right';
+  const fadeDir = b.side === 'right' ? '90deg' : '270deg';
+  f.innerHTML = `
+    <img class="art ${b.side}" src="../art/${b.art}.jpg" alt="">
+    <div class="fade" style="${b.side}: 0; ${b.side === 'right' ? 'right: auto; left: calc(1280px - var(--w))' : 'left: calc(var(--w) - 240px)'}; background: linear-gradient(${fadeDir}, #0c1110 0%, rgba(12,17,16,0) 100%);"></div>
+    <div class="copy ${textSide}">
+      <div class="eyebrow slate"><i></i>${b.n} · ${b.label}</div>
+      <h1>${b.title}</h1>
+      <p>${b.sub}</p>
+    </div>`;
+  const img = f.querySelector('img');
+  window.__ready = false;
+  img.onload = () => {
+    f.style.setProperty('--w', img.getBoundingClientRect().width + 'px');
+    window.__ready = true;
+  };
+</script>
+</body>
+</html>

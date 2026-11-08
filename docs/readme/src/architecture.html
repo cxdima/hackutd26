@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="diagram.css">
+<script src="diagram.js"></script>
+</head>
+<body>
+<div id="frame"></div>
+<script>
+const { mount, group, box, wire, header, el } = window.D;
+const W = 1080, Y0 = 176;
+const f = document.getElementById('frame');
+const ctx = mount(f, { width: W, height: 1200 });
+const kv = (rows) => rows.map(([k, v]) => `<div class="kv"><span class="k">${k}</span><span>${v}</span></div>`).join('');
+
+header(f, {
+  n: '01', label: 'System map',
+  title: 'One Rust process owns every decision.',
+  sub: 'Providers carry audio and text. Nemotron proposes typed tool calls. Only the per-call Rust actor can authorize, revoke, dial, speak or persist.',
+});
+
+// ── Telephony edge ────────────────────────────────────────────
+const GH = 880;
+group(f, { x: 30, y: Y0, w: 262, h: GH, label: 'Telephony + voice · external', tone: 'water' });
+box(f, { x: 46, y: Y0 + 40, w: 230, h: 86, tone: 'ext', title: 'Caller',
+  lines: ['any phone · PSTN', '<span class="dim">caller ID: a clue only</span>'] });
+box(f, { x: 46, y: Y0 + 152, w: 230, h: 104, tone: 'ext', title: 'Photon', tag: 'SIP trunk',
+  lines: ['SMS-number voice line', 'TLS :5061 · SRTP', 'digest auth → Twilio'] });
+box(f, { x: 46, y: Y0 + 282, w: 230, h: 86, tone: 'ext', title: 'Twilio Voice', tag: 'TwiML',
+  lines: ['SIP Domain → webhooks', '&lt;Connect&gt; → Relay'] });
+box(f, { x: 46, y: Y0 + 394, w: 230, h: 284, tone: 'ext', title: 'ConversationRelay', tag: 'managed',
+  html: kv([
+    ['stt', '<b>Deepgram</b> nova-3'], ['', '<span class="dim">or flux (startup flag)</span>'],
+    ['tts', '<b>ElevenLabs</b> eleven_v4'], ['', '<span class="dim">preset per household</span>'],
+    ['turn', 'speechTimeout'], ['', '600–1000 ms'],
+    ['barge', 'interruptible=any'], ['', 'ignoreBackchannel'],
+    ['hints', 'household name, …'],
+    ['dtmf', 'dtmfDetection=true'],
+    ['alt', 'Gather + Polly Joanna'],
+  ]) });
+box(f, { x: 46, y: Y0 + 704, w: 230, h: 154, tone: 'ext', title: 'ElevenLabs API', tag: 'REST',
+  html: kv([
+    ['ivc', '<b>/v1/voices/add</b>'], ['', '<span class="dim">owner voice clone</span>'],
+    ['say', 'eleven_flash_v2_5'], ['end', 'eleven_v4 closings'],
+    ['del', 'DELETE on revoke'],
+  ]) });
+
+// ── FirstRing core ───────────────────────────────────────────
+group(f, { x: 324, y: Y0, w: 404, h: GH, label: 'FirstRing core · one Rust binary', tone: 'paper' });
+box(f, { x: 342, y: Y0 + 40, w: 368, h: 120, title: 'Ingress', file: 'server/src/http.rs',
+  lines: ['POST /voice/* · HMAC-SHA1(configured URL)', 'GET /voice/relay → WS + session token', '/media/{speech,voice}/{cap} · short-lived'] });
+box(f, { x: 342, y: Y0 + 186, w: 368, h: 196, tone: 'actor', title: 'Session actor', tag: 'one per call',
+  file: 'server/src/calls/{actor,conversation,state}.rs',
+  html: `<div class="ln">Tokio task · bounded mpsc · serial state</div>
+    <div class="chips"><span>turn_version</span><span>generation_id</span><span>policy_epoch</span><span>offer · 30 s TTL</span><span>legs[]</span><span>understanding</span></div>
+    <div style="margin-top:9px" class="ln lime">stale output dropped by generation + epoch</div>` });
+box(f, { x: 342, y: Y0 + 408, w: 176, h: 138, tone: 'gate', title: 'Tool gate', file: 'tools.rs · state.rs',
+  lines: ['phase → tools', 'quote ⊂ caller turn', 'deny_unknown_fields', 'bounded strings'] });
+box(f, { x: 534, y: Y0 + 408, w: 176, h: 138, title: 'Action ledger', file: 'store.rs',
+  lines: ['reserve → submit', '→ reconcile', 'UNIQUE idem. key', 'action_id in URL'] });
+box(f, { x: 342, y: Y0 + 572, w: 176, h: 120, title: 'Firebreak', file: 'patterns · reputation',
+  lines: ['capsules · 24 h TTL', 'HMAC number keys', 'reports · 14 d TTL'] });
+box(f, { x: 534, y: Y0 + 572, w: 176, h: 120, title: 'Event log', file: 'store.rs · events.rs',
+  lines: ['append-only · seq', 'broadcast → SSE'] });
+box(f, { x: 342, y: Y0 + 718, w: 368, h: 96, title: 'Speech + owner voice', file: 'providers/speech.rs · voice_clone.rs',
+  lines: ['closings cached 24 h (SHA-256 key)', 'owner clone → mp3 → /media/voice/{cap}'] });
+el(f, `<span class="mono" style="font-size:12px;color:#c3c9c0;white-space:nowrap"><b style="color:#f7f7f2;font-family:Manrope;font-weight:800;font-size:13.5px">SQLite</b>&nbsp; via sqlx · 11 tables · one file</span>`,
+  `left:342px;top:${Y0 + 828}px;width:368px;height:36px;display:flex;align-items:center;padding:0 13px;border-radius:10px;border:1px solid #3a433c;background:#161b17;z-index:2`);
+
+// ── NVIDIA ───────────────────────────────────────────────────
+group(f, { x: 760, y: Y0, w: 290, h: 334, label: 'NVIDIA inference', tone: 'lime' });
+box(f, { x: 776, y: Y0 + 40, w: 258, h: 176, tone: 'nv', title: 'Brev GPU', badge: { text: 'primary', tone: 'lime' },
+  lines: ['1× H100 80GB via Brev', 'vLLM 0.27.1 · digest-pinned', '<b>Nemotron 3.5 Lightning</b>', '30B-A3B · NVFP4 · 8k context', 'prefix cache · ≤4 sequences', '127.0.0.1:8000 ⇠ SSH :18080'] });
+box(f, { x: 776, y: Y0 + 230, w: 258, h: 88, tone: 'nv', title: 'NVIDIA hosted API', badge: { text: 'fallback', tone: 'lime' },
+  lines: ['integrate.api.nvidia.com', 'same model id + contract'] });
+
+// ── Outbound + operators ─────────────────────────────────────
+group(f, { x: 760, y: Y0 + 356, w: 290, h: GH - 356, label: 'Outbound & operators', tone: 'paper' });
+box(f, { x: 776, y: Y0 + 396, w: 258, h: 118, tone: 'plan', title: 'Outbound legs', badge: { text: 'armed' },
+  lines: ['Twilio Calls API → Photon', 'handoff: one-use arm', 'family callback: flag-gated'] });
+box(f, { x: 776, y: Y0 + 530, w: 258, h: 142, title: 'Operator console', file: 'frontend/',
+  lines: ['Angular 22 · Tailwind 4', 'Zod-validated contracts', 'loopback trusted, else bearer', 'dual-channel call playback'] });
+box(f, { x: 776, y: Y0 + 688, w: 258, h: 124, title: 'Static site', file: 'infra/terraform',
+  lines: ['S3 + CloudFront (OAC)', 'Route 53 · ACM', 'console only, no backend'] });
+
+// ── Wires ────────────────────────────────────────────────────
+const L = (pts, o) => wire(ctx, pts, o);
+L([[161, Y0 + 126], [161, Y0 + 152]], { color: 'water' });
+L([[161, Y0 + 256], [161, Y0 + 282]], { color: 'water' });
+L([[161, Y0 + 368], [161, Y0 + 394]], { color: 'water' });
+L([[276, Y0 + 325], [302, Y0 + 325], [302, Y0 + 100], [342, Y0 + 100]], { color: 'water', num: '1', numAt: [302, Y0 + 212] });
+L([[276, Y0 + 480], [316, Y0 + 480], [316, Y0 + 280], [342, Y0 + 280]], { color: 'water', start: true, num: '2', numAt: [316, Y0 + 390] });
+L([[526, Y0 + 160], [526, Y0 + 186]], { color: 'paper' });
+L([[430, Y0 + 382], [430, Y0 + 408]], { color: 'magenta' });
+L([[622, Y0 + 382], [622, Y0 + 408]], { color: 'paper' });
+L([[430, Y0 + 546], [430, Y0 + 572]], { color: 'paper' });
+L([[622, Y0 + 546], [622, Y0 + 572]], { color: 'paper' });
+L([[710, Y0 + 225], [744, Y0 + 225], [744, Y0 + 128], [776, Y0 + 128]], { color: 'lime', start: true, num: '3', numAt: [744, Y0 + 176] });
+L([[710, Y0 + 274], [776, Y0 + 274]], { color: 'lime', dashed: true, num: '4', numAt: [743, Y0 + 274] });
+L([[710, Y0 + 470], [744, Y0 + 470], [744, Y0 + 455], [776, Y0 + 455]], { color: 'amber', dashed: true, num: '6', numAt: [744, Y0 + 462] });
+L([[710, Y0 + 640], [734, Y0 + 640], [734, Y0 + 600], [776, Y0 + 600]], { color: 'paper', num: '5', numAt: [755, Y0 + 600] });
+L([[342, Y0 + 770], [306, Y0 + 770], [306, Y0 + 788], [276, Y0 + 788]], { color: 'water', start: true, num: '7', numAt: [314, Y0 + 770] });
+
+// ── Wire legend (flow layout; frame height follows content) ──
+const wires = [
+  ['1', 'water', 'Signed webhooks', 'form POST + <code>X-Twilio-Signature</code>: incoming, status, after-relay, closing'],
+  ['2', 'water', 'Relay WebSocket', 'in <code>setup · prompt · interrupt · dtmf</code>, out <code>text · play · end</code>'],
+  ['3', 'lime', 'Chat completions', 'native tools, <code>tool_choice</code> forced per phase, temperature 0.2, thinking off'],
+  ['4', 'lime', 'Hosted fallback', 'identical request body when the Brev backend is not selected'],
+  ['5', 'paper', 'Event stream', 'SSE over fetch with a bearer header; resumes from <code>Last-Event-ID</code>'],
+  ['6', 'amber', 'Outbound REST', 'reserved before send; <code>action_id</code> rides in the StatusCallback URL'],
+  ['7', 'water', 'Owner voice', 'clone created from an enrollment call; replies synthesized, served for 15 min, sent as Relay <code>play</code>'],
+];
+const foot = el(f, `<div class="wires">${wires.map(([n, c, t, d]) =>
+  `<div><span class="n" style="border-color:var(--c-${c});color:var(--c-${c})">${n}</span><span><b>${t}.</b> ${d}</span></div>`).join('')}</div>
+  <div class="legend" style="margin-top:22px;padding-top:16px;border-top:1px solid #2a312b">
+  <span><span class="sq" style="border-color:var(--c-water)"></span>external provider</span>
+  <span><span class="sq" style="border-color:var(--lime)"></span>NVIDIA</span>
+  <span><span class="sq" style="border-color:var(--c-magenta)"></span>policy boundary</span>
+  <span><span class="sw" style="border-color:var(--c-amber);border-top-style:dashed"></span>operator-armed or flag-gated</span>
+  <span style="margin-left:auto" class="mono">FirstRing · HackUTD 2026</span></div>`,
+  `left:32px;top:${Y0 + 912}px;right:32px`);
+const h = Y0 + 912 + foot.offsetHeight + 30;
+f.style.height = h + 'px';
+ctx.svg.setAttribute('height', h);
+</script>
+</body>
+</html>

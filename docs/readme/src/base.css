@@ -1,0 +1,60 @@
+/* Shared tokens for README art. Values mirror DESIGN.md (ink/lime/magenta). */
+@font-face {
+  font-family: 'Manrope';
+  src: url('fonts/manrope.woff2') format('woff2');
+  font-weight: 200 800;
+  font-display: block;
+}
+:root {
+  --ink: #171c18;
+  --ink-2: #1e241f;
+  --ink-3: #262d27;
+  --ink-4: #303832;
+  --rule: #3a433c;
+  --rule-2: #4a544c;
+  --paper: #f7f7f2;
+  --muted: #b8bfb6;
+  --dim: #8a928b;
+  --lime: #76b900;
+  --lime-hi: #9be01a;
+  --lime-wash: rgba(118, 185, 0, 0.12);
+  --lime-line: rgba(118, 185, 0, 0.55);
+  --magenta: #e20074;
+  --magenta-on-ink: #ff74b5;
+  --magenta-wash: rgba(226, 0, 116, 0.12);
+  --water: #b9e2d4;
+  --water-wash: rgba(185, 226, 212, 0.08);
+  --amber: #f0b54a;
+  --amber-wash: rgba(240, 181, 74, 0.1);
+  --mono: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+  --sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: transparent; }
+body {
+  font-family: var(--sans);
+  color: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'ss01' on;
+}
+#frame {
+  position: relative;
+  background: var(--ink);
+  border-radius: 22px;
+  overflow: hidden;
+}
+.mono { font-family: var(--mono); }
+.slate {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+/* Faint engineering grid used behind diagrams. */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(247, 247, 242, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(247, 247, 242, 0.035) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.ring-mark { display: inline-block; vertical-align: middle; }

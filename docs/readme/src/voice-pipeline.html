@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="diagram.css">
+<script src="diagram.js"></script>
+<style>
+  .lane-name { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; }
+  .lane-sub { font-family: var(--mono); font-size: 11.5px; color: #8a938b; margin-top: 4px; line-height: 1.5; }
+  .lane-tag { display: inline-block; margin-top: 8px; }
+  .step .b-title { font-size: 14.5px; }
+  .step .b-body { margin-top: 6px; font-size: 11.4px; }
+</style>
+</head>
+<body>
+<div id="frame"></div>
+<script>
+const { mount, el, box, wire, header } = window.D;
+const W = 1080;
+const f = document.getElementById('frame');
+const ctx = mount(f, { width: W, height: 900 });
+header(f, {
+  n: '02', label: 'Voice pipeline',
+  title: 'How FirstRing hears and speaks.',
+  sub: 'FirstRing never handles the live audio stream. Twilio terminates the media; Rust trades text, keypresses and short-lived audio URLs over one WebSocket, and every outgoing word is checked against the current turn first.',
+});
+
+const LX = 32, BX = 174, BW = 164, GAP = 13, BH = 92, Y = 186, PITCH = 150;
+const xs = [0, 1, 2, 3, 4].map((i) => BX + i * (BW + GAP));
+const lanes = [
+  { name: 'Hear', sub: 'caller audio → text', color: 'water', tone: 'ext', steps: [
+    ['Caller speaks', ['PSTN → Photon SIP', 'TLS · SRTP']],
+    ['Twilio media', ['SIP Domain', 'ConversationRelay']],
+    ['Deepgram STT', ['nova-3-general', 'or flux (flag)']],
+    ['Relay events', ['prompt · last=true', 'interrupt · dtmf']],
+    ['Actor commits', ['turn_version++', 'stale task aborted'], 'actor'],
+  ] },
+  { name: 'Speak', sub: 'model reply → audio', color: 'lime', tone: 'core', steps: [
+    ['Nemotron', ['ask_caller.question', '≤ 240 chars, no URLs'], 'nv'],
+    ['Rust validates', ['evidence + phase', 'epoch still current'], 'gate'],
+    ['Reply frame', ['preset → text token', 'owner → play URL']],
+    ['ElevenLabs TTS', ['v4 preset via Relay', 'or flash_v2_5 clone'], 'ext'],
+    ['Caller hears', ['barge-in → interrupt', 'gate re-closes'], 'ext'],
+  ] },
+  { name: 'Close', sub: 'fixed goodbye phrases', color: 'paper', tone: 'core', steps: [
+    ['Closing chosen', ['saved · protective', 'no-message · failure']],
+    ['ElevenLabs REST', ['eleven_v4 · mp3', 'same voice as call'], 'ext'],
+    ['Speech cache', ['SHA-256 key · 24 h', '≤ 512 KiB · 0600']],
+    ['Capability URL', ['/media/speech/{cap}', 'expires in 5 min']],
+    ['TwiML closing', ['Gather + Play', 'then Hangup']],
+  ] },
+  { name: 'Enroll', sub: 'owner voice, opt-in', color: 'magenta', tone: 'core', tag: 'consented', steps: [
+    ['Consent + arm', ['operator consent', 'expires in 10 min']],
+    ['Setup call', ['next signed inbound', '&lt;Record&gt; caller only']],
+    ['Sample check', ['15 s min · 90 s max', 'fetched from Twilio']],
+    ['ElevenLabs IVC', ['POST /v1/voices/add', 'noise removal on'], 'ext'],
+    ['Use my voice', ['operator activates', 'delete → API DELETE']],
+  ] },
+];
+
+lanes.forEach((lane, li) => {
+  const y = Y + li * PITCH;
+  el(f, `<div class="lane-name" style="color:var(--c-${lane.color})">${lane.name}</div>
+    <div class="lane-sub">${lane.sub}</div>
+    ${lane.tag ? `<span class="badge lane-tag" style="color:var(--c-${lane.color});border:1px solid var(--c-${lane.color})">${lane.tag}</span>` : ''}`, `left:${LX}px;top:${y + 8}px;width:136px`);
+  lane.steps.forEach(([title, lines, tone], si) => {
+    const b = box(f, { x: xs[si], y, w: BW, h: BH, title, lines, tone: tone ?? lane.tone });
+    b.classList.add('step');
+    if (si < 4) wire(ctx, [[xs[si] + BW, y + BH / 2], [xs[si + 1], y + BH / 2]],
+      { color: lane.color, dashed: lane.tone === 'plan' });
+  });
+});
+
+// Loop: the committed turn feeds the model, which starts the Speak lane.
+const gy = Y + BH + 28;
+wire(ctx, [[xs[4] + BW / 2, Y + BH], [xs[4] + BW / 2, gy], [xs[0] + BW / 2, gy], [xs[0] + BW / 2, Y + PITCH]], { color: 'lime' });
+el(f, `<span class="mono" style="font-size:11.5px;color:#b5e36a;background:#121714;padding:0 8px">conversation_messages(session) → /v1/chat/completions</span>`,
+  `left:${xs[1] + 40}px;top:${gy - 9}px;z-index:4`);
+
+const bottom = Y + 3 * PITCH + BH + 34;
+f.style.height = bottom + 'px';
+ctx.svg.setAttribute('height', bottom);
+</script>
+</body>
+</html>

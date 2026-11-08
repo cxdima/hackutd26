@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="diagram.css">
+<script src="diagram.js"></script>
+<style>
+  .layer { position: absolute; display: grid; grid-template-columns: 110px 1fr; align-items: center; z-index: 2;
+           border-radius: 12px; border: 1px solid #3a433c; background: #1b211c; padding: 0 16px 0 0; overflow: hidden; }
+  .layer .idx { height: 100%; display: flex; flex-direction: column; justify-content: center; padding-left: 16px;
+                border-right: 1px solid #2f3730; font-family: var(--mono); font-size: 11px; color: #7f8a80; letter-spacing: 0.06em; text-transform: uppercase; }
+  .layer .idx b { font-family: var(--sans); font-size: 13.5px; color: var(--paper); letter-spacing: -0.01em; text-transform: none; }
+  .layer .txt { padding-left: 16px; }
+  .layer .t { font-size: 14.5px; font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; }
+  .layer .d { font-family: var(--mono); font-size: 11.6px; color: #c3c9c0; margin-top: 3px; white-space: nowrap; }
+  .layer .d .dim { color: #858e86; }
+  .layer.nv { border-color: var(--lime); background: #19220f; }
+  .layer.nv .t { color: #d6f2a8; }
+  .layer.app { border-color: rgba(247,247,242,0.35); }
+  .layer.net { border-color: rgba(143, 211, 189, 0.5); }
+  .layer.net .t { color: #d3efe5; }
+  .guard { position: absolute; z-index: 2; }
+  .guard h3 { font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c-amber); }
+  .g-item { margin-top: 14px; padding-left: 14px; border-left: 2px solid rgba(240,181,74,0.5); }
+  .g-item b { display: block; font-size: 14px; font-weight: 800; }
+  .g-item span { display: block; font-family: var(--mono); font-size: 11.6px; color: #b9c0b7; margin-top: 3px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="frame"></div>
+<script>
+const { mount, el, header, group, wire } = window.D;
+const W = 1080;
+const f = document.getElementById('frame');
+const ctx = mount(f, { width: W, height: 900 });
+header(f, {
+  n: '03', label: 'NVIDIA inference',
+  title: 'Serving Nemotron on a Brev H100.',
+  sub: 'One GPU, one digest-pinned vLLM container, loopback-only, reached through an SSH tunnel and deleted by a hard deadline. Every value below is from scripts/brev-nemotron/.',
+});
+
+const X = 32, LW = 664, Y = 190, H = 62, G = 10;
+const layers = [
+  ['app', 'L7', 'FirstRing', 'Rust adapter', 'BREV_NEMOTRON_CHAT_URL = http://127.0.0.1:18080/v1/chat/completions', '<span class="dim">dedicated bearer key · never the NVIDIA hosted key</span>'],
+  ['net', 'L6', 'Transport', 'loopback only', 'ssh -L 18080:127.0.0.1:8000 · vLLM --host 127.0.0.1 --port 8000', '<span class="dim">VLLM_API_KEY generated on the box into a 0600 file</span>'],
+  ['', 'L5', 'Parsers', 'native tools', '--tool-call-parser qwen3_coder · --reasoning-parser nemotron_v3', '<span class="dim">optional</span> firstring_qwen3_compact <span class="dim">plugin (XGrammar 0.2.3, sha-pinned)</span>'],
+  ['', 'L4', 'Engine', 'vLLM flags', '--max-model-len 8192 · --max-num-seqs 4 · --enable-prefix-caching', '--async-scheduling · --mamba-backend flashinfer · ssm cache fp16'],
+  ['nv', 'L3', 'Model', 'checkpoint', 'nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4 @ bee7596', '<span class="dim">NemotronHForCausalLM · hybrid Mamba/attention MoE · 52 shards · 21.6 GB</span>'],
+  ['', 'L2', 'Container', 'runtime', 'vllm/vllm-openai@sha256:0a51ea5b… (v0.27.1) · torch 2.13 + CUDA 13', '<span class="dim">--gpus all --ipc=host --restart=no · usage stats off</span>'],
+  ['nv', 'L1', 'Hardware', 'Brev instance', '1× NVIDIA H100 80GB PCIe · 81,559 MiB visible', '<span class="dim">serve.sh refuses anything but exactly one H100 ≥ 79,000 MiB</span>'],
+];
+layers.forEach(([tone, n, name, kind, d1, d2], i) => {
+  el(f, `<div class="idx">${n}<b>${name}</b></div>
+    <div class="txt"><div class="t">${kind}</div><div class="d">${d1}</div><div class="d">${d2}</div></div>`,
+    `left:${X}px;top:${Y + i * (H + G)}px;width:${LW}px;height:${H + 16}px`, `layer ${tone}`);
+});
+// Re-space now that height is known (H + 16 actual).
+const stackBottom = Y + layers.length * (H + 16) + (layers.length - 1) * G;
+[...f.querySelectorAll('.layer')].forEach((n, i) => { n.style.top = `${Y + i * (H + 16 + G)}px`; });
+
+group(f, { x: 724, y: Y - 4, w: 324, h: stackBottom - Y + 8, label: '', tone: 'amber' });
+el(f, `<h3>Cost &amp; lifecycle guardrails</h3>
+  <div class="g-item"><b>$60 lifetime ceiling</b><span>versioned budget policy · no top-ups<br>auto-recharge verified off</span></div>
+  <div class="g-item"><b>Quote before create</b><span>exact instance type + hourly rate<br>--count 1 · unknown create reconciled</span></div>
+  <div class="g-item"><b>Two deadline guards</b><span>local watchdog (caffeinate) and an<br>on-instance systemd timer, both bound<br>to the exact resource id</span></div>
+  <div class="g-item"><b>Deletion is read back</b><span>HTTP 404 + zero-instance inventory<br>before a run counts as cleaned up</span></div>
+  <div class="g-item"><b>Reversible restarts</b><span>restart-compact.sh requires the live<br>guard, keeps caches + the old container</span></div>
+  <div class="g-item"><b>Sanitized receipts</b><span>quote · runtime · cleanup JSON<br>no keys, hosts or provider bodies</span></div>`,
+  `left:744px;top:${Y + 16}px;width:290px`, 'guard');
+
+const bottom = stackBottom + 36;
+f.style.height = bottom + 'px';
+ctx.svg.setAttribute('height', bottom);
+</script>
+</body>
+</html>

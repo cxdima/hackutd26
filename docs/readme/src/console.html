@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="diagram.css">
+<script src="diagram.js"></script>
+<style>
+  .shot { position: absolute; border-radius: 14px; overflow: hidden; border: 1px solid #3a433c; background: #f7f7f2;
+          box-shadow: 0 18px 40px rgba(0,0,0,0.45); z-index: 2; }
+  .shot img { display: block; width: 100%; }
+  .cap { position: absolute; z-index: 3; display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 800; }
+  .cap .mono { font-weight: 400; font-size: 11.5px; color: #8a938b; }
+</style>
+</head>
+<body>
+<div id="frame"></div>
+<script>
+const { mount, el, header } = window.D;
+const W = 1080;
+const f = document.getElementById('frame');
+const ctx = mount(f, { width: W, height: 1200 });
+header(f, {
+  n: '07', label: 'Operator console',
+  title: 'Every decision, with its receipt.',
+  sub: 'Angular 22 + Tailwind 4, fed by /api/state, /api/session/:id and an authenticated SSE stream. These screens use the console’s built-in demo dataset, which the UI labels as authored fictional receipts.',
+});
+const Y = 186;
+const shot = (src, x, y, w, cap, sub) => {
+  el(f, `<span>${cap}</span><span class="mono">${sub}</span>`, `left:${x}px;top:${y}px`, 'cap');
+  return el(f, `<img src="../art/console/${src}.jpg" alt="">`, `left:${x}px;top:${y + 26}px;width:${w}px`, 'shot');
+};
+const a = shot('overview', 32, Y, 640, 'Overview', '/console · calls for one household');
+const b = shot('receipts', 696, Y, 352, 'Call receipts', 'heard → model → proposed → rule → done');
+window.__ready = false;
+Promise.all([...f.querySelectorAll('img')].map((i) => i.decode())).then(() => {
+  const c = shot('present-evidence', 32, a.offsetTop + a.offsetHeight + 20, 640, 'Present mode', 'evidence drawer for the live call');
+  return c.querySelector('img').decode().then(() => {
+    const bottomLeft = c.offsetTop + c.offsetHeight;
+    // Trim the receipts column to the left column's height.
+    b.style.height = `${bottomLeft - b.offsetTop}px`;
+    const h = bottomLeft + 32;
+    f.style.height = `${h}px`;
+    ctx.svg.setAttribute('height', h);
+    window.__ready = true;
+  });
+});
+</script>
+</body>
+</html>

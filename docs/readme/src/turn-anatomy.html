@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="diagram.css">
+<script src="diagram.js"></script>
+<style>
+  .lane-label { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
+  .lane-sub { font-family: var(--mono); font-size: 11.5px; color: #8a938b; margin-top: 3px; white-space: nowrap; }
+  .bar { position: absolute; height: 30px; border-radius: 8px; display: flex; align-items: center; padding: 0 10px;
+         font-family: var(--mono); font-size: 12px; white-space: nowrap; z-index: 2; }
+  .bar.water { background: rgba(143, 211, 189, 0.16); border: 1px solid rgba(143, 211, 189, 0.6); color: #d3efe5; }
+  .bar.ghost { background: repeating-linear-gradient(135deg, rgba(143,211,189,0.08) 0 6px, transparent 6px 12px); border: 1px dashed rgba(143,211,189,0.4); color: #8fd3bd; }
+  .bar.lime { background: rgba(118, 185, 0, 0.22); border: 1px solid var(--lime); color: #e4f7c2; }
+  .bar.gate { background: rgba(255, 116, 181, 0.18); border: 1px solid rgba(255, 116, 181, 0.7); color: #ffd0e6; padding: 0; justify-content: center; }
+  .bar.paper { background: rgba(247, 247, 242, 0.08); border: 1px solid rgba(247, 247, 242, 0.3); color: #e6e9e3; }
+  .bar.fade { background: linear-gradient(90deg, rgba(118,185,0,0.28), rgba(118,185,0,0)); border: 1px solid rgba(118,185,0,0.5); border-right: none; color: #e4f7c2; }
+  .note { position: absolute; font-family: var(--mono); font-size: 11.5px; color: #a9b1a7; white-space: nowrap; z-index: 2; }
+  .tick { position: absolute; font-family: var(--mono); font-size: 11px; color: #7f8a80; transform: translateX(-50%); }
+  .rule-v { position: absolute; width: 0; border-left: 1px solid rgba(247,247,242,0.07); }
+  .marker { position: absolute; width: 0; border-left: 1.5px dashed; z-index: 1; }
+  .marker-label { position: absolute; font-size: 12px; font-weight: 800; white-space: nowrap; z-index: 2; }
+  .marker-label span { display: block; font-family: var(--mono); font-weight: 400; font-size: 11px; color: #a9b1a7; }
+  .panel { position: absolute; border: 1px solid #2f3730; border-radius: 14px; background: rgba(247,247,242,0.02); padding: 16px 18px; }
+  .panel h3 { font-size: 13px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lime); }
+  .stat { display: grid; grid-template-columns: 1fr auto; gap: 2px 16px; margin-top: 12px; align-items: baseline; }
+  .stat .k { font-size: 13.5px; color: #c9cfc6; }
+  .stat .k small { display: block; font-family: var(--mono); font-size: 11px; color: #7f8a80; }
+  .stat .v { font-family: var(--mono); font-size: 14px; color: var(--paper); font-weight: 600; text-align: right; white-space: nowrap; }
+  .stat .v.lime { color: #b5e36a; }
+  .stat hr { grid-column: 1 / -1; border: 0; border-top: 1px solid #2a312b; margin: 6px 0; }
+</style>
+</head>
+<body>
+<div id="frame"></div>
+<script>
+const { mount, el, header } = window.D;
+const W = 1080;
+const f = document.getElementById('frame');
+const ctx = mount(f, { width: W, height: 900 });
+header(f, {
+  n: '04', label: 'Latency',
+  title: 'Anatomy of one caller turn.',
+  sub: 'The critical path from the caller going quiet to FirstRing speaking. Bars use the live Brev H100 call recorded on Nov 8 (07:42 UTC); provider-side audio stages are not instrumented and are drawn open-ended.',
+});
+
+// Time axis: 0 → 6.2 s across the chart area.
+const X0 = 250, X1 = 1040, T = 6200, px = (ms) => X0 + (ms / T) * (X1 - X0);
+const Y = 176, ROW = 58;
+for (let s = 0; s <= 6; s++) {
+  el(f, '', `left:${px(s * 1000)}px;top:${Y - 10}px;height:${ROW * 6 + 18}px`, 'rule-v');
+  el(f, `${s}.0 s`, `left:${px(s * 1000)}px;top:${Y + ROW * 6 + 14}px`, 'tick');
+}
+const lanes = [
+  ['Endpointing', 'Deepgram via Relay'],
+  ['Turn commit', 'WS prompt → actor'],
+  ['Nemotron · assess', 'record_assessment'],
+  ['Policy gate', 'Rust, in-process'],
+  ['Nemotron · act', 'ask / message / end'],
+  ['Speech out', 'Relay → ElevenLabs'],
+];
+lanes.forEach(([t, s], i) => el(f, `<div class="lane-label">${t}</div><div class="lane-sub">${s}</div>`, `left:32px;top:${Y + i * ROW + 4}px;width:210px`));
+
+const bar = (i, a, b, cls, html) => el(f, html, `left:${px(a)}px;top:${Y + i * ROW + 6}px;width:${Math.max(px(b) - px(a), 8)}px${px(b) - px(a) < 40 ? ';padding:0' : ''}`, `bar ${cls}`);
+const note = (i, at, html) => el(f, html, `left:${px(at) + 10}px;top:${Y + i * ROW + 14}px`, 'note');
+
+bar(0, 0, 600, 'water', '600 ms');
+bar(0, 600, 1000, 'ghost', '');
+note(0, 1000, 'speechTimeout · was 1000 ms default');
+bar(1, 600, 640, 'paper', '');
+note(1, 663, 'turn_version++ · generation++ · stale task aborted');
+bar(2, 640, 1865, 'lime', '1,225 ms · 229 tok');
+note(2, 1865, 'forced tool · finish=stop');
+bar(3, 1865, 1905, 'gate', '');
+note(3, 1928, 'quote ⊂ turn · phase · epoch → next phase');
+bar(4, 1905, 2505, 'lime', '600 ms');
+note(4, 2505, '99 tok · finish=tool_calls');
+bar(5, 2505, 3600, 'fade', 'text token → TTS');
+note(5, 3600, '<span style="color:#7f8a80">streamed by provider · not instrumented</span>');
+
+// Hard limits.
+const mark = (at, color, label, sub, top, left = false) => {
+  el(f, '', `left:${px(at)}px;top:${Y - 16}px;height:${ROW * 6 + 26}px;border-color:${color}`, 'marker');
+  el(f, `${label}<span>${sub}</span>`, left
+    ? `right:${W - px(at) + 8}px;top:${top}px;color:${color};text-align:right`
+    : `left:${px(at) + 8}px;top:${top}px;color:${color}`, 'marker-label');
+};
+mark(6000, 'var(--c-magenta)', '6 s turn deadline', '→ protective closing', Y + ROW * 3 + 4, true);
+mark(640 + 3500, 'var(--c-amber)', '3.5 s request cap', 'per model call', Y + ROW * 2 + 4);
+
+// Panels.
+const P = Y + ROW * 6 + 50;
+el(f, `<h3>Measured on real calls</h3>
+  <div class="stat">
+    <span class="k">Brev H100 · assess + act<small>live owned-number call · Nov 8</small></span><span class="v lime">1,225 + 600 ms</span>
+    <hr>
+    <span class="k">NVIDIA hosted · 8 in-call requests<small>live call · Nov 7 · min / median / max</small></span><span class="v">1,120 / 1,796 / 2,892</span>
+    <hr>
+    <span class="k">Caller end → closing audio<small>speechTimeout 1000 → 600 ms</small></span><span class="v">4,873 → 4,553 ms</span>
+    <hr>
+    <span class="k">Stop at &lt;/tool_call&gt; token 15<small>same-prefix clarification · Brev</small></span><span class="v">2,368 → 765 ms</span>
+  </div>`, `left:32px;top:${P}px;width:500px`, 'panel');
+el(f, `<h3>Hard bounds in code</h3>
+  <div class="stat">
+    <span class="k">Per model request<small>reqwest timeout · connect 1.5 s</small></span><span class="v">3.5 s</span>
+    <hr>
+    <span class="k">Per caller turn<small>tokio::time::timeout_at</small></span><span class="v">6 s</span>
+    <hr>
+    <span class="k">Native tool steps per turn<small>plus one structural repair</small></span><span class="v">≤ 4</span>
+    <hr>
+    <span class="k">Output tokens per request<small>max_tokens · runtime</small></span><span class="v">512</span>
+  </div>`, `left:548px;top:${P}px;width:500px`, 'panel');
+const bottom = Math.max(...[...f.querySelectorAll('.panel')].map((n) => n.offsetTop + n.offsetHeight));
+f.style.height = bottom + 30 + 'px';
+ctx.svg.setAttribute('height', bottom + 30);
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+/* Diagram styles shared by architecture, voice, brev and turn figures. */
+:root {
+  --c-lime: #76b900;
+  --c-water: #8fd3bd;
+  --c-amber: #f0b54a;
+  --c-paper: #c9cfc6;
+  --c-magenta: #ff74b5;
+}
+#frame { background-color: #121714; border: 1px solid #2a312b; }
+.d-header .eyebrow { display: flex; align-items: center; gap: 12px; color: var(--lime); }
+.d-header .eyebrow i { width: 26px; height: 2px; background: var(--lime); display: block; }
+.d-title { margin-top: 10px; font-size: 28px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
+.d-sub { margin-top: 8px; font-size: 15px; color: var(--muted); line-height: 1.5; max-width: 760px; }
+
+.group {
+  border: 1px solid rgba(247, 247, 242, 0.1);
+  border-radius: 18px;
+  background: rgba(247, 247, 242, 0.018);
+}
+.group.tone-water { border-color: rgba(143, 211, 189, 0.28); background: rgba(143, 211, 189, 0.03); }
+.group.tone-lime { border-color: rgba(118, 185, 0, 0.45); background: rgba(118, 185, 0, 0.04); }
+.group.tone-amber { border-color: rgba(240, 181, 74, 0.3); }
+.g-label { position: absolute; left: 16px; top: 12px; font-size: 11px; color: var(--dim); }
+.g-label.tone-water { color: var(--c-water); }
+.g-label.tone-lime { color: var(--lime); }
+
+.box {
+  z-index: 2;
+  border-radius: 12px;
+  padding: 11px 13px 10px;
+  background: #1b211c;
+  border: 1px solid #3a433c;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+.box.tone-ext { border-color: rgba(143, 211, 189, 0.45); }
+.box.tone-ext .b-title { color: #d3efe5; }
+.box.tone-nv { border-color: rgba(118, 185, 0, 0.75); background: #18200f; }
+.box.tone-nv .b-title { color: #d6f2a8; }
+.box.tone-actor { border: 1.5px solid var(--lime); background: #1a2116; }
+.box.tone-plan { border: 1.5px dashed rgba(240, 181, 74, 0.7); background: rgba(240, 181, 74, 0.04); }
+.box.tone-gate { border-color: rgba(255, 116, 181, 0.6); }
+.box.tone-gate .b-title { color: #ffd0e6; }
+.b-head { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.b-title { font-size: 15.5px; font-weight: 800; letter-spacing: -0.015em; line-height: 1.2; }
+.b-tag { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--dim); }
+.b-file { font-size: 11px; color: #7f8a80; margin-top: 2px; white-space: nowrap; }
+.b-body { margin-top: 7px; font-size: 12px; line-height: 1.55; color: #c3c9c0; }
+.b-body > .ln, .b-body > .kv { white-space: nowrap; }
+.kv { display: grid; grid-template-columns: 44px 1fr; }
+.b-body b { color: var(--paper); font-weight: 600; }
+.b-body .k { color: var(--c-water); }
+.b-body .lime { color: #b5e36a; }
+.b-body .dim { color: #858e86; }
+.badge {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px;
+}
+.badge.amber { color: var(--c-amber); border: 1px solid rgba(240, 181, 74, 0.55); }
+.badge.lime { color: #b5e36a; border: 1px solid rgba(118, 185, 0, 0.6); }
+.badge.water { color: var(--c-water); border: 1px solid rgba(143, 211, 189, 0.5); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chips span {
+  font-family: var(--mono); font-size: 12px; padding: 3px 8px; border-radius: 7px;
+  background: rgba(118, 185, 0, 0.1); border: 1px solid rgba(118, 185, 0, 0.35); color: #d6f2a8;
+}
+.legend { display: flex; gap: 18px; font-size: 12.5px; color: var(--muted); align-items: center; }
+.legend .sw { display: inline-block; width: 22px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 7px; }
+.legend .sq { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid; vertical-align: -1px; margin-right: 7px; }
+.wires { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 28px; }
+.wires div { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.45; color: #c3c9c0; }
+.wires .n {
+  flex: none; width: 21px; height: 21px; border-radius: 50%; border: 1.5px solid; display: grid; place-items: center;
+  font-weight: 800; font-size: 11.5px; margin-top: 0;
+}
+.wires b { color: var(--paper); font-weight: 800; }
+.wires code { font-family: var(--mono); font-size: 12px; color: #d6f2a8; }
