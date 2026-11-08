@@ -7,3 +7,11 @@ node_modules/
 __pycache__/
 dist/
 build/
+target/
+.tools/
+*.db
+*.db-shm
+*.db-wal
+.playwright-cli/
+test-results/
+web/playwright-report/

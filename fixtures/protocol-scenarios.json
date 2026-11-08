@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "data_origin": "synthetic",
+  "kind": "acceptance_specification_not_execution_results",
+  "cases": [
+    {
+      "id": "stale_acceptance_after_risky_turn",
+      "events": [
+        "offer_pending",
+        "caller_final_authentication_request",
+        "assessment_committed_risky",
+        "old_sarah_digit_1"
+      ],
+      "expected": [
+        "offer_revoked",
+        "stale_acceptance_rejected",
+        "zero_bridge_commits"
+      ]
+    },
+    {
+      "id": "speech_hold_before_assessment",
+      "events": [
+        "offer_pending",
+        "caller_speech_started",
+        "sarah_digit_1"
+      ],
+      "expected": [
+        "zero_bridge_commits",
+        "choice_held_or_declined"
+      ]
+    },
+    {
+      "id": "read_only_tool_does_not_assess",
+      "events": [
+        "offer_pending",
+        "caller_final_new_turn",
+        "lookup_tactics_result",
+        "sarah_digit_1"
+      ],
+      "expected": [
+        "unassessed_turn_hold",
+        "zero_bridge_commits"
+      ]
+    },
+    {
+      "id": "obsolete_generation",
+      "events": [
+        "caller_final_turn_1",
+        "caller_speech_started",
+        "late_turn_1_assessment",
+        "late_turn_1_audio",
+        "sarah_digit_1"
+      ],
+      "expected": [
+        "late_results_discarded",
+        "zero_bridge_commits"
+      ]
+    },
+    {
+      "id": "lost_create_response",
+      "events": [
+        "action_reserved",
+        "provider_create_accepted_response_lost",
+        "duplicate_action_request",
+        "signed_status_with_action_id_and_sid"
+      ],
+      "expected": [
+        "one_create_submission",
+        "sid_reconciled",
+        "no_blind_retry"
+      ]
+    },
+    {
+      "id": "reordered_callbacks",
+      "events": [
+        "outbound_completed",
+        "outbound_ringing",
+        "outbound_in_progress",
+        "outbound_completed"
+      ],
+      "expected": [
+        "terminal_status_preserved",
+        "no_acknowledgement_without_correct_digit"
+      ]
+    },
+    {
+      "id": "wrong_leg_ack",
+      "events": [
+        "family_answered",
+        "caller_a_digit_1_for_family_action"
+      ],
+      "expected": [
+        "ack_rejected",
+        "family_unacknowledged"
+      ]
+    },
+    {
+      "id": "partial_conference",
+      "events": [
+        "current_private_acceptance",
+        "sarah_conference_join",
+        "unrelated_leg_conference_join"
+      ],
+      "expected": [
+        "bridge_not_connected",
+        "unrelated_leg_rejected"
+      ]
+    },
+    {
+      "id": "restart_reserved_action",
+      "events": [
+        "action_reserved",
+        "process_restart",
+        "same_action_request"
+      ],
+      "expected": [
+        "no_second_submission",
+        "unknown_outcome_reconciliation"
+      ]
+    },
+    {
+      "id": "inert_replay",
+      "events": [
+        "replay_session",
+        "offer_handoff_tool",
+        "trusted_callback_tool",
+        "probe_operator_action"
+      ],
+      "expected": [
+        "zero_provider_call_creations",
+        "replay_labels_preserved"
+      ]
+    },
+    {
+      "id": "global_smoke_limit",
+      "events": [
+        "session_one_authorized_probe_reserved",
+        "session_two_probe_requested"
+      ],
+      "expected": [
+        "one_create_submission_maximum",
+        "second_probe_rejected"
+      ]
+    },
+    {
+      "id": "subscriber_receipt",
+      "events": [
+        "tactic_persisted",
+        "subscriber_delivery_pending",
+        "maya_next_call"
+      ],
+      "expected": [
+        "no_applied_claim_before_receipt",
+        "no_unapplied_tactic_used"
+      ]
+    },
+    {
+      "id": "expired_tactic",
+      "events": [
+        "expired_capsule_present",
+        "matching_requested_action_lookup"
+      ],
+      "expected": [
+        "expired_capsule_excluded"
+      ]
+    },
+    {
+      "id": "inbound_end_child_alive",
+      "events": [
+        "family_action_authorized_and_reserved",
+        "caller_a_hangup",
+        "family_answered",
+        "family_correct_digit_1"
+      ],
+      "expected": [
+        "parent_retained",
+        "child_status_recorded",
+        "family_acknowledged"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "data_origin": "synthetic",
+  "households": [
+    {
+      "id": "sarah",
+      "display_name": "Sarah",
+      "contact_roles": [
+        "sarah",
+        "family",
+        "clinic"
+      ]
+    },
+    {
+      "id": "maya",
+      "display_name": "Maya",
+      "contact_roles": [
+        "sarah",
+        "family",
+        "clinic"
+      ]
+    }
+  ],
+  "enrollment_note": "Role names are scenario data, not telephone enrollment. Resolve actual destinations from local environment. Current authorization is one smoke-test call to Sarah only."
+}

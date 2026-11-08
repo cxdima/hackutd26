@@ -1,0 +1,11 @@
+rust-async-patterns|rust-agents|https://github.com/wshobson/agents.git|4bde3168b43c0655c4d00ea2726e631719908a6d|plugins/systems-programming/skills/rust-async-patterns|LICENSE
+twilio-voice-twiml|twilio-ai|https://github.com/twilio/ai.git|803790a281f0ef11d2928ffb41bc8422237fb434|skills/twilio/twilio-voice-twiml|LICENSE
+twilio-webhook-architecture|twilio-ai|https://github.com/twilio/ai.git|803790a281f0ef11d2928ffb41bc8422237fb434|skills/twilio/twilio-webhook-architecture|LICENSE
+twilio-security-hardening|twilio-ai|https://github.com/twilio/ai.git|803790a281f0ef11d2928ffb41bc8422237fb434|skills/twilio/twilio-security-hardening|LICENSE
+nemotron-speech|nvidia-speech|https://github.com/nvidia-riva/Nemotron-speech-skills.git|d41a75082063692b2fbd7f98202354b665f019f5|skills/nemotron-speech|LICENSE
+frontend-design|anthropic-skills|https://github.com/anthropics/skills.git|2c5958ecac7cee2b583967a2c4981d0f4a75c579|skills/frontend-design|skills/frontend-design/LICENSE.txt
+playwright-cli|playwright-cli|https://github.com/microsoft/playwright-cli.git|4bc00fb7fa5b4329f2fb53ac4743a066c2c664e8|skills/playwright-cli|LICENSE
+test-driven-development|superpowers|https://github.com/obra/superpowers.git|22f0b463e7a5e579904dd6211a520321035526f7|skills/test-driven-development|LICENSE
+systematic-debugging|superpowers|https://github.com/obra/superpowers.git|22f0b463e7a5e579904dd6211a520321035526f7|skills/systematic-debugging|LICENSE
+verification-before-completion|superpowers|https://github.com/obra/superpowers.git|22f0b463e7a5e579904dd6211a520321035526f7|skills/verification-before-completion|LICENSE
+property-based-testing|trailofbits|https://github.com/trailofbits/skills.git|e4dd0bb5b15535f7c5a0834187dffba6ac37e4ff|plugins/property-based-testing/skills/property-based-testing|LICENSE
