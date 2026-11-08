@@ -1,0 +1,66 @@
+{
+  "test": "first_manual_inbound_transport_probe",
+  "date_central": "2026-11-07",
+  "result": "PASS",
+  "route": "Caller A -> Photon SMS-number voice profile -> authenticated TLS SIP -> Twilio -> signed Rust webhook",
+  "execution_mode": "live",
+  "transport": "probe",
+  "application_events": [
+    {
+      "sequence": 1,
+      "type": "call.inbound.received",
+      "occurred_at": "2026-11-08T02:42:33.069083+00:00",
+      "leg_role": "caller",
+      "execution_mode": "live",
+      "data_origin": "synthetic",
+      "payload": {
+        "caller_identity": "unverified",
+        "transport": "probe"
+      }
+    },
+    {
+      "sequence": 2,
+      "type": "transport.keypad",
+      "occurred_at": "2026-11-08T02:42:43.779833+00:00",
+      "leg_role": "caller",
+      "execution_mode": "live",
+      "data_origin": "synthetic",
+      "payload": {
+        "key": "1"
+      }
+    },
+    {
+      "sequence": 4,
+      "type": "call.ended",
+      "occurred_at": "2026-11-08T02:42:49.144009+00:00",
+      "leg_role": "caller",
+      "execution_mode": "live",
+      "data_origin": "synthetic",
+      "payload": {}
+    }
+  ],
+  "provider_readback": {
+    "status": "completed",
+    "direction": "inbound",
+    "duration": "15",
+    "start_time": "Sun, 08 Nov 2026 02:42:33 +0000",
+    "end_time": "Sun, 08 Nov 2026 02:42:48 +0000",
+    "answered_by": null,
+    "http_status": 200,
+    "call_id_sha256_prefix": "11708dc25f64"
+  },
+  "audible_evidence": {
+    "source": "user report in conversation",
+    "greeting_heard": true,
+    "key_pressed": "1",
+    "voice_quality": "user reported poor quality",
+    "recording_captured": false
+  },
+  "outbound_action_reservations": 0,
+  "sarah_attempt": "unspent; second endpoint not enrolled",
+  "limitations": [
+    "No outbound phone proof",
+    "No live Relay or spoken Nemotron conversation proof",
+    "Polly.Joanna-Neural selected after this call; its perceived quality is untested"
+  ]
+}

@@ -155,9 +155,25 @@ async fn native_assessment_result_is_returned_with_matching_id_before_validated_
         .await
         .unwrap();
     let first = request(&mut provider).await;
-    assert_eq!(first["tools"].as_array().unwrap().len(), 8);
+    assert_eq!(first["tools"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        first["tool_choice"]["function"]["name"],
+        "record_assessment"
+    );
     assert_eq!(first["parallel_tool_calls"], false);
     let second = request(&mut provider).await;
+    assert_eq!(second["tool_choice"], "required");
+    assert_eq!(second["tools"].as_array().unwrap().len(), 6);
+    assert!(
+        second["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|t| !matches!(
+                t["function"]["name"].as_str(),
+                Some("record_assessment" | "publish_tactic")
+            ))
+    );
     let messages = second["messages"].as_array().unwrap();
     assert_eq!(messages.len(), 4);
     assert_eq!(messages[2]["role"], "assistant");

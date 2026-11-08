@@ -3,7 +3,7 @@ use crate::{
     calls::state::{Leg, Turn, terminal},
     config::ExecutionMode,
     providers::{
-        nemotron::{Nemotron, system_prompt},
+        nemotron::{Nemotron, ToolPhase, system_prompt},
         twilio,
     },
     tools::{ContactRole, QuestionPurpose, ToolCall},
@@ -473,7 +473,7 @@ impl Actor {
                 json!({"role":"system","content":system_prompt()}),
                 json!({"role":"user","content":json!({"post_call_job":true,"instruction":"The blocked incident has ended. Propose only publish_tactic using categorical fields. No private content or transcript in tool arguments.","turns":turns}).to_string()}),
             ];
-            if let Ok(tool) = model.next_tool(&messages).await {
+            if let Ok(tool) = model.next_tool_for(&messages, ToolPhase::PostCall).await {
                 let _ = h.send(Input::PostCallTool { tool }).await;
             }
         });
@@ -492,8 +492,9 @@ impl Actor {
                     json!({"role":"user","content":serde_json::to_string(&json!({"household":s.household_id,"turns":s.turns,"instruction":"Assess the latest caller turn, then choose a useful next tool."}))?}),
                 ];
                 let mut epoch = s.policy_epoch;
+                let mut phase = ToolPhase::Assessment;
                 for _ in 0..4 {
-                    let tool = model.next_tool(&messages).await?;
+                    let tool = model.next_tool_for(&messages, phase).await?;
                     let assistant = tool.assistant_message.clone();
                     let id = tool.id.clone();
                     let outcome = h
@@ -506,6 +507,9 @@ impl Actor {
                         })
                         .await?;
                     epoch = outcome["epoch"].as_u64().unwrap_or(epoch);
+                    if phase == ToolPhase::Assessment && outcome["ok"] == true {
+                        phase = ToolPhase::NextStep;
+                    }
                     messages.push(assistant);
                     messages.push(
                         json!({"role":"tool","tool_call_id":id,"content":outcome.to_string()}),

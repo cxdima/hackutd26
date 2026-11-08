@@ -2,6 +2,8 @@
 
 Current live authorization: **one outbound smoke-test call to Sarah / Phone B**, resolved from local `SARAH_TEST_E164`. Caller A initiates inbound manually. Family is not enrolled or authorized; keep family calling disabled. Later handoff calls, no-answer retries and full rehearsals need their own authorized scope. Local replay/tests remain available without dialing.
 
+**Inbound passed Nov 7 at 20:42 Central:** A heard the greeting and pressed 1; signed caller/keypad/terminal events and Twilio's completed 15-second call agree. See [inbound evidence](evidence/inbound-probe-2026-11-07.json). The original voice was rated poor; `Polly.Joanna-Neural` / `en-US` is deployed for Say/Gather, listening comparison pending. Runtime remains `live` / `probe`, all three calling flags false, with **0 outbound actions/reservations**. `SARAH_TEST_E164` is still missing; the user's personal phone is caller A only. M1 is not complete.
+
 ## Start locally
 
 1. Copy `.env.example` to `.env` only if `.env` does not already exist. Populate secrets locally; never paste them into chat or commit them. Keep `DEMO_EXECUTION_MODE=replay` for development. Set a random `DEMO_ADMIN_TOKEN` of at least 24 characters.
@@ -17,8 +19,8 @@ Before using the one authorized attempt:
 
 - Configure Photon beta voice profile → the authenticated Twilio SIP Domain → `POST https://HOST/voice/incoming`. Use separate Photon outbound credentials and the assigned SIP endpoint. Verify TLS, compatible SRTP, digest **MD5 (legacy)** and eligible Photon caller number against `provider-preflight.md` and the actual profile.
 - Set `PUBLIC_BASE_URL` to the exact public HTTPS origin; make HTTPS/WSS reachable. Do not disable signature validation to work around a tunnel or URL mismatch.
-- Set `VOICE_TRANSPORT=probe`, `DEMO_EXECUTION_MODE=live`, `TEST_CALLS_AUTHORIZED=true`, `HANDOFF_CALLS_ENABLED=false`, and `FAMILY_CALLS_ENABLED=false`. Leave `FAMILY_TEST_E164` empty. Restart to load configuration.
-- Confirm Phone B belongs to the designated test participant and is reachable at `SARAH_TEST_E164`. The console exposes role IDs rather than accepting a dialed number. Unmute and charge both phones; allow the configured caller number through filtering.
+- Keep `VOICE_TRANSPORT=probe`, `DEMO_EXECUTION_MODE=live`, `TEST_CALLS_AUTHORIZED=false`, `HANDOFF_CALLS_ENABLED=false`, and `FAMILY_CALLS_ENABLED=false` for A-only testing. Leave `FAMILY_TEST_E164` empty.
+- Designate the separate consenting Phone B and configure `SARAH_TEST_E164`. Only when B is ready for the one authorized smoke attempt, set `TEST_CALLS_AUTHORIZED=true` and restart to load it; keep the other calling flags false. The console accepts role IDs, never a dialed number. Unmute and charge both phones; allow the configured caller number through filtering.
 
 Run once:
 
@@ -34,14 +36,14 @@ Phone proof record:
 
 | Check | Observation / receipt |
 |---|---|
-| A reached Photon/Twilio and heard greeting | Pending |
-| A keypad accepted on A only | Pending |
-| Single outbound reservation/submission | Pending |
+| A reached Photon/Twilio and heard greeting | Passed Nov 7, 20:42 Central; user confirmed audio, initial voice rated poor |
+| A keypad accepted on A only | Passed; caller key 1 at Nov 8 `02:42:43.779833Z` |
+| Single outbound reservation/submission | Unspent; 0 reservations/actions, B designation missing |
 | Photon-routed B ringing / answered | Pending |
 | B heard private fictional message | Pending |
 | B's 1 acknowledged B only | Pending |
 | A did not hear B's private message | Pending |
-| Both terminal statuses reconciled | Pending |
+| Terminal statuses reconciled | A passed: Twilio completed inbound, 15s; `call.ended` at Nov 8 `02:42:49.144009Z`. B pending |
 
 ## Conversation and full branch gates
 

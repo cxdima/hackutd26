@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow, bail, ensure};
 use firstring::{
     calls::state::{Session, Turn},
     config::ExecutionMode,
-    providers::nemotron::{ModelToolCall, Nemotron, RequestObservation, system_prompt},
+    providers::nemotron::{ModelToolCall, Nemotron, RequestObservation, ToolPhase, system_prompt},
     tools::{Direction, Observation, RequestedObject, SpeechAct, ToolCall},
 };
 use serde::{Deserialize, Serialize};
@@ -17,6 +17,7 @@ const ENDPOINT: &str = "https://integrate.api.nvidia.com/v1/chat/completions";
 const FIXTURES: &str = "fixtures/language-held-out.json";
 const OUTPUT: &str = ".tools/evaluation-results.json";
 const MAX_CASES: usize = 12;
+const DEFAULT_REQUEST_TIMEOUT_MS: u64 = 3500;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Mode {
@@ -253,6 +254,20 @@ fn contextual_followup(context: usize, question: &str) -> bool {
     lower.contains('?') && anchors.iter().any(|word| lower.contains(word))
 }
 
+fn retain_probe_question(
+    context: usize,
+    question: String,
+    questions: &mut Vec<String>,
+) -> Result<()> {
+    let contextual = contextual_followup(context, &question);
+    questions.push(question);
+    ensure!(
+        contextual,
+        "Probe question failed the prewritten context-anchor check; human relevance review still required"
+    );
+    Ok(())
+}
+
 fn ratio(n: usize, d: usize) -> Option<f64> {
     (d > 0).then(|| n as f64 / d as f64)
 }
@@ -329,7 +344,12 @@ impl Budget {
             observations: Vec::new(),
         }
     }
-    async fn request(&mut self, model: &Nemotron, messages: &[Value]) -> Result<ModelToolCall> {
+    async fn request(
+        &mut self,
+        model: &Nemotron,
+        messages: &[Value],
+        phase: ToolPhase,
+    ) -> Result<ModelToolCall> {
         ensure!(
             self.remaining > 0 && Instant::now() < self.deadline,
             "Evaluation request/time budget exhausted"
@@ -338,7 +358,7 @@ impl Budget {
         self.submitted += 1;
         let observed = tokio::time::timeout_at(
             tokio::time::Instant::from_std(self.deadline),
-            model.next_tool_observed(messages),
+            model.next_tool_observed_for(messages, phase),
         )
         .await
         .map_err(|_| anyhow!("Evaluation total deadline reached"))?;
@@ -351,7 +371,24 @@ impl Budget {
     }
 }
 
-fn model() -> Result<Nemotron> {
+fn request_timeout_ms(mode: Mode, probe_override: Option<&str>) -> Result<u64> {
+    if mode != Mode::ModelProbe {
+        return Ok(DEFAULT_REQUEST_TIMEOUT_MS);
+    }
+    let Some(value) = probe_override else {
+        return Ok(DEFAULT_REQUEST_TIMEOUT_MS);
+    };
+    let milliseconds = value
+        .parse::<u64>()
+        .map_err(|_| anyhow!("NEMOTRON_PROBE_TIMEOUT_MS must be an integer within 1..15000"))?;
+    ensure!(
+        (1..=15000).contains(&milliseconds),
+        "NEMOTRON_PROBE_TIMEOUT_MS must be an integer within 1..15000"
+    );
+    Ok(milliseconds)
+}
+
+fn model(mode: Mode) -> Result<(Nemotron, u64)> {
     let key = std::env::var("NVIDIA_API_KEY").unwrap_or_default();
     ensure!(
         !key.trim().is_empty(),
@@ -363,7 +400,11 @@ fn model() -> Result<Nemotron> {
         url == ENDPOINT && model == MODEL,
         "This preflight requires the documented NEMOTRON_CHAT_URL and NEMOTRON_MODEL; configuration was not changed"
     );
-    Ok(Nemotron::new(key, url, model))
+    let override_value = std::env::var("NEMOTRON_PROBE_TIMEOUT_MS").ok();
+    let milliseconds = request_timeout_ms(mode, override_value.as_deref())?;
+    let model =
+        Nemotron::new(key, url, model).with_request_timeout(Duration::from_millis(milliseconds))?;
+    Ok((model, milliseconds))
 }
 
 async fn followup(
@@ -375,7 +416,7 @@ async fn followup(
 ) -> Result<ModelToolCall> {
     messages.push(first.assistant_message);
     messages.push(json!({"role":"tool","tool_call_id":first.id,"content":json!({"ok":true,"result":{"blocked":session.blocked,"ambiguous":session.ambiguous,"assessed_version":session.assessed_version},"execution":"evaluation_no_actions"}).to_string()}));
-    budget.request(model, messages).await
+    budget.request(model, messages, ToolPhase::NextStep).await
 }
 
 fn validate_next(session: &Session, call: &ModelToolCall) -> Result<ToolCall> {
@@ -394,7 +435,7 @@ fn validate_next(session: &Session, call: &ModelToolCall) -> Result<ToolCall> {
 }
 
 async fn probe(data: &Dataset) -> Result<()> {
-    let model = model()?;
+    let (model, request_timeout_ms) = model(Mode::ModelProbe)?;
     let mut budget = Budget::new(4);
     let mut questions = Vec::new();
     let outcome = async {
@@ -412,7 +453,7 @@ async fn probe(data: &Dataset) -> Result<()> {
             &case,
             "Assess the latest caller turn first. For this access probe, then ask one short context-specific clarifying question using ask_caller.",
         );
-        let first = budget.request(&model, &messages).await?;
+        let first = budget.request(&model, &messages, ToolPhase::Assessment).await?;
         let (session, observation) = assess(&case, &first)?;
         ensure!(
             flags(&observation).0 == "benign",
@@ -422,11 +463,7 @@ async fn probe(data: &Dataset) -> Result<()> {
         let ToolCall::AskCaller { question, .. } = validate_next(&session, &next)? else {
             bail!("Probe follow-up was not ask_caller");
         };
-        ensure!(
-            contextual_followup(index, &question),
-            "Probe question failed the prewritten context-anchor check; human relevance review still required"
-        );
-        questions.push(question);
+        retain_probe_question(index, question, &mut questions)?;
     }
     ensure!(
         questions[0].to_lowercase() != questions[1].to_lowercase(),
@@ -436,9 +473,10 @@ async fn probe(data: &Dataset) -> Result<()> {
     }.await;
     let report = json!({"status":if outcome.is_ok(){"model_probe_passed"}else{"model_probe_failed"},
         "recorded_at":chrono::Utc::now().to_rfc3339(),"requested_model":MODEL,"data_origin":"synthetic",
+        "request_timeout_ms":request_timeout_ms,"native_tool_choice":"named_assessment_then_required_next_step",
         "requests_submitted":budget.submitted,"request_observations":budget.observations,
         "native_result_roundtrips":budget.observations.iter().enumerate().filter(|(i,o)|i%2==1 && o.outcome=="success").count(),
-        "distinct_contextual_followups":questions,"error":outcome.as_ref().err().map(ToString::to_string),
+        "observed_followups":questions,"error":outcome.as_ref().err().map(ToString::to_string),
         "relevance_check":"prewritten lexical anchors; human review still required","phone_tested":false,
         "latency_boundary":"HTTP request through complete response and tool parsing; not audible latency"});
     save_report_to(".tools/model-probe-results.json", &report)?;
@@ -456,7 +494,9 @@ async fn evaluate_case(
         case,
         "Assess the latest caller turn, then choose a useful next tool. Do not execute any action.",
     );
-    let first = budget.request(model, &messages).await?;
+    let first = budget
+        .request(model, &messages, ToolPhase::Assessment)
+        .await?;
     let (session, observation) = assess(case, &first)?;
     result.evidence_valid = true;
     let (classification, authentication) = flags(&observation);
@@ -494,11 +534,11 @@ fn save_report_to(path: &str, value: &Value) -> Result<()> {
 }
 
 async fn evaluate(data: &Dataset) -> Result<()> {
-    let model = match model() {
+    let (model, request_timeout_ms) = match model(Mode::Evaluate) {
         Ok(m) => m,
         Err(e) => {
             save_report(
-                &json!({"status":"pending","reason":e.to_string(),"data_origin":"synthetic","case_count":data.cases.len(),"requests_submitted":0,"metrics":null,"cases":[],"phone_tested":false}),
+                &json!({"status":"pending","reason":e.to_string(),"data_origin":"synthetic","request_timeout_ms":DEFAULT_REQUEST_TIMEOUT_MS,"native_tool_choice":"named_assessment_then_required_next_step","case_count":data.cases.len(),"requests_submitted":0,"metrics":null,"cases":[],"phone_tested":false}),
             )?;
             return Err(e);
         }
@@ -523,7 +563,7 @@ async fn evaluate(data: &Dataset) -> Result<()> {
         results.push(result);
     }
     let metrics = totals(&results);
-    let report = json!({"status":"completed_with_observations","recorded_at":chrono::Utc::now().to_rfc3339(),"model":MODEL,"data_origin":"synthetic","split":"held_out","case_count":data.cases.len(),"requests_submitted":budget.submitted,"request_observations":budget.observations,"metrics":metrics,"cases":results,"phone_tested":false,"tool_actions_executed":0,"interpretation":"Prewritten rubric compared with observed native tool fields; fixtures and model self-report are not phone verification. Null rates have no scored denominator."});
+    let report = json!({"status":"completed_with_observations","recorded_at":chrono::Utc::now().to_rfc3339(),"model":MODEL,"data_origin":"synthetic","request_timeout_ms":request_timeout_ms,"native_tool_choice":"named_assessment_then_required_next_step","split":"held_out","case_count":data.cases.len(),"requests_submitted":budget.submitted,"request_observations":budget.observations,"metrics":metrics,"cases":results,"phone_tested":false,"tool_actions_executed":0,"interpretation":"Prewritten rubric compared with observed native tool fields; fixtures and model self-report are not phone verification. Null rates have no scored denominator."});
     save_report(&report)?;
     println!(
         "{}",
@@ -576,7 +616,7 @@ async fn main() -> Result<()> {
         }
         Mode::Help => {
             println!(
-                "FirstRing preflight\n  (no flags)           Report environment NAMES only; no external calls.\n  --model-probe        Opt in to up to 4 NVIDIA requests; native tool/result roundtrip for two synthetic contexts.\n  --evaluate-held-out  Opt in to up to 24 NVIDIA requests across <=12 frozen cases; save ignored .tools/evaluation-results.json.\n  --help              Show usage.\nModel requests require NVIDIA_API_KEY and the documented endpoint/model; 3.5-second request and 120-second run limits. No command dials phones or executes tools. Run from repository root."
+                "FirstRing preflight\n  (no flags)           Report environment NAMES only; no external calls.\n  --model-probe        Opt in to up to 4 NVIDIA requests; native tool/result roundtrip for two synthetic contexts.\n  --evaluate-held-out  Opt in to up to 24 NVIDIA requests across <=12 frozen cases; save ignored .tools/evaluation-results.json.\n  --help              Show usage.\nModel requests require NVIDIA_API_KEY and the documented endpoint/model; named record_assessment first, then required next-step tool selection, with 3.5-second request and 120-second run limits. NEMOTRON_PROBE_TIMEOUT_MS=1..15000 overrides only --model-probe; held-out evaluation and runtime retain their normal deadlines. Reports record request_timeout_ms and native_tool_choice=named_assessment_then_required_next_step. No command dials phones or executes tools. Run from repository root."
             );
             Ok(())
         }
@@ -624,6 +664,33 @@ mod tests {
         );
         assert!(parse_args(&["--evaluate-held-out".into(), "--model-probe".into()]).is_err());
         assert!(parse_args(&["--call".into()]).is_err());
+    }
+    #[test]
+    fn diagnostic_timeout_override_is_confined_to_model_probe() {
+        for mode in [Mode::Evaluate, Mode::Status, Mode::Help] {
+            for value in [None, Some("15000"), Some("invalid"), Some("0")] {
+                assert_eq!(request_timeout_ms(mode, value).unwrap(), 3500);
+            }
+        }
+        assert_eq!(request_timeout_ms(Mode::ModelProbe, None).unwrap(), 3500);
+        assert_eq!(request_timeout_ms(Mode::ModelProbe, Some("1")).unwrap(), 1);
+        assert_eq!(
+            request_timeout_ms(Mode::ModelProbe, Some("15000")).unwrap(),
+            15000
+        );
+        for value in ["0", "15001", "-1", "invalid", ""] {
+            assert!(request_timeout_ms(Mode::ModelProbe, Some(value)).is_err());
+        }
+    }
+    #[test]
+    fn failed_context_question_is_retained_without_passing_the_gate() {
+        let question = "Could you clarify that?";
+        let mut questions = Vec::new();
+        assert!(retain_probe_question(0, question.into(), &mut questions).is_err());
+        assert_eq!(questions, [question]);
+        let valid = "Which entrance should the grocery delivery use?";
+        assert!(retain_probe_question(1, valid.into(), &mut questions).is_ok());
+        assert_eq!(questions, [question, valid]);
     }
     #[test]
     fn frozen_held_out_schema_is_required_and_expected_answers_are_not_sent() {

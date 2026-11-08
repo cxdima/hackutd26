@@ -149,18 +149,21 @@ pub fn escape(text: &str) -> String {
         .replace('\'', "&apos;")
 }
 pub fn say_end(text: &str) -> String {
-    format!("<Response><Say>{}</Say><Hangup/></Response>", escape(text))
+    format!(
+        "<Response><Say voice=\"Polly.Joanna-Neural\" language=\"en-US\">{}</Say><Hangup/></Response>",
+        escape(text)
+    )
 }
 pub fn gather(url: &str, text: &str, timeout: u32) -> String {
     format!(
-        "<Response><Gather input=\"dtmf\" numDigits=\"1\" timeout=\"{timeout}\" actionOnEmptyResult=\"true\" action=\"{}\" method=\"POST\"><Say>{}</Say></Gather><Hangup/></Response>",
+        "<Response><Gather input=\"dtmf\" numDigits=\"1\" timeout=\"{timeout}\" actionOnEmptyResult=\"true\" action=\"{}\" method=\"POST\"><Say voice=\"Polly.Joanna-Neural\" language=\"en-US\">{}</Say></Gather><Hangup/></Response>",
         escape(url),
         escape(text)
     )
 }
 pub fn speech_gather(url: &str, text: &str) -> String {
     format!(
-        "<Response><Gather input=\"speech\" speechTimeout=\"auto\" timeout=\"8\" actionOnEmptyResult=\"true\" action=\"{}\" method=\"POST\"><Say>{}</Say></Gather><Say>No input received. Goodbye.</Say><Hangup/></Response>",
+        "<Response><Gather input=\"speech\" speechTimeout=\"auto\" timeout=\"8\" actionOnEmptyResult=\"true\" action=\"{}\" method=\"POST\"><Say voice=\"Polly.Joanna-Neural\" language=\"en-US\">{}</Say></Gather><Say voice=\"Polly.Joanna-Neural\" language=\"en-US\">No input received. Goodbye.</Say><Hangup/></Response>",
         escape(url),
         escape(text)
     )

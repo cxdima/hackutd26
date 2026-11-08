@@ -1,0 +1,355 @@
+{
+  "source": "Actual authenticated NVIDIA preflight reports, including failed attempts; synthetic inputs; zero phone calls.",
+  "runs": [
+    {
+      "data_origin": "synthetic",
+      "distinct_contextual_followups": [
+        "Are you calling to update Sarah's clinic appointment time, or is there another reason you need to share information with her?"
+      ],
+      "error": "unknown tool or invalid tool arguments",
+      "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+      "native_result_roundtrips": 1,
+      "phone_tested": false,
+      "recorded_at": "2026-11-08T01:46:15.409652+00:00",
+      "relevance_check": "prewritten lexical anchors; human review still required",
+      "request_observations": [
+        {
+          "elapsed_ms": 1230,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        {
+          "elapsed_ms": 761,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        {
+          "elapsed_ms": 943,
+          "error": "unknown tool or invalid tool arguments",
+          "outcome": "schema",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        }
+      ],
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "requests_submitted": 3,
+      "status": "model_probe_failed"
+    },
+    {
+      "data_origin": "synthetic",
+      "distinct_contextual_followups": [
+        "Is this a routine update about the appointment time, or are you being asked to verify or share credentials?"
+      ],
+      "error": "unknown tool or invalid tool arguments; sanitized tool shape: {\"arguments\":{\"fields\":{\"evidence_refs\":{\"items\":[{\"fields\":{\"quote\":{\"length\":85,\"type\":\"string\"},\"turn_id\":{\"length\":6,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0}],\"length\":1,\"type\":\"array\"},\"observation\":{\"length\":101,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0},\"tool\":\"record_assessment\"}",
+      "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+      "native_result_roundtrips": 1,
+      "phone_tested": false,
+      "recorded_at": "2026-11-08T01:48:42.674314+00:00",
+      "relevance_check": "prewritten lexical anchors; human review still required",
+      "request_observations": [
+        {
+          "elapsed_ms": 888,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        {
+          "elapsed_ms": 1157,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        {
+          "elapsed_ms": 1415,
+          "error": "unknown tool or invalid tool arguments; sanitized tool shape: {\"arguments\":{\"fields\":{\"evidence_refs\":{\"items\":[{\"fields\":{\"quote\":{\"length\":85,\"type\":\"string\"},\"turn_id\":{\"length\":6,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0}],\"length\":1,\"type\":\"array\"},\"observation\":{\"length\":101,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0},\"tool\":\"record_assessment\"}",
+          "outcome": "schema",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        }
+      ],
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "requests_submitted": 3,
+      "status": "model_probe_failed"
+    },
+    {
+      "data_origin": "synthetic",
+      "distinct_contextual_followups": [
+        "Are you calling to update Sarah's appointment time, or is there another reason you need to share information with her?"
+      ],
+      "error": "unknown tool or invalid tool arguments; sanitized tool shape: {\"arguments\":{\"fields\":{\"evidence_refs\":{\"items\":[{\"fields\":{\"quote\":{\"length\":85,\"type\":\"string\"},\"turn_id\":{\"length\":6,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0}],\"length\":1,\"type\":\"array\"},\"observation\":{\"length\":101,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0},\"tool\":\"record_assessment\"}",
+      "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+      "native_result_roundtrips": 1,
+      "phone_tested": false,
+      "recorded_at": "2026-11-08T01:50:44.932649+00:00",
+      "relevance_check": "prewritten lexical anchors; human review still required",
+      "request_observations": [
+        {
+          "elapsed_ms": 1117,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        {
+          "elapsed_ms": 903,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        {
+          "elapsed_ms": 1068,
+          "error": "unknown tool or invalid tool arguments; sanitized tool shape: {\"arguments\":{\"fields\":{\"evidence_refs\":{\"items\":[{\"fields\":{\"quote\":{\"length\":85,\"type\":\"string\"},\"turn_id\":{\"length\":6,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0}],\"length\":1,\"type\":\"array\"},\"observation\":{\"length\":101,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0},\"tool\":\"record_assessment\"}",
+          "outcome": "schema",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        }
+      ],
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "requests_submitted": 3,
+      "status": "model_probe_failed"
+    },
+    {
+      "data_origin": "synthetic",
+      "distinct_contextual_followups": [],
+      "error": "Nemotron request timed out",
+      "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+      "native_result_roundtrips": 0,
+      "phone_tested": false,
+      "recorded_at": "2026-11-08T01:51:46.325249+00:00",
+      "relevance_check": "prewritten lexical anchors; human review still required",
+      "request_observations": [
+        {
+          "elapsed_ms": 3503,
+          "error": "Nemotron request timed out",
+          "outcome": "timeout",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": null
+        }
+      ],
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "requests_submitted": 1,
+      "status": "model_probe_failed"
+    },
+    {
+      "data_origin": "synthetic",
+      "distinct_contextual_followups": [],
+      "error": "Nemotron request timed out",
+      "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+      "native_result_roundtrips": 0,
+      "phone_tested": false,
+      "recorded_at": "2026-11-08T01:52:07.268594+00:00",
+      "relevance_check": "prewritten lexical anchors; human review still required",
+      "request_observations": [
+        {
+          "elapsed_ms": 3505,
+          "error": "Nemotron request timed out",
+          "outcome": "timeout",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": null
+        }
+      ],
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "requests_submitted": 1,
+      "status": "model_probe_failed"
+    },
+    {
+      "data_origin": "synthetic",
+      "distinct_contextual_followups": [
+        "Are you calling to update Sarah's appointment time, or is there another reason you need to share information with her?"
+      ],
+      "error": "unknown tool or invalid tool arguments; sanitized tool shape: {\"arguments\":{\"fields\":{\"evidence_refs\":{\"items\":[{\"fields\":{\"quote\":{\"length\":85,\"type\":\"string\"},\"turn_id\":{\"length\":6,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0}],\"length\":1,\"type\":\"array\"},\"observation\":{\"length\":101,\"redacted_structure\":\"{\\\"xxxxxxxxx\\\": \\\"xxxxxxxxxxxxxxx\\\", \\\"xxxxxxxxxxxxxxxx\\\": \\\"xxxxxxxxxxxxxxxxxxx\\\", \\\"xxxxxxxxxx\\\": \\\"xxxxxxx\\\"}]\",\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0},\"tool\":\"record_assessment\"}",
+      "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+      "native_result_roundtrips": 1,
+      "phone_tested": false,
+      "recorded_at": "2026-11-08T01:53:47.996787+00:00",
+      "relevance_check": "prewritten lexical anchors; human review still required",
+      "request_observations": [
+        {
+          "elapsed_ms": 860,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        {
+          "elapsed_ms": 1048,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        {
+          "elapsed_ms": 791,
+          "error": "unknown tool or invalid tool arguments; sanitized tool shape: {\"arguments\":{\"fields\":{\"evidence_refs\":{\"items\":[{\"fields\":{\"quote\":{\"length\":85,\"type\":\"string\"},\"turn_id\":{\"length\":6,\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0}],\"length\":1,\"type\":\"array\"},\"observation\":{\"length\":101,\"redacted_structure\":\"{\\\"xxxxxxxxx\\\": \\\"xxxxxxxxxxxxxxx\\\", \\\"xxxxxxxxxxxxxxxx\\\": \\\"xxxxxxxxxxxxxxxxxxx\\\", \\\"xxxxxxxxxx\\\": \\\"xxxxxxx\\\"}]\",\"type\":\"string\"}},\"type\":\"object\",\"unexpected_field_count\":0},\"tool\":\"record_assessment\"}",
+          "outcome": "schema",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        }
+      ],
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "requests_submitted": 3,
+      "status": "model_probe_failed"
+    },
+    {
+      "data_origin": "synthetic",
+      "distinct_contextual_followups": [],
+      "error": "Nemotron request timed out",
+      "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+      "native_result_roundtrips": 0,
+      "phone_tested": false,
+      "recorded_at": "2026-11-08T01:58:21.134090+00:00",
+      "relevance_check": "prewritten lexical anchors; human review still required",
+      "request_observations": [
+        {
+          "elapsed_ms": 3504,
+          "error": "Nemotron request timed out",
+          "outcome": "timeout",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": null
+        }
+      ],
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "requests_submitted": 1,
+      "status": "model_probe_failed"
+    },
+    {
+      "data_origin": "synthetic",
+      "distinct_contextual_followups": [],
+      "error": "Probe question failed the prewritten context-anchor check; human relevance review still required",
+      "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+      "native_result_roundtrips": 1,
+      "phone_tested": false,
+      "recorded_at": "2026-11-08T01:58:35.165829+00:00",
+      "relevance_check": "prewritten lexical anchors; human review still required",
+      "request_observations": [
+        {
+          "elapsed_ms": 7864,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        {
+          "elapsed_ms": 862,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        }
+      ],
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "requests_submitted": 2,
+      "status": "model_probe_failed"
+    },
+    {
+      "data_origin": "synthetic",
+      "error": "Nemotron request timed out",
+      "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+      "native_result_roundtrips": 0,
+      "native_tool_choice": "required",
+      "observed_followups": [],
+      "phone_tested": false,
+      "recorded_at": "2026-11-08T02:00:53.562392+00:00",
+      "relevance_check": "prewritten lexical anchors; human review still required",
+      "request_observations": [
+        {
+          "elapsed_ms": 3505,
+          "error": "Nemotron request timed out",
+          "outcome": "timeout",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": null
+        }
+      ],
+      "request_timeout_ms": 3500,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "requests_submitted": 1,
+      "status": "model_probe_failed"
+    },
+    {
+      "data_origin": "synthetic",
+      "error": "Follow-up must be a next-step tool, not another assessment or publication",
+      "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+      "native_result_roundtrips": 1,
+      "native_tool_choice": "required",
+      "observed_followups": [],
+      "phone_tested": false,
+      "recorded_at": "2026-11-08T02:01:27.707353+00:00",
+      "relevance_check": "prewritten lexical anchors; human review still required",
+      "request_observations": [
+        {
+          "elapsed_ms": 1028,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        {
+          "elapsed_ms": 743,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        }
+      ],
+      "request_timeout_ms": 15000,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "requests_submitted": 2,
+      "status": "model_probe_failed"
+    },
+    {
+      "data_origin": "synthetic",
+      "error": null,
+      "latency_boundary": "HTTP request through complete response and tool parsing; not audible latency",
+      "native_result_roundtrips": 2,
+      "native_tool_choice": "named_assessment_then_required_next_step",
+      "observed_followups": [
+        "Is this a routine appointment change or does it involve a payment or credential request?",
+        "Which entrance would you like the bags left at?"
+      ],
+      "phone_tested": false,
+      "recorded_at": "2026-11-08T02:04:57.023438+00:00",
+      "relevance_check": "prewritten lexical anchors; human review still required",
+      "request_observations": [
+        {
+          "elapsed_ms": 1524,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        {
+          "elapsed_ms": 2675,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        {
+          "elapsed_ms": 992,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        {
+          "elapsed_ms": 741,
+          "error": null,
+          "outcome": "success",
+          "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "response_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        }
+      ],
+      "request_timeout_ms": 3500,
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "requests_submitted": 4,
+      "status": "model_probe_passed"
+    }
+  ]
+}

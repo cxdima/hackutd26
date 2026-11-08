@@ -72,6 +72,8 @@ Test real behavior: signature rejection, allowed contacts, deduplication, timeou
 
 Maintain short bootstrap/preflight/progress documents and a live-demo runbook. A missing credential is a named live-test blocker, not a reason to fabricate success. Continue independent implementation with labeled fixtures, then return to the actual phone gates. Protect rehearsal and submission time.
 
+Commit and push verified runnable checkpoints to the existing GitHub repository so the user can request independent AI code reviews. Include current verification evidence and known limitations. Keep credentials, local databases, generated runtime artifacts and unrelated IDE files out of commits. Report the pushed commit and review link; do not force-push over other contributors' work.
+
 ## Primary references
 
 - [HackUTD tracks](https://zeroday.hackutd.co/#tracks)

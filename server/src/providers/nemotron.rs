@@ -24,11 +24,58 @@ pub struct ObservedToolResponse {
     pub observation: RequestObservation,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ToolPhase {
+    Assessment,
+    NextStep,
+    PostCall,
+}
+
+impl ToolPhase {
+    fn permits(self, name: &str) -> bool {
+        match self {
+            Self::Assessment => name == "record_assessment",
+            Self::NextStep => matches!(
+                name,
+                "ask_caller"
+                    | "offer_handoff"
+                    | "take_message"
+                    | "lookup_tactics"
+                    | "lookup_trusted_contact"
+                    | "start_trusted_callback"
+            ),
+            Self::PostCall => name == "publish_tactic",
+        }
+    }
+}
+
 impl Nemotron {
+    /// Explicit measurement override for the non-dialing preflight. Runtime
+    /// construction keeps its normal 3.5-second request limit.
+    pub fn with_request_timeout(mut self, timeout: Duration) -> Result<Self> {
+        ensure!(
+            !timeout.is_zero() && timeout <= Duration::from_secs(15),
+            "Diagnostic request timeout must be within 1..15000 milliseconds"
+        );
+        self.client = reqwest::Client::builder()
+            .timeout(timeout)
+            .connect_timeout(Duration::from_millis(1500).min(timeout))
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?;
+        Ok(self)
+    }
     pub async fn next_tool_observed(&self, messages: &[Value]) -> ObservedToolResponse {
+        self.next_tool_observed_for(messages, ToolPhase::NextStep)
+            .await
+    }
+    pub async fn next_tool_observed_for(
+        &self,
+        messages: &[Value],
+        phase: ToolPhase,
+    ) -> ObservedToolResponse {
         let start = Instant::now();
         let mut response_model = None;
-        let result = self.request(messages, &mut response_model).await;
+        let result = self.request(messages, phase, &mut response_model).await;
         let error = result.as_ref().err().map(ToString::to_string);
         let outcome = match error.as_deref() {
             None => "success",
@@ -72,10 +119,18 @@ impl Nemotron {
     pub async fn next_tool(&self, messages: &[Value]) -> Result<ModelToolCall> {
         self.next_tool_observed(messages).await.result
     }
+    pub async fn next_tool_for(
+        &self,
+        messages: &[Value],
+        phase: ToolPhase,
+    ) -> Result<ModelToolCall> {
+        self.next_tool_observed_for(messages, phase).await.result
+    }
 
     async fn request(
         &self,
         messages: &[Value],
+        phase: ToolPhase,
         response_model: &mut Option<String>,
     ) -> Result<ModelToolCall> {
         ensure!(
@@ -98,8 +153,24 @@ impl Nemotron {
             !self.model.trim().is_empty(),
             "Nemotron model configuration is missing"
         );
+        // Rust chooses the workflow phase. The model still supplies the actual
+        // assessment and next action; unchanged schemas and actor checks apply.
+        let schemas = tools::schemas();
+        let schemas: Vec<_> = schemas
+            .as_array()
+            .expect("static tool schemas")
+            .iter()
+            .filter(|schema| phase.permits(schema["function"]["name"].as_str().unwrap_or_default()))
+            .collect();
+        let choice = match phase {
+            ToolPhase::Assessment => {
+                json!({"type":"function","function":{"name":"record_assessment"}})
+            }
+            ToolPhase::NextStep => json!("required"),
+            ToolPhase::PostCall => json!({"type":"function","function":{"name":"publish_tactic"}}),
+        };
         let payload = json!({
-            "model":self.model,"messages":messages,"tools":tools::schemas(),"tool_choice":"auto",
+            "model":self.model,"messages":messages,"tools":schemas,"tool_choice":choice,
             "stream":false,"temperature":0.2,"max_tokens":512,"parallel_tool_calls":false,
             "chat_template_kwargs":{"enable_thinking":false}
         });
@@ -154,7 +225,12 @@ impl Nemotron {
                         .all(|b| b.is_ascii_alphanumeric() || b"/._:-".contains(&b))
             })
             .map(str::to_owned);
-        parse_response(body)
+        let tool = parse_response(body)?;
+        ensure!(
+            phase.permits(&tool.name),
+            "Nemotron returned a tool outside the requested phase"
+        );
+        Ok(tool)
     }
 }
 
@@ -221,7 +297,21 @@ pub fn parse_response(body: Value) -> Result<ModelToolCall> {
         .ok_or_else(|| anyhow!("Nemotron tool arguments must be a bounded JSON string"))?;
     let arguments: Value = serde_json::from_str(raw)
         .map_err(|_| anyhow!("Nemotron tool arguments are invalid JSON"))?;
-    ToolCall::parse(name, arguments.clone())?;
+    if let Err(error) = ToolCall::parse(name, arguments.clone()) {
+        // Diagnostics describe only schema-owned names/types and accepted enum
+        // values. Never retain free text, unexpected field names or reasoning.
+        let schemas = tools::schemas();
+        let schema = schemas
+            .as_array()
+            .and_then(|items| items.iter().find(|s| s["function"]["name"] == name));
+        let diagnostic = match schema {
+            Some(s) => {
+                json!({"tool":s["function"]["name"],"arguments":argument_shape(&s["function"]["parameters"], &arguments)})
+            }
+            None => json!({"tool":"unrecognized"}),
+        };
+        return Err(anyhow!("{error}; sanitized tool shape: {diagnostic}"));
+    }
     // Keep the exact assistant tool message for the native tool-result loop. Never expose content as speech.
     Ok(ModelToolCall {
         id: id.into(),
@@ -229,6 +319,46 @@ pub fn parse_response(body: Value) -> Result<ModelToolCall> {
         arguments,
         assistant_message: message.clone(),
     })
+}
+
+fn argument_shape(schema: &Value, value: &Value) -> Value {
+    let kind = match value {
+        Value::Null => "null",
+        Value::Bool(_) => "boolean",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    };
+    if let Some(allowed) = schema["enum"].as_array() {
+        return json!({"type":kind,"enum_valid":allowed.contains(value),"value":if allowed.contains(value){value.clone()}else{Value::Null}});
+    }
+    match (value, schema["type"].as_str()) {
+        (Value::Object(object), Some("object")) => {
+            let fields = schema["properties"]
+                .as_object()
+                .expect("static tool schema");
+            let shape: serde_json::Map<String, Value> = fields
+                .iter()
+                .map(|(key, nested)| {
+                    (
+                        key.clone(),
+                        object
+                            .get(key)
+                            .map_or(json!({"missing":true}), |v| argument_shape(nested, v)),
+                    )
+                })
+                .collect();
+            json!({"type":kind,"fields":shape,"unexpected_field_count":object.keys().filter(|k| !fields.contains_key(*k)).count()})
+        }
+        (Value::Array(items), Some("array")) => {
+            json!({"type":kind,"length":items.len(),"items":items.iter().take(2).map(|v| argument_shape(&schema["items"],v)).collect::<Vec<_>>()})
+        }
+        (Value::String(text), Some("object")) => json!({"type":kind,"length":text.chars().count(),
+            "redacted_structure":text.chars().take(256).map(|c| match c { '{'|'}'|'['|']'|':'|','|'\''|'"' => c, c if c.is_whitespace() => ' ', _ => 'x' }).collect::<String>()}),
+        (Value::String(text), _) => json!({"type":kind,"length":text.chars().count()}),
+        _ => json!({"type":kind}),
+    }
 }
 
 #[cfg(test)]
@@ -285,6 +415,56 @@ mod tests {
         json!({"id":"chatcmpl-fixture","model":"nvidia/nemotron-3.5-lightning-30b-a3b","choices":[{"index":0,"finish_reason":"tool_calls","message":{"role":"assistant","content":"Internal planning must never be spoken.","tool_calls":[{"id":"call_fixture_1","type":"function","function":{"name":"lookup_trusted_contact","arguments":"{\"role\":\"family\"}"}}]}}]})
     }
 
+    #[test]
+    fn invalid_tool_diagnostics_locate_shape_without_exposing_argument_text() {
+        let mut body = response();
+        body["choices"][0]["message"]["tool_calls"][0]["function"] = json!({
+            "name":"record_assessment",
+            "arguments":json!({"observation":"private-test-secret", "evidence_refs":[]}).to_string()
+        });
+        let error = parse_response(body).unwrap_err().to_string();
+        assert!(error.contains("observation"));
+        assert!(error.contains("string"));
+        assert!(!error.contains("private-test-secret"));
+        assert!(!error.contains("Internal planning"));
+    }
+
+    #[test]
+    fn stringified_observations_are_rejected_even_when_the_inner_json_is_valid() {
+        let observation = json!({"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"});
+        for name in ["record_assessment", "offer_handoff"] {
+            let mut arguments = json!({"observation":observation.to_string(),"evidence_refs":[{"turn_id":"turn-1","quote":"Delivery at the entrance."}]});
+            if name == "offer_handoff" {
+                arguments["summary"] = json!("Caller reports a delivery.");
+            }
+            let raw = arguments.to_string();
+            let mut body = response();
+            body["choices"][0]["message"]["tool_calls"][0]["function"] =
+                json!({"name":name,"arguments":raw});
+            assert!(parse_response(body).is_err());
+        }
+    }
+
+    #[test]
+    fn malformed_observations_and_evidence_are_never_repaired() {
+        let valid = json!({"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"});
+        for observation in [
+            json!(json!({"speech_act":"invented","requested_object":"routine_information","direction":"caller_supplies"}).to_string()),
+            json!(json!({"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies","dial":"private-test-secret"}).to_string()),
+            json!(json!(valid.to_string()).to_string()),
+            json!(format!("{valid}]")),
+            json!("[]"),
+        ] {
+            let mut body = response();
+            body["choices"][0]["message"]["tool_calls"][0]["function"] = json!({"name":"record_assessment","arguments":json!({"observation":observation,"evidence_refs":[{"turn_id":"turn-1","quote":"Delivery."}]}).to_string()});
+            let error = parse_response(body).unwrap_err().to_string();
+            assert!(!error.contains("private-test-secret"));
+        }
+        let mut body = response();
+        body["choices"][0]["message"]["tool_calls"][0]["function"] = json!({"name":"record_assessment","arguments":json!({"observation":valid.to_string(),"evidence_refs":"[]"}).to_string()});
+        assert!(parse_response(body).is_err());
+    }
+
     #[tokio::test]
     async fn observations_retain_provider_model_and_measure_the_request() {
         let (url, server) =
@@ -300,6 +480,28 @@ mod tests {
         assert_eq!(observed.observation.outcome, "success");
         assert!((50..3500).contains(&observed.observation.elapsed_ms));
         server.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn explicit_diagnostic_timeout_remains_bounded_and_enforced() {
+        let (url, server) =
+            local_server_delayed(200, response().to_string(), Duration::from_millis(100)).await;
+        let model = Nemotron::new("test-only".into(), url.clone(), "test-model".into())
+            .with_request_timeout(Duration::from_millis(10))
+            .unwrap();
+        let observed = model.next_tool_observed(&[]).await;
+        assert_eq!(observed.observation.outcome, "timeout");
+        server.abort();
+        assert!(
+            Nemotron::new("test-only".into(), url.clone(), "test-model".into())
+                .with_request_timeout(Duration::ZERO)
+                .is_err()
+        );
+        assert!(
+            Nemotron::new("test-only".into(), url, "test-model".into())
+                .with_request_timeout(Duration::from_secs(16))
+                .is_err()
+        );
     }
 
     #[tokio::test]
@@ -395,9 +597,37 @@ mod tests {
         let body: Value = serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
         assert_eq!(body["model"], "nvidia/nemotron-3.5-lightning-30b-a3b");
         assert_eq!(body["parallel_tool_calls"], false);
+        assert_eq!(body["tool_choice"], "required");
         assert_eq!(body["chat_template_kwargs"]["enable_thinking"], false);
         assert_eq!(body["messages"][3]["tool_call_id"], "previous-tool");
-        assert_eq!(body["tools"].as_array().unwrap().len(), 8);
+        assert_eq!(body["tools"].as_array().unwrap().len(), 6);
+        assert!(body["tools"].as_array().unwrap().iter().all(|tool| ToolPhase::NextStep.permits(tool["function"]["name"].as_str().unwrap())));
+    }
+
+    #[tokio::test]
+    async fn mandatory_phases_send_named_tool_and_reject_wrong_phase_responses() {
+        for (phase, name) in [
+            (ToolPhase::Assessment, "record_assessment"),
+            (ToolPhase::PostCall, "publish_tactic"),
+        ] {
+            let (url, received) = local_server(200, response().to_string()).await;
+            let model = Nemotron::new("test-only".into(), url, "test-model".into());
+            // This provider fixture returns a valid lookup, which is not valid
+            // in either mandatory phase. HTTP200 cannot bypass the phase gate.
+            let result = model
+                .next_tool_for(&[json!({"role":"user","content":"synthetic"})], phase)
+                .await;
+            let request = received.await.unwrap();
+            let body: Value =
+                serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+            assert_eq!(
+                body["tool_choice"],
+                json!({"type":"function","function":{"name":name}})
+            );
+            assert_eq!(body["tools"].as_array().unwrap().len(), 1);
+            assert_eq!(body["tools"][0]["function"]["name"], name);
+            assert!(result.is_err());
+        }
     }
 
     #[tokio::test]

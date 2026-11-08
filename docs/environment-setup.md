@@ -1,15 +1,18 @@
 # Configure FirstRing locally
 
-Real phone tests remain **DEPENDENT ON SETUP**. `.env` was created from the example on Nov 7; its public origin points to the running temporary voice tunnel and `DEMO_ADMIN_TOKEN` was generated locally without being displayed. The rebuilt service reads this file, currently in replay mode. Provider credential fields are still empty at the latest check. The current authorization permits exactly one outbound smoke-test attempt to Sarah / Phone B. Family calling stays disabled.
+The first real inbound test **passed Nov 7 at 20:42 Central**: the user heard the assistant and pressed 1; signed caller/keypad/terminal events and Twilio's completed 15-second inbound call agree. See [inbound evidence](evidence/inbound-probe-2026-11-07.json). Twilio is Full/active, Photon default profile has the user's purchased line, and `PHOTON_NUMBER` is configured. The application runs in `live` / `probe` mode through the existing tunnel.
+
+All three calling flags remain false. The local ledger contains **0 outbound action reservations**; Sarah's single authorized attempt is unspent. The user's personal phone is caller A only, not Sarah / Phone B. Family remains unenrolled and disabled. The initial voice was rated poor; `Polly.Joanna-Neural` / `en-US` is now deployed for Say/Gather, with a listening comparison pending.
 
 ## Remaining account actions
 
-1. **Inbound Photon/Twilio:** Photon **Beta → project → Voice → Lines**: use the assigned voice-capable line as `PHOTON_NUMBER` and open its SIP profile. A shared iMessage assignment cannot carry voice; do not buy another messaging plan to solve this. Twilio **Console → Account dashboard** supplies `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`. Twilio **Communications → Voice → SIP domains → Credential Lists**: attach the inbound login to the SIP Domain, then enter that same pair in Photon profile **Inbound calls**, destination `sips:YOURDOMAIN.sip.twilio.com`, TLS, and save. These are provider-to-provider settings, not the Photon outbound env variables. Set the SIP Domain Voice URL to `POST ${PUBLIC_BASE_URL}/voice/incoming`. The local operator token is already generated.
-2. **Outbound Photon/Sarah:** the assigned Photon profile's **Outbound calls** supplies `PHOTON_SIP_USERNAME`, `PHOTON_SIP_PASSWORD`, and **SIP connection** `PHOTON_SIP_HOST`/`PHOTON_SIP_PORT`. Verify **MD5 (legacy)**, TLS and compatible secure media; use the connection host, not the authentication realm. Set designated `SARAH_TEST_E164`. Keep `HANDOFF_CALLS_ENABLED=false`, `FAMILY_CALLS_ENABLED=false`; the one existing smoke authorization uses `TEST_CALLS_AUTHORIZED=true` only when ready. Use the app probe once, not an additional terminal call.
-3. **Hosted inference:** NVIDIA **API Catalog → Nemotron 3.5 Lightning → Get API Key** supplies `NVIDIA_API_KEY`. Keep the supplied model/URL constants. The existing `--model-probe` runs independently of phones; the held-out evaluator runs only after that protocol gate passes.
-4. **Optional Brev/NGC: deferred by the user; no action needed for the first call.** When resumed, Brev **organization → launch/create instance → GPU selection** supplies the actual GPU/region and compute/storage quote. NVIDIA **NGC → account menu → Setup → Generate Personal Key**, with **NGC Catalog** scope, supplies `NGC_API_KEY` for the dedicated GPU host. Entitlement, Zeroshot approval and supported tag must then be confirmed. `MAGPIE_ZERO_SHOT_URL` stays blank. See [Brev preparation](brev-speech-preflight.md); no GPU has been allocated.
+1. **Sarah / Phone B:** designate the separate consenting second phone and set `SARAH_TEST_E164` locally. This is the only missing core phone variable. Keep `TEST_CALLS_AUTHORIZED=false` until B is designated and ready; then enable it for the one authorized smoke attempt. Keep handoff and family flags false. A-only testing does not require outbound authorization.
 
-Only these external setup facts remain. No additional messaging purchase, model migration or GPU is needed for the initial transport test. Configure values locally; never paste credentials in chat.
+The added card resolved Photon outbound entitlement. MD5 outbound credentials are saved locally and read back with the assigned TLS endpoint; inbound TLS and required SRTP remain configured. The user purchased the Photon number on the default profile, which now has one line. Outbound delivery to B is still untested. Hosted model protocol passed, while held-out behavior failed (3/12 composite passes); see [verification](verification.md). Relay/model conversation has not been verified by phone. Brev remains deferred.
+
+The configured Twilio SIP domain is `hackutd26-firstring-d232a271.sip.twilio.com`. It requires TLS/SRTP and an attached credential list, routes Voice via POST to the current `PUBLIC_BASE_URL` plus `/voice/incoming`, and status to `/voice/status`. Locally generated inbound SIP credentials are stored in `.env` as `TWILIO_SIP_USERNAME` / `TWILIO_SIP_PASSWORD`, separate from Photon outbound credentials. No credentials were rotated. The project-local setup records retain resource IDs and prevent blind re-creation after ambiguous results.
+
+Setup used the [official Twilio SIP API](https://www.twilio.com/docs/voice/sip/api/sip-domain-resource), [Photon Beta API](https://api.photon.codes/openapi.json) and [current cookbook](https://photon.codes/docs/beta/cookbooks/voice/twilio.md). No MCP is required: native authenticated APIs already connect the services. No Twilio/Photon plugin was found in the available catalog; no plugin/global browser configuration was installed.
 
 Create `.env` from `.env.example` without overwriting any existing file, then edit locally. The server reads `.env` automatically on startup; restart after changes. Git ignores `.env`, `.env.*`, databases and `.tools/`; only `.env.example` is intentionally tracked.
 
@@ -20,7 +23,7 @@ chmod 600 .env
 git check-ignore .env
 ```
 
-`DEMO_ADMIN_TOKEN` is already generated in `.env` with mode600 file permissions; an authenticated local API read succeeded without displaying it. Enter its value locally in the console; do not send it in chat. Preserve it on subsequent setup edits. This token is not a Twilio or Photon credential. The separate replay helper uses `.tools/replay-admin-token`; the currently running normal service uses `.env`.
+`DEMO_ADMIN_TOKEN` is already generated in `.env` with mode 600 file permissions; an authenticated local API read succeeded without displaying it. Enter its value locally in the console; do not send it in chat. Preserve it on subsequent setup edits. This token is not a Twilio or Photon credential. The separate replay helper uses `.tools/replay-admin-token`; the currently running normal service uses `.env`.
 
 ## Values needed for the first two-phone test
 
@@ -30,18 +33,18 @@ git check-ignore .env
 | `PORT` | Local choice; keep `8080` unless another service uses it. |
 | `DATABASE_URL` | Local choice; keep `sqlite:firstring.db`. Preserve this database because it contains the one-attempt ledger. |
 | `DEMO_ADMIN_TOKEN` | Generate locally as above; at least 24 characters. |
-| `DEMO_EXECUTION_MODE` | Keep `replay` while configuring. Set `live` only for the authorized manual-A/single-B test. |
-| `TEST_CALLS_AUTHORIZED` | Set `true` for the already-authorized single Sarah smoke attempt once setup is ready. This does not authorize retries or other phone roles. |
-| `TWILIO_ACCOUNT_SID` | Open the Twilio Console account dashboard and copy the live Account SID (`AC…`) for the account owning your SIP Domain. |
-| `TWILIO_AUTH_TOKEN` | Reveal/copy that same account's live Auth Token locally. The app uses it for API Basic auth and signature validation. An API Key Secret or Twilio test credential is not a replacement. |
-| `PHOTON_NUMBER` | In the **Photon Beta / 2.0** project, open **Voice → Lines** and copy the voice-enabled number assigned to the intended SIP profile, in E.164 format. Use the SMS-number voice route in the project plan. |
+| `DEMO_EXECUTION_MODE` | Current phone checkpoint uses `live`; use an isolated `replay` service for development fixtures. |
+| `TEST_CALLS_AUTHORIZED` | Keep `false` for A-only testing. Enable only when the designated `SARAH_TEST_E164` is ready for the single smoke attempt; retries and other roles are not covered. |
+| `TWILIO_ACCOUNT_SID` | Already configured; authenticated account status is Full / active. Preserve the value. |
+| `TWILIO_AUTH_TOKEN` | Already configured and authenticated with that account. Used for API Basic auth and signature validation; preserve it. |
+| `PHOTON_NUMBER` | Already configured from the purchased line on Photon Beta / 2.0's default SIP profile. Preserve its E.164 value. |
 | `PHOTON_SIP_HOST` / `PHOTON_SIP_PORT` | In that Photon Voice SIP profile, open **Outbound calls** and copy the assigned **SIP connection** host/port. The guide example is `sip.photon.codes:5061`; use the actual assignment, not the authentication realm. |
 | `PHOTON_SIP_USERNAME` / `PHOTON_SIP_PASSWORD` | Generate/copy the **outbound** credentials in the same Photon Voice profile. Configure digest **MD5 (legacy)** for Twilio compatibility and retain TLS/compatible SRTP. |
 | `SARAH_TEST_E164` | Your designated consenting Phone B's actual E.164 number, `+` followed by country code and subscriber digits. It is entered by you, never selected by the model or caller. |
 | `VOICE_TRANSPORT` | Keep `probe` for Milestone 1; no model key is required for that checkpoint. |
 | `MAX_CALL_SECONDS` | Local duration cap; keep `180` (range 15–600). |
 
-Twilio documents the dashboard credentials in its [Auth Token reference](https://www.twilio.com/docs/iam/api/authtoken). Use a funded/enabled account; [trial restrictions](https://www.twilio.com/docs/usage/trials/try-out-voice) prevent the final Relay/SIP architecture. No purchase or account change has been performed by this implementation.
+Twilio documents the dashboard credentials in its [Auth Token reference](https://www.twilio.com/docs/iam/api/authtoken). Use a funded/enabled account; [trial restrictions](https://www.twilio.com/docs/usage/trials/try-out-voice) prevent the final Relay/SIP architecture. The user completed the account upgrade, purchased the Photon line, and initiated the verified inbound call. No outbound call has been placed.
 
 The Photon values and current console labels come from its [official Beta Twilio cookbook](https://photon.codes/docs/beta/cookbooks/voice/twilio.md). If HTML access fails, the `.md` version contains the same official walkthrough. Profile edits can affect other numbers using that profile; use the intended test profile.
 
@@ -59,13 +62,13 @@ bash scripts/voice-tunnel.sh
 # update the Twilio SIP Domain Voice webhook. Keep this process running.
 ```
 
-This is the one prepared ingress option. Reuse the running process while it is available; its current URL is already in `.env`. Do not add `--allowed-mail` or an access-login policy: provider webhooks cannot use browser authentication. [Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) have no uptime guarantee and change hostname on restart. Their lack of SSE is handled by using the operator console at `http://127.0.0.1:8080`, while the public URL carries only voice HTTP/WSS and later generated audio. [WebSocket support](https://developers.cloudflare.com/network/websockets/) is documented; a real signed Relay session still needs verification. Public health succeeded and unsigned POST/upgrade requests returned 403; those checks do not count as a phone or valid-signature gate.
+Reuse the running ingress process; its current URL is already in `.env`. Do not add `--allowed-mail` or an access-login policy: provider webhooks cannot use browser authentication. [Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) have no uptime guarantee and change hostname on restart. Their lack of SSE is handled by using the operator console at `http://127.0.0.1:8080`, while the public URL carries voice HTTP/WSS and later generated audio. Real signed inbound HTTP is now verified. [WebSocket support](https://developers.cloudflare.com/network/websockets/) is documented, but the actual signed Relay session remains pending. Public/local health returned 200 and unsigned POST returned 403 after the preset-voice deployment.
 
 ## Later conversation values
 
 | Variable | Where its value comes from / current setting |
 |---|---|
-| `NVIDIA_API_KEY` | Sign in to the [NVIDIA API Catalog model page](https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b), use **Get API Key**, and save it locally. NVIDIA's [quickstart](https://docs.api.nvidia.com/nim/docs/api-quickstart) describes this flow. Access/credits/tool support still require a real probe. |
+| `NVIDIA_API_KEY` | Already authenticated for the [requested model](https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b). Native protocol passed; held-out behavior failed. No new key collection is needed. |
 | `NEMOTRON_CHAT_URL` | Keep the provided NVIDIA chat-completions URL. This is an application constant, not a value to invent. |
 | `NEMOTRON_MODEL` | Keep `nvidia/nemotron-3.5-lightning-30b-a3b`; do not silently substitute a model. |
 | `VOICE_TRANSPORT` | After the first phone checkpoint, use `relay` after Twilio ConversationRelay onboarding/addendum. Use `gather` for the explicit setup-blocked fallback. |
@@ -74,7 +77,7 @@ This is the one prepared ingress option. Reuse the running process while it is a
 | `FAMILY_CALLS_ENABLED` | Keep `false`: family is not enrolled or authorized. |
 | `FAMILY_TEST_E164` / `CLINIC_TEST_E164` | Leave blank until the roles have designated consenting endpoints and their test scope is authorized. |
 
-Optional `MAGPIE_ZERO_SHOT_URL`, `PHOTON_API_KEY`, `PHOTON_PROJECT_ID`, and `PHOTON_WEBHOOK_SECRET` are reserved for future clone/messaging adapters and are not used by the current build. Leave them blank. An approved Zeroshot deployment would supply its own HTTPS endpoint; Photon messaging would use a project API key/project ID and the configured webhook signing secret, independently of voice SIP credentials. None is needed for the core transport test.
+`PHOTON_API_KEY` is already configured and authenticated for the read-only setup audit; preserve it. Current voice call creation still uses the separate Photon SIP credentials through Twilio. `PHOTON_PROJECT_ID` and `PHOTON_WEBHOOK_SECRET` remain optional for future messaging integration. `MAGPIE_ZERO_SHOT_URL` stays blank while Brev is deferred. None of these optional adapters is needed for the core transport test.
 
 ## Check without making a call
 
@@ -84,4 +87,4 @@ bash scripts/cargo.sh run --bin preflight
 
 The default reports variable **names** that are present/missing, not their values, and performs zero external requests. Presence does not prove correct flags, provider access or authorization. With the NVIDIA key ready, the explicit `--model-probe` flag makes bounded model-only requests; it never dials.
 
-When ready, stop the separate replay process, start `bash scripts/cargo.sh run --bin firstring`, then follow the [two-phone checklist](demo-runbook.md). A calls manually; the console's authenticated Phone B action uses only `contact_id="sarah"`. Unknown create outcomes remain reserved and must not be retried blindly.
+Preserve the current live/probe service, tunnel and ledger. Follow the [two-phone checklist](demo-runbook.md) once B is designated. A calls manually; the console's authenticated Phone B action uses only `contact_id="sarah"`. Unknown create outcomes remain reserved and must not be retried blindly.

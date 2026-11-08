@@ -2,7 +2,9 @@
 
 A Rust call-screening prototype for HackUTD 2026. A disclosed assistant screens unfamiliar callers, offers a private keypad choice, and withdraws that offer when the request changes. Rust owns permission and provider effects. The console shows actual actor events and separates real execution from authored replay.
 
-**Current checkpoint:** local transport, consent/revocation, model adapter, console and community logic are implemented. Phone audio, live Nemotron access and Relay onboarding remain **pending setup and live testing**. No real outbound call has been made. The only authorized external dial is one smoke-test attempt to locally configured Sarah / Phone B. Family calls remain disabled.
+**Current checkpoint:** the first real inbound call passed **Nov 7 at 20:42 Central**: the user heard the disclosed assistant, pressed 1, and the signed events reconcile with Twilio's completed 15-second call. See [inbound evidence](docs/evidence/inbound-probe-2026-11-07.json). The user rated the initial voice poor; Say/Gather now uses `Polly.Joanna-Neural` / `en-US`, with a listening comparison pending. Phone B and Relay/model conversation remain unverified; M1 is not complete.
+
+Local consent/revocation, model adapter, console and community logic are implemented. Hosted Nemotron native protocol passed, but held-out behavior passed only 3/12 composite cases; see [actual results](docs/verification.md). The purchased Photon line is configured. Runtime is `live` / `probe`, all three calling flags are false, and there are 0 outbound actions/reservations. Sarah's one authorized smoke attempt is unspent; `SARAH_TEST_E164` is the only missing core phone variable. The user's personal phone is caller A only. Family remains disabled and Brev is deferred.
 
 ## Run the verified local replay
 
@@ -23,16 +25,16 @@ A 58-second labeled replay video and sanitized screenshot are saved in `.tools/a
 
 ## Configure the real two-phone gate
 
-See [where to obtain every environment value](docs/environment-setup.md). Copy `.env.example` to `.env` if it does not already exist. Configure secrets and designated numbers locally. Keep `HANDOFF_CALLS_ENABLED=false` and `FAMILY_CALLS_ENABLED=false`. For the single authorized smoke test set `VOICE_TRANSPORT=probe`, `DEMO_EXECUTION_MODE=live`, and `TEST_CALLS_AUTHORIZED=true` after checking the assigned Photon profile values.
+See [where to obtain every environment value](docs/environment-setup.md). Preserve the existing `.env`, service, tunnel and ledger. Keep `VOICE_TRANSPORT=probe`, `DEMO_EXECUTION_MODE=live`, and all calling flags false for A-only testing. Designate Sarah / Phone B and configure `SARAH_TEST_E164` locally. Only when B is ready for the single authorized smoke attempt, enable `TEST_CALLS_AUTHORIZED` and restart; keep `HANDOFF_CALLS_ENABLED=false` and `FAMILY_CALLS_ENABLED=false`.
 
 ```sh
 bash scripts/cargo.sh run --bin preflight
 bash scripts/cargo.sh run --bin firstring
 ```
 
-Configure the Photon beta voice profile and authenticated Twilio SIP Domain to the public HTTPS origin. The inbound Voice URL is `/voice/incoming`; configure inbound status notifications to `/voice/status` where supported. All voice endpoints validate the Twilio signature using the configured URL; there is no validation bypass. An authenticated operator requests Phone B with its contact ID after A calls manually. The durable global smoke budget allows one attempt, including uncertain outcomes. Reset does not clear that reservation.
+The purchased Photon line, authenticated Twilio SIP Domain and public HTTPS origin are configured. The inbound Voice URL is `/voice/incoming`, with status notifications to `/voice/status`. All voice endpoints validate the Twilio signature using the configured URL; there is no validation bypass. An authenticated operator requests Phone B with its contact ID after A calls manually. The durable global smoke budget allows one attempt, including uncertain outcomes. Reset does not clear that reservation.
 
-Follow [provider preflight](docs/provider-preflight.md) and the concrete [phone checklist](docs/demo-runbook.md). Provider account provisioning, tunnel/deployment, additional phone tests and family enrollment are not completed by this repository. Do not enable a later calling mode until its external test scope is authorized.
+Follow [provider preflight](docs/provider-preflight.md) and the remaining [phone checklist](docs/demo-runbook.md). Phone B delivery, Relay conversation, private handoff/revocation and family enrollment remain live gates. Do not enable a later calling mode until its external test scope is authorized.
 
 The primary conversation transport is `VOICE_TRANSPORT=relay`; `gather` is the explicit turn-based fallback after a 30–45 minute Relay onboarding blocker. Gather pauses A while the private offer is pending, so it **does not demonstrate concurrent revocation**. Relay's optional undocumented speaker-event envelope still requires signed live capture; that subscription is disabled. Documented partial prompts and interruptions hold consent, while assistant diagnostics cannot cancel their own reply. No raw audio/SIP server is used.
 

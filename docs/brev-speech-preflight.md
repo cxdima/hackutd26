@@ -1,5 +1,8 @@
 # Optional Brev speech preflight
 
+User screenshot confirms a **$60 Brev balance**; it does not establish a GPU quote, Magpie access or NGC entitlement. Provisioning remains deferred. The current [NVIDIA sponsor challenge](https://zeroday.hackutd.co/#tracks) requires Nemotron and multi-step tool/API workflows, but does not require Brev or self-hosting. Hosted Nemotron is consistent with that deployment-neutral wording; no private booth/portal amendment has been verified. Preserve credits for an optional speech experiment after the core phone gate, rather than moving the already working hosted decision model.
+
+
 Checked 2026-11-07. **User explicitly deferred GPU provisioning while core phone integration proceeds. Preparation only: no GPU provisioned, image pulled, account changed, purchase/top-up made, or adapter implemented.** The reported $60 Brev credits are a budget input, not verified model access or permission to spend. If later resumed, first experiment target: at most $10 including storage/other charges. Core phone work keeps native Relay speech.
 
 ## Step 1/5 — Establish access and the actual quote
@@ -120,7 +123,7 @@ The name above must be the actual approved **Brev instance name**, not merely th
 
 Planned FirstRing integration, not yet implemented:
 
-- Authenticated voice-reference enrollment binds consent, household and expiry. Validate decoded WAV/size/duration; keep reference private; expire after 1,800 seconds and delete on reset or withdrawal.
+- Authenticated voice-reference enrollment binds consent, household and expiry. Validate decoded WAV/size/duration; keep reference private; expire after 1, 800 seconds and delete on reset or withdrawal.
 - Rust submits only validated assistant text and the enrolled reference through the private NIM connection. Bound concurrency, response size and timeout; cancel/discard obsolete generation/epoch results. Keep the core six-second turn budget; slow synthesis falls back to native speech before either output is sent.
 - Store validated generated WAV under a cryptographically random opaque token on FirstRing's own configured HTTPS `/audio/<token>.wav` route. Bind token to session, intended leg, generation/epoch and 300-second expiry. Recheck expiry and revocation per request; return no body after invalidation. Permit bounded provider fetch/retry while valid. Use `Content-Type: audio/wav` and `Cache-Control: private, no-store`; omit audio tokens and reference bytes from logs/UI/events.
 - Send Relay `play` with that FirstRing URL, `loop:1`, `interruptible:true`, `preemptible:true`. Never send both `text` and `play` for the same reply. Keep private summary media on B; do not expose the reference to Twilio. An accepted message means `audio.requested`; an actual phone playback remains a separate gate.
