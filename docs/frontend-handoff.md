@@ -103,4 +103,5 @@ There were 10 jobs in a 12-job budget. The balance went from 270 to 240.5 credit
 - On connect, the full event history streams in. The trace fills in within a few seconds on the current database.
 - The demo uses times relative to "now", so its dates change between visits.
 - No audio examples ship. No approved FirstRing voice sample exists to play, so the page doesn't imitate one with browser speech.
-- `AGENTS.md` still says to use React for a new frontend. A one-line note recording the user's Angular decision was added to the stack bullet.
+- `AGENTS.md` previously said React for a new frontend. Its stack bullet now records the user's Angular decision.
+- Design-system drift found by the Impeccable documenter. These were fixed: a second status bug on the call page (now a plain "Source" field), "Example" tags using the `bug-demo` class, and an unused display token (the hero now uses `text-display`). Still open: several console title sizes are inline values rather than tokens, there is one hard-coded field-hover border colour, and the SVG ring colours are hex values. `DESIGN.md` and `.impeccable/design.json` record the shipped system.

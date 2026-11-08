@@ -41,10 +41,7 @@ import { OutcomeChip } from './outcome-chip';
     @let s = c.session;
     <article aria-labelledby="call-title">
       <header class="border-b-2 border-ink pb-6">
-        <div class="flex flex-wrap items-center gap-2">
-          <app-outcome-chip [outcome]="c.outcome" />
-          <span class="bug" [class]="modeClass()">{{ modeLabel() }}</span>
-        </div>
+        <app-outcome-chip [outcome]="c.outcome" />
         <h1
           id="call-title"
           class="mt-4 max-w-[40ch] text-[clamp(1.6rem,1.3rem+1.2vw,2.35rem)] leading-[1.15] font-extrabold tracking-[-0.02em]"
@@ -69,6 +66,10 @@ import { OutcomeChip } from './outcome-chip';
           <div class="flex gap-1.5">
             <dt class="text-muted">Caller identity</dt>
             <dd class="font-semibold">Unverified</dd>
+          </div>
+          <div class="flex gap-1.5">
+            <dt class="text-muted">Source</dt>
+            <dd class="font-semibold">{{ modeLabel() }}</dd>
           </div>
         </dl>
       </header>
@@ -427,13 +428,6 @@ export class CallDetail {
       : this.call().session.execution_mode === 'live'
         ? 'Live call'
         : 'Replay',
-  );
-  readonly modeClass = computed(() =>
-    this.store.isDemo()
-      ? 'bug-demo'
-      : this.call().session.execution_mode === 'live'
-        ? 'bug-live'
-        : 'bug-replay',
   );
 
   readonly canOperate = computed(() => this.store.source() === 'live');

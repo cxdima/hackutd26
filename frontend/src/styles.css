@@ -27,7 +27,7 @@
   --color-amber-ink: #7a4a00;
   --color-amber-wash: #fbefd6;
 
-  --text-display: clamp(3rem, 1.6rem + 4.4vw, 5.6rem);
+  --text-display: clamp(2.75rem, 1.1rem + 4.1vw, 5.25rem);
   --text-display--line-height: 0.98;
   --text-display--letter-spacing: -0.035em;
   --text-section: clamp(2.25rem, 1.55rem + 2.6vw, 3.9rem);
@@ -226,6 +226,7 @@
     color: var(--color-ink);
     box-shadow: inset 0 0 0 2px var(--color-ink);
   }
+  .on-ink .bug-example,
   .on-ink .bug-replay,
   .on-ink .bug-demo {
     background: transparent;

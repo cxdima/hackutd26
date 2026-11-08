@@ -1,0 +1,554 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-08T09:35:33+00:00",
+  "title": "Design System: FirstRing",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "Studio Paper",
+        "canonical": "#f7f7f2",
+        "oklch": "oklch(97.5% 0.007 106.5)",
+        "tonalRamp": [
+          "oklch(15% 0.007 106.5)",
+          "oklch(26% 0.007 106.5)",
+          "oklch(38% 0.007 106.5)",
+          "oklch(50% 0.007 106.5)",
+          "oklch(62% 0.007 106.5)",
+          "oklch(74% 0.007 106.5)",
+          "oklch(85% 0.007 106.5)",
+          "oklch(95% 0.007 106.5)"
+        ]
+      },
+      "paper-2": {
+        "role": "neutral",
+        "displayName": "Paper 2",
+        "canonical": "#efefe7",
+        "oklch": "oklch(95.0% 0.011 106.6)",
+        "tonalRamp": [
+          "oklch(15% 0.011 106.6)",
+          "oklch(26% 0.011 106.6)",
+          "oklch(38% 0.011 106.6)",
+          "oklch(50% 0.011 106.6)",
+          "oklch(62% 0.011 106.6)",
+          "oklch(74% 0.011 106.6)",
+          "oklch(85% 0.011 106.6)",
+          "oklch(95% 0.011 106.6)"
+        ]
+      },
+      "paper-3": {
+        "role": "neutral",
+        "displayName": "Paper 3",
+        "canonical": "#e3e4da",
+        "oklch": "oklch(91.5% 0.013 111.3)",
+        "tonalRamp": [
+          "oklch(15% 0.013 111.3)",
+          "oklch(26% 0.013 111.3)",
+          "oklch(38% 0.013 111.3)",
+          "oklch(50% 0.013 111.3)",
+          "oklch(62% 0.013 111.3)",
+          "oklch(74% 0.013 111.3)",
+          "oklch(85% 0.013 111.3)",
+          "oklch(95% 0.013 111.3)"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "#d2d4c8",
+        "oklch": "oklch(86.5% 0.016 114.4)",
+        "tonalRamp": [
+          "oklch(15% 0.016 114.4)",
+          "oklch(26% 0.016 114.4)",
+          "oklch(38% 0.016 114.4)",
+          "oklch(50% 0.016 114.4)",
+          "oklch(62% 0.016 114.4)",
+          "oklch(74% 0.016 114.4)",
+          "oklch(85% 0.016 114.4)",
+          "oklch(95% 0.016 114.4)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Broadcast Charcoal",
+        "canonical": "#171c18",
+        "oklch": "oklch(22.0% 0.011 151.2)",
+        "tonalRamp": [
+          "oklch(15% 0.011 151.2)",
+          "oklch(26% 0.011 151.2)",
+          "oklch(38% 0.011 151.2)",
+          "oklch(50% 0.011 151.2)",
+          "oklch(62% 0.011 151.2)",
+          "oklch(74% 0.011 151.2)",
+          "oklch(85% 0.011 151.2)",
+          "oklch(95% 0.011 151.2)"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Ink 2",
+        "canonical": "#222923",
+        "oklch": "oklch(27.2% 0.015 149.3)",
+        "tonalRamp": [
+          "oklch(15% 0.015 149.3)",
+          "oklch(26% 0.015 149.3)",
+          "oklch(38% 0.015 149.3)",
+          "oklch(50% 0.015 149.3)",
+          "oklch(62% 0.015 149.3)",
+          "oklch(74% 0.015 149.3)",
+          "oklch(85% 0.015 149.3)",
+          "oklch(95% 0.015 149.3)"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Ink 3",
+        "canonical": "#303832",
+        "oklch": "oklch(33.1% 0.015 153.1)",
+        "tonalRamp": [
+          "oklch(15% 0.015 153.1)",
+          "oklch(26% 0.015 153.1)",
+          "oklch(38% 0.015 153.1)",
+          "oklch(50% 0.015 153.1)",
+          "oklch(62% 0.015 153.1)",
+          "oklch(74% 0.015 153.1)",
+          "oklch(85% 0.015 153.1)",
+          "oklch(95% 0.015 153.1)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#59615b",
+        "oklch": "oklch(48.4% 0.014 153.4)",
+        "tonalRamp": [
+          "oklch(15% 0.014 153.4)",
+          "oklch(26% 0.014 153.4)",
+          "oklch(38% 0.014 153.4)",
+          "oklch(50% 0.014 153.4)",
+          "oklch(62% 0.014 153.4)",
+          "oklch(74% 0.014 153.4)",
+          "oklch(85% 0.014 153.4)",
+          "oklch(95% 0.014 153.4)"
+        ]
+      },
+      "muted-on-ink": {
+        "role": "neutral",
+        "displayName": "Muted on Ink",
+        "canonical": "#b8bfb6",
+        "oklch": "oklch(79.7% 0.015 138.7)",
+        "tonalRamp": [
+          "oklch(15% 0.015 138.7)",
+          "oklch(26% 0.015 138.7)",
+          "oklch(38% 0.015 138.7)",
+          "oklch(50% 0.015 138.7)",
+          "oklch(62% 0.015 138.7)",
+          "oklch(74% 0.015 138.7)",
+          "oklch(85% 0.015 138.7)",
+          "oklch(95% 0.015 138.7)"
+        ]
+      },
+      "lime": {
+        "role": "primary",
+        "displayName": "Tally Lime",
+        "canonical": "#76b900",
+        "oklch": "oklch(71.3% 0.194 130.8)",
+        "tonalRamp": [
+          "oklch(15% 0.194 130.8)",
+          "oklch(26% 0.194 130.8)",
+          "oklch(38% 0.194 130.8)",
+          "oklch(50% 0.194 130.8)",
+          "oklch(62% 0.194 130.8)",
+          "oklch(74% 0.194 130.8)",
+          "oklch(85% 0.194 130.8)",
+          "oklch(95% 0.194 130.8)"
+        ]
+      },
+      "lime-hover": {
+        "role": "primary",
+        "displayName": "Tally Lime Bright",
+        "canonical": "#86cc0b",
+        "oklch": "oklch(76.9% 0.206 130.2)",
+        "tonalRamp": [
+          "oklch(15% 0.200 130.2)",
+          "oklch(26% 0.200 130.2)",
+          "oklch(38% 0.200 130.2)",
+          "oklch(50% 0.200 130.2)",
+          "oklch(62% 0.200 130.2)",
+          "oklch(74% 0.200 130.2)",
+          "oklch(85% 0.200 130.2)",
+          "oklch(95% 0.200 130.2)"
+        ]
+      },
+      "lime-ink": {
+        "role": "primary",
+        "displayName": "Field Lime Ink",
+        "canonical": "#3a6300",
+        "oklch": "oklch(45.2% 0.125 131.9)",
+        "tonalRamp": [
+          "oklch(15% 0.125 131.9)",
+          "oklch(26% 0.125 131.9)",
+          "oklch(38% 0.125 131.9)",
+          "oklch(50% 0.125 131.9)",
+          "oklch(62% 0.125 131.9)",
+          "oklch(74% 0.125 131.9)",
+          "oklch(85% 0.125 131.9)",
+          "oklch(95% 0.125 131.9)"
+        ]
+      },
+      "lime-wash": {
+        "role": "primary",
+        "displayName": "Lime Wash",
+        "canonical": "#e6f1cf",
+        "oklch": "oklch(94.1% 0.046 121.9)",
+        "tonalRamp": [
+          "oklch(15% 0.046 121.9)",
+          "oklch(26% 0.046 121.9)",
+          "oklch(38% 0.046 121.9)",
+          "oklch(50% 0.046 121.9)",
+          "oklch(62% 0.046 121.9)",
+          "oklch(74% 0.046 121.9)",
+          "oklch(85% 0.046 121.9)",
+          "oklch(95% 0.046 121.9)"
+        ]
+      },
+      "magenta": {
+        "role": "secondary",
+        "displayName": "Signal Magenta",
+        "canonical": "#e20074",
+        "oklch": "oklch(59.0% 0.239 1.3)",
+        "tonalRamp": [
+          "oklch(15% 0.200 1.3)",
+          "oklch(26% 0.200 1.3)",
+          "oklch(38% 0.200 1.3)",
+          "oklch(50% 0.200 1.3)",
+          "oklch(62% 0.200 1.3)",
+          "oklch(74% 0.200 1.3)",
+          "oklch(85% 0.200 1.3)",
+          "oklch(95% 0.200 1.3)"
+        ]
+      },
+      "magenta-ink": {
+        "role": "secondary",
+        "displayName": "Suspect Magenta Ink",
+        "canonical": "#b3005c",
+        "oklch": "oklch(49.6% 0.201 0.7)",
+        "tonalRamp": [
+          "oklch(15% 0.200 0.7)",
+          "oklch(26% 0.200 0.7)",
+          "oklch(38% 0.200 0.7)",
+          "oklch(50% 0.200 0.7)",
+          "oklch(62% 0.200 0.7)",
+          "oklch(74% 0.200 0.7)",
+          "oklch(85% 0.200 0.7)",
+          "oklch(95% 0.200 0.7)"
+        ]
+      },
+      "magenta-on-ink": {
+        "role": "secondary",
+        "displayName": "Magenta on Ink",
+        "canonical": "#ff74b5",
+        "oklch": "oklch(74.2% 0.182 353.2)",
+        "tonalRamp": [
+          "oklch(15% 0.182 353.2)",
+          "oklch(26% 0.182 353.2)",
+          "oklch(38% 0.182 353.2)",
+          "oklch(50% 0.182 353.2)",
+          "oklch(62% 0.182 353.2)",
+          "oklch(74% 0.182 353.2)",
+          "oklch(85% 0.182 353.2)",
+          "oklch(95% 0.182 353.2)"
+        ]
+      },
+      "magenta-wash": {
+        "role": "secondary",
+        "displayName": "Magenta Wash",
+        "canonical": "#fbe4ef",
+        "oklch": "oklch(94.1% 0.029 347.1)",
+        "tonalRamp": [
+          "oklch(15% 0.029 347.1)",
+          "oklch(26% 0.029 347.1)",
+          "oklch(38% 0.029 347.1)",
+          "oklch(50% 0.029 347.1)",
+          "oklch(62% 0.029 347.1)",
+          "oklch(74% 0.029 347.1)",
+          "oklch(85% 0.029 347.1)",
+          "oklch(95% 0.029 347.1)"
+        ]
+      },
+      "water": {
+        "role": "tertiary",
+        "displayName": "Ripple Water",
+        "canonical": "#b9e2d4",
+        "oklch": "oklch(88.0% 0.047 172.4)",
+        "tonalRamp": [
+          "oklch(15% 0.047 172.4)",
+          "oklch(26% 0.047 172.4)",
+          "oklch(38% 0.047 172.4)",
+          "oklch(50% 0.047 172.4)",
+          "oklch(62% 0.047 172.4)",
+          "oklch(74% 0.047 172.4)",
+          "oklch(85% 0.047 172.4)",
+          "oklch(95% 0.047 172.4)"
+        ]
+      },
+      "amber-ink": {
+        "role": "tertiary",
+        "displayName": "Caution Amber Ink",
+        "canonical": "#7a4a00",
+        "oklch": "oklch(45.4% 0.100 68.1)",
+        "tonalRamp": [
+          "oklch(15% 0.100 68.1)",
+          "oklch(26% 0.100 68.1)",
+          "oklch(38% 0.100 68.1)",
+          "oklch(50% 0.100 68.1)",
+          "oklch(62% 0.100 68.1)",
+          "oklch(74% 0.100 68.1)",
+          "oklch(85% 0.100 68.1)",
+          "oklch(95% 0.100 68.1)"
+        ]
+      },
+      "amber-wash": {
+        "role": "tertiary",
+        "displayName": "Amber Wash",
+        "canonical": "#fbefd6",
+        "oklch": "oklch(95.5% 0.035 85.4)",
+        "tonalRamp": [
+          "oklch(15% 0.035 85.4)",
+          "oklch(26% 0.035 85.4)",
+          "oklch(38% 0.035 85.4)",
+          "oklch(50% 0.035 85.4)",
+          "oklch(62% 0.035 85.4)",
+          "oklch(74% 0.035 85.4)",
+          "oklch(85% 0.035 85.4)",
+          "oklch(95% 0.035 85.4)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Landing hero headline only."
+      },
+      "headline": {
+        "displayName": "Section Headline",
+        "purpose": "Landing section h2s (--text-section)."
+      },
+      "page-title": {
+        "displayName": "Page Title",
+        "purpose": "Console page h1s."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Step and sub-section h3s."
+      },
+      "lede": {
+        "displayName": "Lede",
+        "purpose": "Hero supporting copy (--text-lede)."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Landing prose (--text-body)."
+      },
+      "body-ui": {
+        "displayName": "Body UI",
+        "purpose": "Console text, rows and notices; base body size."
+      },
+      "slate": {
+        "displayName": "Slate",
+        "purpose": "Broadcast slates: bugs, tally tabs, caption speakers, spine stations, standalone small labels. Never a kicker above a heading."
+      }
+    },
+    "shadows": [
+      {
+        "name": "lift",
+        "value": "0 18px 40px -22px rgb(23 28 24 / 0.45), 0 2px 6px -2px rgb(23 28 24 / 0.18)",
+        "purpose": "Floating lower thirds, screening caption band, operator drawer."
+      },
+      {
+        "name": "soft",
+        "value": "0 10px 30px -18px rgb(23 28 24 / 0.35)",
+        "purpose": "Small notes over imagery, video control, selected example option."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Button and state transitions (180–220ms); GSAP authored moments use expo.out."
+      },
+      {
+        "name": "hero-entrance",
+        "value": "GSAP: art fade+scale 0.97 over 1.2s, rings draw in, lower third rises 28px",
+        "purpose": "Landing hero entrance only."
+      },
+      {
+        "name": "hero-depth",
+        "value": "ScrollTrigger: art yPercent 8, rings 16, caption -22",
+        "purpose": "Hero layer depth on scroll."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animations and transitions collapse to 0.01ms; GSAP skipped; loops paused with a visible Play control",
+        "purpose": "Reduced-motion parity."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Flat lime pill with charcoal text for the main action; no bevel or glow.",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\">See how it works <svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></a>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:0.6rem;min-height:3.25rem;padding:0.8rem 1.4rem;border-radius:999px;font-weight:750;font-size:1.0625rem;line-height:1.2;border:2px solid transparent;cursor:pointer;font-family: var(--font-sans, 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, sans-serif);transition:background-color 180ms cubic-bezier(0.16,1,0.3,1),color 180ms cubic-bezier(0.16,1,0.3,1),transform 220ms cubic-bezier(0.16,1,0.3,1);background:var(--color-lime,#76b900);color:var(--color-ink,#171c18);text-decoration:none;} .ds-btn-primary:hover{background:var(--color-lime-hover,#86cc0b);transform:translateY(-1px);} .ds-btn-primary:focus-visible{outline:3px solid #171c18;outline-offset:3px;}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Charcoal-outline pill that inverts on hover.",
+      "html": "<a class=\"ds-btn-secondary\" href=\"#\">Explore the demo <svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></a>",
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;justify-content:center;gap:0.6rem;min-height:3.25rem;padding:0.8rem 1.4rem;border-radius:999px;font-weight:750;font-size:1.0625rem;line-height:1.2;border:2px solid transparent;cursor:pointer;font-family: var(--font-sans, 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, sans-serif);transition:background-color 180ms cubic-bezier(0.16,1,0.3,1),color 180ms cubic-bezier(0.16,1,0.3,1),transform 220ms cubic-bezier(0.16,1,0.3,1);border-color:var(--color-ink,#171c18);background:transparent;color:var(--color-ink,#171c18);text-decoration:none;} .ds-btn-secondary:hover{background:var(--color-ink,#171c18);color:var(--color-paper,#f7f7f2);} .ds-btn-secondary:focus-visible{outline:3px solid #171c18;outline-offset:3px;}"
+    },
+    {
+      "name": "Ink Button",
+      "kind": "button",
+      "refersTo": "button-ink",
+      "description": "Charcoal pill for navigation actions like Open dashboard.",
+      "html": "<a class=\"ds-btn-ink\" href=\"#\">Open dashboard <svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></a>",
+      "css": ".ds-btn-ink{display:inline-flex;align-items:center;justify-content:center;gap:0.6rem;min-height:3.25rem;padding:0.8rem 1.4rem;border-radius:999px;font-weight:750;font-size:1.0625rem;line-height:1.2;border:2px solid transparent;cursor:pointer;font-family: var(--font-sans, 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, sans-serif);transition:background-color 180ms cubic-bezier(0.16,1,0.3,1),color 180ms cubic-bezier(0.16,1,0.3,1),transform 220ms cubic-bezier(0.16,1,0.3,1);background:var(--color-ink,#171c18);color:var(--color-paper,#f7f7f2);text-decoration:none;} .ds-btn-ink:hover{background:var(--color-ink-3,#303832);} .ds-btn-ink:focus-visible{outline:3px solid #171c18;outline-offset:3px;}"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Small outlined utility pill (Menu, Lock, Pause animation).",
+      "html": "<button class=\"ds-btn-quiet\" type=\"button\">Pause animation</button>",
+      "css": ".ds-btn-quiet{display:inline-flex;align-items:center;justify-content:center;gap:0.6rem;min-height:3.25rem;padding:0.8rem 1.4rem;border-radius:999px;font-weight:750;font-size:1.0625rem;line-height:1.2;border:2px solid transparent;cursor:pointer;font-family: var(--font-sans, 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, sans-serif);transition:background-color 180ms cubic-bezier(0.16,1,0.3,1),color 180ms cubic-bezier(0.16,1,0.3,1),transform 220ms cubic-bezier(0.16,1,0.3,1);min-height:2.75rem;padding:0.55rem 1rem;font-weight:700;font-size:1rem;border-color:var(--color-rule,#d2d4c8);background:var(--color-paper,#f7f7f2);color:var(--color-ink,#171c18);} .ds-btn-quiet:hover{border-color:var(--color-ink,#171c18);} .ds-btn-quiet:focus-visible{outline:3px solid #171c18;outline-offset:3px;}"
+    },
+    {
+      "name": "Station Bug",
+      "kind": "chip",
+      "refersTo": "bug-live",
+      "description": "The one data-source tag per view: icon plus word in slate caps.",
+      "html": "<span class=\"ds-bug ds-bug-live\" role=\"status\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4.9 19.1C1 15.2 1 8.8 4.9 4.9\"/><path d=\"M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/><path d=\"M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5\"/><path d=\"M19.1 4.9C23 8.8 23 15.1 19.1 19\"/></svg> Live</span> <span class=\"ds-bug ds-bug-outline\">Demo</span> <span class=\"ds-bug ds-bug-lost\">Signal lost</span>",
+      "css": ".ds-bug{display:inline-flex;align-items:center;gap:0.45rem;padding:0.3rem 0.75rem 0.3rem 0.55rem;border-radius:0.5rem;white-space:nowrap;font-weight:800;font-size:0.8125rem;letter-spacing:0.08em;text-transform:uppercase;line-height:1.2;font-family: var(--font-sans, 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, sans-serif);} .ds-bug-live{background:var(--color-lime,#76b900);color:var(--color-ink,#171c18);} .ds-bug-outline{background:var(--color-paper,#f7f7f2);color:var(--color-ink,#171c18);box-shadow:inset 0 0 0 2px var(--color-ink,#171c18);} .ds-bug-lost{background:var(--color-amber-wash,#fbefd6);color:var(--color-amber-ink,#7a4a00);box-shadow:inset 0 0 0 2px var(--color-amber-ink,#7a4a00);}"
+    },
+    {
+      "name": "Outcome Chips",
+      "kind": "chip",
+      "refersTo": "chip-saved",
+      "description": "Call outcome as icon plus words; lime only for things that happened.",
+      "html": "<span class=\"ds-chip ds-chip-saved\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg> Message saved</span> <span class=\"ds-chip ds-chip-blocked\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/><path d=\"M12 8v4\"/><path d=\"M12 16h.01\"/></svg> Suspicious request blocked</span> <span class=\"ds-chip ds-chip-review\">Needs review</span> <span class=\"ds-proposal\">Proposed · executed below</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;gap:0.4rem;border-radius:0.5rem;padding:0.25rem 0.65rem 0.25rem 0.5rem;font-weight:750;font-size:0.9375rem;line-height:1.3;white-space:nowrap;font-family: var(--font-sans, 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, sans-serif);} .ds-chip-saved{background:var(--color-lime-wash,#e6f1cf);color:var(--color-lime-ink,#3a6300);} .ds-chip-blocked{background:var(--color-magenta-wash,#fbe4ef);color:var(--color-magenta-ink,#b3005c);} .ds-chip-review{background:var(--color-amber-wash,#fbefd6);color:var(--color-amber-ink,#7a4a00);} .ds-proposal{display:inline-block;border-radius:0.375rem;padding:0.125rem 0.5rem;font-family: var(--font-sans, 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, sans-serif);font-weight:800;font-size:0.8125rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-ink-3,#303832);box-shadow:inset 0 0 0 1.5px var(--color-ink-3,#303832);}"
+    },
+    {
+      "name": "Lower Third",
+      "kind": "custom",
+      "refersTo": "caption-band",
+      "description": "Lime tally strip over a charcoal caption band with the >> speaker convention.",
+      "html": "<figure class=\"ds-lower-third\"><div class=\"ds-tally\"><span>Screened call</span><span>Example</span></div><div class=\"ds-caption\"><p><span class=\"ds-speaker\">&gt;&gt; Caller</span>“Read me the code we just texted you.”</p><p class=\"ds-outcome\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/><path d=\"M12 8v4\"/><path d=\"M12 16h.01\"/></svg> FirstRing declined. A note is saved for you.</p></div></figure>",
+      "css": ".ds-lower-third{margin:0;max-width:27rem;overflow:hidden;border-radius:0.875rem;box-shadow:0 18px 40px -22px rgb(23 28 24 / 0.45),0 2px 6px -2px rgb(23 28 24 / 0.18);font-family: var(--font-sans, 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, sans-serif);} .ds-tally{display:flex;justify-content:space-between;background:var(--color-lime,#76b900);color:var(--color-ink,#171c18);padding:0.5rem 1rem;font-weight:800;font-size:0.8125rem;letter-spacing:0.08em;text-transform:uppercase;line-height:1.2;} .ds-caption{background:var(--color-ink,#171c18);color:var(--color-paper,#f7f7f2);padding:1rem;font-size:1.0625rem;line-height:1.375;} .ds-caption p{margin:0;} .ds-speaker{margin-right:0.375rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;font-size:0.8125rem;color:var(--color-muted-on-ink,#b8bfb6);} .ds-outcome{display:flex;gap:0.625rem;align-items:flex-start;margin-top:0.75rem !important;padding-top:0.75rem;border-top:1px solid rgb(255 255 255 / 0.12);font-weight:600;} .ds-outcome svg{color:var(--color-lime,#76b900);flex-shrink:0;margin-top:0.2rem;}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Large labeled field with lime focus outline.",
+      "html": "<label class=\"ds-field-label\" for=\"ds-greet\">Greeting</label><input id=\"ds-greet\" class=\"ds-field\" value=\"Hello, you have reached Sarah’s line.\"><p class=\"ds-field-help\">Used for new calls only.</p>",
+      "css": ".ds-field-label{display:block;font-weight:750;font-size:1.0625rem;margin-bottom:0.4rem;font-family: var(--font-sans, 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, sans-serif);} .ds-field{width:100%;min-height:3.25rem;border-radius:0.875rem;border:2px solid var(--color-rule,#d2d4c8);background:#fff;padding:0.7rem 0.95rem;font-size:1.0625rem;color:var(--color-ink,#171c18);font-family: var(--font-sans, 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, sans-serif);transition:border-color 160ms ease;} .ds-field:hover{border-color:#a9ad9f;} .ds-field:focus-visible{border-color:var(--color-ink,#171c18);outline:3px solid var(--color-lime,#76b900);outline-offset:1px;} .ds-field-help{color:var(--color-muted,#59615b);font-size:1rem;margin-top:0.35rem;font-family: var(--font-sans, 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, sans-serif);}"
+    },
+    {
+      "name": "Console Top Bar",
+      "kind": "nav",
+      "description": "Charcoal station bar: wordmark, pill nav, station bug at right.",
+      "html": "<nav class=\"ds-topbar\"><span class=\"ds-mark\"><svg viewBox=\"0 0 32 32\" width=\"32\" height=\"32\" aria-hidden=\"true\"><circle cx=\"16\" cy=\"16\" r=\"11\" fill=\"none\" stroke=\"#76b900\" stroke-width=\"5.5\"/><path d=\"M24.2 8.6a11 11 0 0 1 2.5 4.2\" fill=\"none\" stroke=\"#e20074\" stroke-width=\"5.5\"/></svg>FirstRing</span><a class=\"ds-nav\" aria-current=\"page\" href=\"#\">Overview</a><a class=\"ds-nav\" href=\"#\">Calls</a><a class=\"ds-nav\" href=\"#\">Community</a><span class=\"ds-bug-live-sm\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4.9 19.1C1 15.2 1 8.8 4.9 4.9\"/><path d=\"M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/><path d=\"M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5\"/><path d=\"M19.1 4.9C23 8.8 23 15.1 19.1 19\"/></svg> Live</span></nav>",
+      "css": ".ds-topbar{display:flex;align-items:center;gap:0.25rem;min-height:4.25rem;padding:0 1.5rem;background:var(--color-ink,#171c18);color:var(--color-paper,#f7f7f2);font-family: var(--font-sans, 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, sans-serif);} .ds-mark{display:inline-flex;align-items:center;gap:0.625rem;font-weight:800;font-size:1.4rem;letter-spacing:-0.02em;margin-right:1rem;} .ds-nav{border-radius:999px;padding:0.625rem 1rem;font-weight:700;font-size:1.0625rem;color:rgb(247 247 242 / 0.85);text-decoration:none;} .ds-nav:hover{background:rgb(255 255 255 / 0.1);color:var(--color-paper,#f7f7f2);} .ds-nav[aria-current=page]{background:var(--color-paper,#f7f7f2);color:var(--color-ink,#171c18);} .ds-nav:focus-visible{outline:3px solid var(--color-lime,#76b900);outline-offset:3px;} .ds-bug-live-sm{margin-left:auto;display:inline-flex;align-items:center;gap:0.45rem;padding:0.3rem 0.75rem 0.3rem 0.55rem;border-radius:0.5rem;background:var(--color-lime,#76b900);color:var(--color-ink,#171c18);font-weight:800;font-size:0.8125rem;letter-spacing:0.08em;text-transform:uppercase;line-height:1.2;}"
+    },
+    {
+      "name": "Rundown Row",
+      "kind": "card",
+      "description": "One call: tabular time, outcome chip, plain bulletin, chevron.",
+      "html": "<a class=\"ds-row\" href=\"#\"><span class=\"ds-when\"><time>Nov 8, 2:50 AM</time><span>38 min ago · 22 s</span></span><span class=\"ds-body\"><span class=\"ds-chip-b\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/><path d=\"M12 8v4\"/><path d=\"M12 16h.01\"/></svg> Suspicious request blocked</span><span class=\"ds-headline\">Asked for a texted verification code. FirstRing declined and saved a note for you.</span></span><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"m9 18 6-6-6-6\"/></svg></a>",
+      "css": ".ds-row{display:grid;grid-template-columns:8.5rem 1fr auto;gap:0.5rem 1.25rem;align-items:center;border-radius:0.75rem;padding:1rem;color:var(--color-ink,#171c18);text-decoration:none;font-family: var(--font-sans, 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, sans-serif);transition:background-color 150ms;} .ds-row:hover{background:var(--color-paper-2,#efefe7);} .ds-row:focus-visible{outline:3px solid #171c18;outline-offset:3px;} .ds-when{display:flex;flex-direction:column;font-variant-numeric:tabular-nums;} .ds-when time{font-weight:700;font-size:1rem;} .ds-when span{font-size:0.95rem;color:var(--color-muted,#59615b);} .ds-chip-b{display:inline-flex;align-items:center;gap:0.4rem;border-radius:0.5rem;padding:0.25rem 0.65rem 0.25rem 0.5rem;font-weight:750;font-size:0.9375rem;line-height:1.3;white-space:nowrap;font-family: var(--font-sans, 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, sans-serif);background:var(--color-magenta-wash,#fbe4ef);color:var(--color-magenta-ink,#b3005c);} .ds-headline{display:block;margin-top:0.375rem;font-size:1.0625rem;line-height:1.375;} .ds-row svg{color:var(--color-muted,#59615b);transition:transform 150ms;} .ds-row:hover svg{transform:translateX(2px);}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Calm Local Station",
+    "overview": "FirstRing looks like a small, trustworthy local TV station that goes on air before you pick up the phone. The page is a warm-white studio ground; information arrives as broadcast graphics: charcoal closed-caption bands with the real `>>` speaker-change convention, lower thirds with a lime tally tab, a single station bug that says where the data comes from (Live, Replay, Demo, Signal lost), and a rundown sheet of calls with tabular times. The dashboard is the same station's rundown and caption archive, with the decision trace drawn as an exposed vertical spine of labeled stations.\n\nHierarchy comes from scale contrast in one family (Manrope, 400 to 800), not from decoration. The only ornament is concentric signal arcs radiating from Ringo's lime ring, with one contiguous magenta segment. Density is generous: older adults are a primary audience, so body copy runs 17 to 19px, controls are 44 to 56px tall, and every state is carried by an icon plus words, never colour alone. Surfaces are flat and opaque; the few shadows are soft lifts under floating broadcast graphics.\n\nConfirmed rejections from the build: no shield-icon hero, no six-feature card grid, no KPI-card dashboard or invented scores, no glass or backdrop blur, no lime-to-magenta gradient, no eyebrows or kickers above headings.",
+    "keyCharacteristics": [
+      "Warm-white studio ground, charcoal broadcast graphics, lime as the on-air/tally colour.",
+      "Closed-caption bands with `>> SPEAKER` labels for every transcript or quoted caller line.",
+      "One station bug per view naming the data source.",
+      "Rundown rows and ruled lists instead of nested cards.",
+      "Concentric signal arcs as the sole ornament; Ringo at monumental scale, cropped by the frame.",
+      "Opaque, flat surfaces; soft lift only under floating lower thirds and the operator drawer."
+    ],
+    "rules": [
+      {
+        "name": "The Ink-Variant Rule",
+        "body": "Lime and magenta fills keep their brand value; any lime or magenta *text* on paper uses the `-ink` variant, and on charcoal the `-on-ink` variant. Dark text on lime, never white.",
+        "section": "colors"
+      },
+      {
+        "name": "The Lime Means Done Rule",
+        "body": "Lime washes and lime-ink text mark things that actually happened (saved, Done, accepted). Proposals the model merely suggested are neutral ink-outline (\"Proposed · executed below\") or amber (\"Proposed · not executed\"), never lime.",
+        "section": "colors"
+      },
+      {
+        "name": "The Suspected-Needs-Words Rule",
+        "body": "Magenta always travels with an icon and words (\"Suspected\", \"blocked\"); it is never the only signal.",
+        "section": "colors"
+      },
+      {
+        "name": "The Scale-Not-Eyebrow Rule",
+        "body": "Hierarchy is carried by scale contrast alone. Nothing sits above a heading to announce it; slate caps are broadcast graphics or self-standing labels, never a kicker over a larger title.",
+        "section": "typography"
+      },
+      {
+        "name": "The Big-Enough Rule",
+        "body": "No reading text below 0.95rem; landing body stays at 19px.",
+        "section": "typography"
+      },
+      {
+        "name": "The Opaque Air Rule",
+        "body": "Anything that overlaps something else is solid paper or solid ink. No blur, no glass.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do show every transcript or quoted caller line as a charcoal caption band with `>> SPEAKER` slate labels.",
+      "Do pair every outcome colour with an icon and words; magenta always says \"Suspected\" or \"blocked\".",
+      "Do keep exactly one data-source station bug per view, in the header on the console.",
+      "Do use the `-ink` variants (lime-ink #3a6300, magenta-ink #b3005c) for coloured text on paper.",
+      "Do reserve lime washes for things that happened; render proposals as neutral outline or amber.",
+      "Do keep primary actions flat lime pills with charcoal text.",
+      "Do render progressions and comparisons as ruled rows and rundown lines.",
+      "Do keep overlays and floating graphics opaque, using the Lift or Soft shadow only."
+    ],
+    "donts": [
+      "Don't put eyebrows or kickers above headings; carry hierarchy with scale.",
+      "Don't use backdrop blur, glass or translucent overlays.",
+      "Don't add a bevel, gradient or glow to the primary button, and never draw a lime-to-magenta gradient.",
+      "Don't nest cards inside cards.",
+      "Don't show a model proposal in lime or as completed.",
+      "Don't add ornaments beyond the concentric signal arcs and Ringo.",
+      "Don't set reading text below 0.95rem or rely on hover for essential information."
+    ]
+  }
+}

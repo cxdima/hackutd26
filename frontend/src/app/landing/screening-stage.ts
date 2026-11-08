@@ -32,7 +32,7 @@ import { gsap, Motion, ScrollTrigger } from '../shared/motion';
         <figcaption id="stage-title" class="text-[1.0625rem] font-bold">
           One call, step by step
         </figcaption>
-        <span class="bug bug-demo">Example</span>
+        <span class="bug bug-example">Example</span>
       </div>
 
       <ol

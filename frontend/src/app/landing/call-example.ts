@@ -68,7 +68,7 @@ interface Example {
       >
         <div class="mb-5 flex items-center justify-between gap-3">
           <h3 class="text-[1.125rem] font-bold">What was said</h3>
-          <span class="bug bug-demo">Written example</span>
+          <span class="bug bug-example">Written example</span>
         </div>
         <!-- The caller poses on the left; FirstRing answers across the seam. -->
         <div class="relative">
