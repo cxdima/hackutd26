@@ -14,7 +14,9 @@ import {
   LucideMonitorPlay,
   LucideNetwork,
   LucidePanelRightOpen,
+  LucidePause,
   LucidePhone,
+  LucidePlay,
   LucideSettings2,
   LucideX,
 } from '@lucide/angular';
@@ -23,9 +25,19 @@ import { CallerDirectory } from '../core/caller-directory';
 import { ConsoleStore } from '../core/console-store';
 import { formatPhone, formatTime, isE164 } from '../core/format';
 import { household } from '../core/household';
+import { Motion } from '../shared/motion';
 import { Wordmark } from '../shared/wordmark';
 import { ConnectPanel } from './connect-panel';
 import { OperatorPanel } from './operator-panel';
+
+const ART_KEY = 'firstring.rail-art-paused';
+function readArtPaused(): boolean {
+  try {
+    return localStorage.getItem(ART_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 type NavIcon = 'overview' | 'calls' | 'callers' | 'community' | 'settings';
 
@@ -46,6 +58,8 @@ type NavIcon = 'overview' | 'calls' | 'callers' | 'community' | 'settings';
     LucideContactRound,
     LucideNetwork,
     LucideSettings2,
+    LucidePause,
+    LucidePlay,
   ],
   template: `
     @if (presenting()) {
@@ -169,8 +183,8 @@ type NavIcon = 'overview' | 'calls' | 'callers' | 'community' | 'settings';
               }
             </div>
 
-            <div class="rail-art" aria-hidden="true">
-              <picture>
+            <div class="rail-art">
+              <picture aria-hidden="true">
                 <source
                   type="image/avif"
                   srcset="media/console-sidebar-512.avif 512w, media/console-sidebar-752.avif 752w"
@@ -186,11 +200,40 @@ type NavIcon = 'overview' | 'calls' | 'callers' | 'community' | 'settings';
                   decoding="async"
                 />
               </picture>
-              <svg class="rail-ripples" viewBox="0 0 264 275" preserveAspectRatio="none">
-                <ellipse cx="127" cy="221" rx="70" ry="13" />
-                <ellipse cx="127" cy="221" rx="70" ry="13" />
-                <ellipse cx="127" cy="221" rx="70" ry="13" />
-              </svg>
+              @if (artMoves()) {
+                <video
+                  class="rail-video"
+                  [muted]="true"
+                  autoplay
+                  loop
+                  playsinline
+                  disablePictureInPicture
+                  preload="auto"
+                  poster="media/console-sidebar-loop-poster.jpg"
+                  aria-hidden="true"
+                  tabindex="-1"
+                >
+                  <source src="media/console-sidebar-loop.webm" type="video/webm" />
+                  <source src="media/console-sidebar-loop.mp4" type="video/mp4" />
+                </video>
+              }
+              @if (!motion.reduced()) {
+                <button
+                  type="button"
+                  class="rail-pause"
+                  [attr.aria-label]="
+                    artPaused() ? 'Play the Ringo animation' : 'Pause the Ringo animation'
+                  "
+                  [attr.aria-pressed]="artPaused()"
+                  (click)="toggleArt()"
+                >
+                  @if (artPaused()) {
+                    <svg lucidePlay [size]="15" aria-hidden="true"></svg>
+                  } @else {
+                    <svg lucidePause [size]="15" aria-hidden="true"></svg>
+                  }
+                </button>
+              }
             </div>
           }
         </aside>
@@ -288,6 +331,10 @@ export class ConsoleShell {
     }
   });
   readonly operatorOpen = signal(false);
+  readonly motion = inject(Motion);
+  /** The rail animation can be paused; the choice is remembered on this browser. */
+  readonly artPaused = signal(readArtPaused());
+  readonly artMoves = computed(() => !this.motion.reduced() && !this.artPaused());
   private readonly url = signal(this.router.url);
   /** The presentation view is chrome-less: it draws its own bug, banners and controls. */
   readonly presenting = computed(
@@ -322,6 +369,16 @@ export class ConsoleShell {
     this.store.lock();
     void this.store.retryLocal();
     void this.router.navigate(['/console']);
+  }
+
+  toggleArt() {
+    const paused = !this.artPaused();
+    this.artPaused.set(paused);
+    try {
+      localStorage.setItem(ART_KEY, paused ? '1' : '0');
+    } catch {
+      /* storage unavailable: the choice lasts for this page only */
+    }
   }
 
   toggleOperator() {

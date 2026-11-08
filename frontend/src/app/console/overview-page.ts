@@ -121,6 +121,14 @@ type Tab = 'watch' | 'warnings' | 'trusted' | 'system';
             >
               {{ call.headline }}
             </p>
+            @if (quote(); as q) {
+              <figure class="caption-band mt-5 max-w-[46rem] px-5 py-3.5">
+                <figcaption class="caption-speaker">&gt;&gt; Caller</figcaption>
+                <blockquote class="mt-1 text-[1.125rem] leading-snug font-semibold">
+                  “{{ q }}”
+                </blockquote>
+              </figure>
+            }
             <dl class="mt-6 grid gap-x-8 border-t border-paper-3 sm:grid-cols-2">
               <div class="border-b border-paper-3 py-3 sm:border-b-0">
                 <dt class="text-[0.95rem] font-semibold text-muted">The caller wanted</dt>
@@ -502,6 +510,17 @@ export class OverviewPage {
       calls.find((c) => c.outcome === 'needs_review' && recent(c)) ??
       calls.find((c) => c.outcome !== 'in_progress')
     );
+  });
+  /** The caller's own words: the quote the AI cited, else their last turn. */
+  readonly quote = computed(() => {
+    const call = this.featured();
+    if (!call || call.trusted) return '';
+    const said =
+      call.session.evidence_quote ??
+      call.session.turns.filter((t) => t.speaker === 'caller').at(-1)?.text ??
+      '';
+    const text = said.trim();
+    return text.length > 180 ? text.slice(0, 177).trimEnd() + '…' : text;
   });
   readonly featuredLabel = computed(() => {
     const call = this.featured();
