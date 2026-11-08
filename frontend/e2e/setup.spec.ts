@@ -149,10 +149,14 @@ test.describe('call evidence on a mocked live server', () => {
     );
     await page.goto('/console/calls/live-1');
     await new ConsolePage(page).connected();
+    await page.getByText('Every receipt, in order').click();
     await expect(
-      page.getByText('Not done: Save a private message. Rust rejected this proposal.'),
+      page
+        .getByText('Not done: Save a private message. Rust rejected this proposal.')
+        .filter({ visible: true })
+        .first(),
     ).toBeVisible();
-    await expect(page.locator('app-call-detail app-outcome-chip')).not.toContainText(
+    await expect(page.locator('app-call-detail app-outcome-text').first()).not.toContainText(
       'Message saved',
     );
     await page.getByText('Technical details').click();
@@ -163,7 +167,7 @@ test.describe('call evidence on a mocked live server', () => {
 
 test.describe('reported-number history on a mocked live server', () => {
   for (const configured of [false, true])
-    test(`community page says ${configured ? 'provided' : 'not provided'} from the server capability`, async ({
+    test(`call detail says ${configured ? 'provided' : 'not provided'} from the server capability`, async ({
       page,
     }) => {
       const requests: string[] = [];
@@ -201,14 +205,6 @@ test.describe('reported-number history on a mocked live server', () => {
           },
         }),
       );
-      await page.goto('/console/community');
-      await new ConsolePage(page).connected();
-      const section = page.getByRole('region', { name: 'Reported-number history' });
-      await expect(
-        section.getByText(
-          configured ? 'The server provides it.' : 'This server does not provide it yet',
-        ),
-      ).toBeVisible();
       await page.goto('/console/calls/live-1');
       await new ConsolePage(page).connected();
       const panel = page.locator('app-reputation-panel');

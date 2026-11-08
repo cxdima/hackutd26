@@ -18,6 +18,7 @@ import {
 
 export type Outcome =
   | 'in_progress'
+  | 'trusted'
   | 'blocked'
   | 'connected'
   | 'message_saved'
@@ -27,6 +28,7 @@ export type Outcome =
 
 export const OUTCOME_LABEL: Record<Outcome, string> = {
   in_progress: 'On the line now',
+  trusted: 'Trusted caller, put straight through',
   blocked: 'Suspicious request blocked',
   connected: 'Connected after permission',
   message_saved: 'Message saved',
@@ -37,6 +39,7 @@ export const OUTCOME_LABEL: Record<Outcome, string> = {
 
 export const OUTCOME_CHIP: Record<Outcome, string> = {
   in_progress: 'chip-live',
+  trusted: 'chip-saved',
   blocked: 'chip-blocked',
   connected: 'chip-saved',
   message_saved: 'chip-saved',
@@ -67,6 +70,54 @@ export interface CallRecord {
   hasEndReceipt: boolean;
   /** Still connected: no end receipt and a recent receipt, whatever the outcome so far. */
   active: boolean;
+  /** Present when the caller was on the trusted list and skipped screening. */
+  trusted?: TrustedPassthrough;
+}
+
+export interface TrustedPassthrough {
+  name: string;
+  relation?: string;
+  numberLabel?: string;
+  /** dialing | caller_is_enrolled_phone | no_enrolled_phone | no_outbound_route */
+  route: string;
+  dialStatus?: string;
+  durationSeconds?: number;
+}
+
+function text(value: unknown): string | undefined {
+  return typeof value === 'string' && value ? value : undefined;
+}
+
+export function trustedPassthrough(events: readonly CallEvent[]): TrustedPassthrough | undefined {
+  const start = events.find((e) => e.type === 'trusted.passthrough');
+  if (!start) return undefined;
+  const done = [...events].reverse().find((e) => e.type === 'trusted.passthrough.completed');
+  const duration = done?.payload['duration_seconds'];
+  return {
+    name: text(start.payload['name']) ?? 'A trusted caller',
+    relation: text(start.payload['relation']),
+    numberLabel: text(start.payload['number_label']),
+    route: text(start.payload['outcome']) ?? 'dialing',
+    dialStatus: text(done?.payload['dial_status']),
+    durationSeconds: typeof duration === 'number' ? duration : undefined,
+  };
+}
+
+/** Plain words for what happened to a trusted caller's call. */
+export function trustedHeadline(t: TrustedPassthrough, ringsFirst: string): string {
+  const who = t.relation ? `${t.name} (${t.relation})` : t.name;
+  switch (t.route) {
+    case 'caller_is_enrolled_phone':
+      return `${who} called from ${ringsFirst}’s own enrolled phone, so there was nothing to forward. No screening.`;
+    case 'no_enrolled_phone':
+      return `${who} is trusted, but no phone is enrolled to ring, so the call could not be put through.`;
+    case 'no_outbound_route':
+      return `${who} is trusted, but the line has no outbound route to ring ${ringsFirst}’s phone.`;
+    default: {
+      const status = t.dialStatus ? ` Ring result: ${t.dialStatus.replaceAll('-', ' ')}.` : '';
+      return `${who} is on the trusted list. FirstRing skipped screening and rang ${ringsFirst}’s phone.${status}`;
+    }
+  }
 }
 
 function eventsBySession(events: readonly CallEvent[]): Map<string, CallEvent[]> {
@@ -123,12 +174,16 @@ export function buildCallRecord(
   const relayEnded = [...events].reverse().find((e) => e.type === 'relay.ended');
   const last = events.at(-1);
   const relayDuration = relayEnded?.payload['duration_seconds'];
+  const passthroughDuration = events.find((e) => e.type === 'trusted.passthrough.completed')
+    ?.payload['duration_seconds'];
   const durationSeconds =
     typeof relayDuration === 'number'
       ? relayDuration
-      : start && end
-        ? (Date.parse(end.occurred_at) - Date.parse(start.occurred_at)) / 1000
-        : undefined;
+      : typeof passthroughDuration === 'number'
+        ? passthroughDuration
+        : start && end
+          ? (Date.parse(end.occurred_at) - Date.parse(start.occurred_at)) / 1000
+          : undefined;
 
   const deniedAssessment = [...events]
     .reverse()
@@ -158,8 +213,11 @@ export function buildCallRecord(
   // Connected only on the bridge receipt: an offer, ringing or keypad choice is not a connection.
   const bridged = events.some((e) => e.type === 'bridge.connected');
 
+  const trusted = trustedPassthrough(events);
+
   let outcome: Outcome;
-  if (blocked) outcome = 'blocked';
+  if (trusted) outcome = 'trusted';
+  else if (blocked) outcome = 'blocked';
   else if (!ended && !quiet) outcome = 'in_progress';
   else if (bridged) outcome = 'connected';
   else if (session.message) outcome = 'message_saved';
@@ -175,6 +233,9 @@ export function buildCallRecord(
   const observation = protectedRequest ?? lastObservation(session, events);
   let headline: string;
   switch (outcome) {
+    case 'trusted':
+      headline = trustedHeadline(trusted!, ringsFirstName(session.household_id, name));
+      break;
     case 'blocked':
       headline = `Asked for ${OBJECT_LABEL[protectedRequest?.requested_object ?? 'unknown']}. FirstRing declined${session.message ? ' and saved a note for you' : ''}.`;
       break;
@@ -206,11 +267,13 @@ export function buildCallRecord(
           : 'The caller did not say anything FirstRing could act on.';
   }
 
-  const request = understanding?.requested_action
-    ? understanding.requested_action
-    : observation
-      ? describeObservation(observation, name)
-      : 'No request was heard.';
+  const request = trusted
+    ? `Trusted caller: ${trusted.name}${trusted.relation ? ` (${trusted.relation})` : ''}`
+    : understanding?.requested_action
+      ? understanding.requested_action
+      : observation
+        ? describeObservation(observation, name)
+        : 'No request was heard.';
 
   return {
     id: session.id,
@@ -230,6 +293,7 @@ export function buildCallRecord(
     failure,
     hasEndReceipt: !!end,
     active: !ended && !quiet,
+    trusted,
   };
 }
 

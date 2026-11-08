@@ -7,6 +7,7 @@ import {
   LucidePhoneCall,
   LucidePhoneForwarded,
   LucideShieldAlert,
+  LucideUserCheck,
 } from '@lucide/angular';
 import { OUTCOME_CHIP, OUTCOME_LABEL, type Outcome } from '../core/calls';
 
@@ -21,12 +22,16 @@ import { OUTCOME_CHIP, OUTCOME_LABEL, type Outcome } from '../core/calls';
     LucidePhoneCall,
     LucidePhoneForwarded,
     LucideCircleMinus,
+    LucideUserCheck,
   ],
   host: { class: 'inline-flex shrink-0' },
   template: `
     @switch (outcome()) {
       @case ('blocked') {
         <svg lucideShieldAlert [size]="size()" aria-hidden="true"></svg>
+      }
+      @case ('trusted') {
+        <svg lucideUserCheck [size]="size()" aria-hidden="true"></svg>
       }
       @case ('connected') {
         <svg lucidePhoneForwarded [size]="size()" aria-hidden="true"></svg>
@@ -73,6 +78,7 @@ export class OutcomeChip {
 
 export const OUTCOME_SHORT: Record<Outcome, string> = {
   in_progress: 'On the line now',
+  trusted: 'Trusted, put through',
   blocked: 'Blocked',
   connected: 'Connected',
   message_saved: 'Message saved',
@@ -83,6 +89,7 @@ export const OUTCOME_SHORT: Record<Outcome, string> = {
 
 const OUTCOME_TEXT_CLASS: Record<Outcome, string> = {
   in_progress: 'text-ink',
+  trusted: 'outcome-ok',
   blocked: 'outcome-blocked',
   connected: 'outcome-ok',
   message_saved: 'outcome-ok',

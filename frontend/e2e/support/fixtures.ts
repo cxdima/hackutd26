@@ -186,6 +186,21 @@ export const test = base.extend<{ apiGuard: void }>({
       // The console connects to the local server by itself; with /api aborted it reports
       // that the server is not running. Tests that need a server mock /api/state.
       await page.route('**/api/**', (route) => route.abort('blockedbyclient'));
+      // A server with an empty trusted list unless a test installs its own (GET only).
+      await page.route(
+        (url) => url.pathname === '/api/trusted',
+        (route) =>
+          route.request().method() === 'GET'
+            ? route.fulfill({
+                json: {
+                  household_id: 'sarah',
+                  items: [],
+                  connects_to_enrolled_phone: true,
+                  meaning: '',
+                },
+              })
+            : route.abort('blockedbyclient'),
+      );
       await use();
     },
     { auto: true },

@@ -16,6 +16,7 @@ type Filter = 'all' | Outcome;
 const ORDER: Outcome[] = [
   'in_progress',
   'blocked',
+  'trusted',
   'connected',
   'message_saved',
   'needs_review',
@@ -144,7 +145,10 @@ const ORDER: Outcome[] = [
                 </td>
                 <td class="whitespace-nowrap">{{ call.name }}</td>
                 <td class="whitespace-nowrap">
-                  @if (caller(call.id); as c) {
+                  @if (call.trusted; as t) {
+                    <span class="font-semibold">{{ t.name }}</span>
+                    <span class="block text-[0.95rem] text-lime-ink">On the trusted list</span>
+                  } @else if (caller(call.id); as c) {
                     <span class="font-semibold">{{ c.captured ? c.label : 'Not captured' }}</span>
                     @if (c.captured) {
                       <span

@@ -13,6 +13,37 @@ const benign = {
 };
 
 describe('call outcome', () => {
+  it('reports a trusted caller as put straight through, not as incomplete', () => {
+    const events = [
+      receipt('call.inbound.received'),
+      receipt('trusted.passthrough', {
+        name: 'Jimmy',
+        relation: 'Son',
+        number_label: 'ending 4471',
+        outcome: 'dialing',
+        screened: false,
+      }),
+      receipt('trusted.passthrough.completed', { dial_status: 'completed', duration_seconds: 42 }),
+      receipt('call.ended'),
+    ];
+    const record = buildCallRecord(session({}), events, NOW);
+    expect(record.outcome).toBe('trusted');
+    expect(record.trusted?.route).toBe('dialing');
+    expect(record.headline).toContain('Jimmy (Son) is on the trusted list');
+    expect(record.request).toBe('Trusted caller: Jimmy (Son)');
+    expect(record.durationSeconds).toBe(42);
+  });
+
+  it('says plainly when a trusted call had no enrolled phone to ring', () => {
+    const events = [
+      receipt('call.inbound.received'),
+      receipt('trusted.passthrough', { name: 'Maya', outcome: 'no_enrolled_phone' }),
+    ];
+    const record = buildCallRecord(session({}), events, NOW);
+    expect(record.outcome).toBe('trusted');
+    expect(record.headline).toContain('no phone is enrolled');
+  });
+
   it('reports a denied assessment as a blocked suspicious request, even when a note was saved', () => {
     const s = session({
       blocked: true,

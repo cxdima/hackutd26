@@ -1,3 +1,4 @@
+import { Access } from '../core/access';
 import { Component, computed, inject, input, signal } from '@angular/core';
 import {
   LucideCheck,
@@ -644,7 +645,9 @@ export class CallDetail {
         : 'Replay',
   );
 
-  readonly canOperate = computed(() => this.store.source() === 'live');
+  private readonly access = inject(Access);
+  /** Operator actions write to the server: live and on the presenting laptop only. */
+  readonly canOperate = computed(() => this.store.source() === 'live' && !this.access.readOnly);
   readonly disabled = computed(() => !!this.store.busy() || this.store.stale());
   readonly allEnded = computed(() => {
     const s = this.call().session;

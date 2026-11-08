@@ -105,11 +105,11 @@ test.describe('presentation view · fictional rehearsal', () => {
     await expect(page.getByRole('button', { name: 'Maya was ready' })).toBeDisabled();
     await play(page, 'The request changes');
     await page.getByRole('button', { name: 'Community', exact: true }).click();
-    await expect(page.getByText('A shared warning is ready for Maya.')).toBeVisible();
+    await expect(page.getByText('A shared warning is ready for Maya and Jimmy.')).toBeVisible();
     await page.getByRole('button', { name: 'Call', exact: true }).click();
     await play(page, 'Maya was ready');
     await page.getByRole('button', { name: 'Community', exact: true }).click();
-    await expect(page.getByText('Sarah spotted it. Maya was ready.')).toBeVisible();
+    await expect(page.getByText('Sarah spotted it. Maya and Jimmy were ready.')).toBeVisible();
     await expect(page.getByText('not the same person or number')).toBeVisible();
   });
 

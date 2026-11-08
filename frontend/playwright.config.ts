@@ -1,7 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
+/** Override with E2E_PORT to test a second checkout without reusing another dev server. */
+const port = process.env['E2E_PORT'] ?? '4310';
+
 /**
- * Browser checks run against the Angular dev server on port 4310.
+ * Browser checks run against the Angular dev server (port 4310 unless E2E_PORT is set).
  * Every /api request is mocked or aborted by the fixtures in e2e/support, so no
  * test can reach or mutate a live FirstRing server.
  */
@@ -16,7 +19,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'test-results/html' }]],
   outputDir: 'test-results/artifacts',
   use: {
-    baseURL: 'http://127.0.0.1:4310',
+    baseURL: `http://127.0.0.1:${port}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -32,8 +35,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm start',
-    url: 'http://127.0.0.1:4310',
+    command: `npm start -- --port ${port}`,
+    url: `http://127.0.0.1:${port}`,
     reuseExistingServer: !process.env['CI'],
     timeout: 120000,
   },

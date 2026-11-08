@@ -13,6 +13,7 @@
   --color-ink: #171c18;
   --color-ink-2: #222923;
   --color-ink-3: #303832;
+  --color-ink-deep: #0f1612;
   --color-muted: #59615b;
   --color-muted-on-ink: #b8bfb6;
   --color-lime: #76b900;
@@ -512,40 +513,173 @@
     margin-top: 0.9em;
   }
 
-  /* Console sidebar navigation */
-  .nav-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    min-height: 3rem;
-    padding: 0 0.875rem;
-    border-radius: 0.75rem;
-    font-size: 1.0625rem;
-    font-weight: 700;
-    color: color-mix(in oklab, var(--color-paper) 82%, transparent);
-    text-decoration: none;
-    white-space: nowrap;
-    transition: background-color 150ms ease-out, color 150ms ease-out;
-  }
-  .nav-item:hover {
-    background: rgb(255 255 255 / 0.08);
-    color: var(--color-paper);
-  }
-  .nav-item.nav-active {
-    background: var(--color-paper);
-    color: var(--color-ink);
+  /* Console rail: night water under the station's wordmark. Deep ink so the
+     Ringo art at the foot blends in without a seam. */
+  .console-rail {
+    background:
+      radial-gradient(120% 60% at 50% 100%, rgb(118 185 0 / 0.07), transparent 60%),
+      linear-gradient(180deg, var(--color-ink) 0%, var(--color-ink-deep) 62%);
+    background-color: var(--color-ink-deep);
   }
   @media (max-width: 1023.98px) {
-    .nav-item {
-      border-radius: 0;
-      min-height: 3.25rem;
+    .console-rail {
+      background: var(--color-ink);
+      box-shadow: 0 1px 0 rgb(255 255 255 / 0.08);
+    }
+  }
+  .rail-nav {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    border-top: 1px solid rgb(255 255 255 / 0.1);
+  }
+  @media (min-width: 1024px) {
+    .rail-nav {
+      display: block;
+      border-top: 0;
       padding: 0 0.875rem;
-      box-shadow: inset 0 -3px 0 transparent;
+    }
+    .rail-nav > li + li {
+      margin-top: 0.25rem;
+    }
+    .rail-nav > li.rail-gap {
+      margin-top: 0.875rem;
+      padding-top: 0.875rem;
+      border-top: 1px solid rgb(255 255 255 / 0.09);
+    }
+  }
+
+  .nav-item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 3.75rem;
+    padding: 0.5rem 0.125rem;
+    font-size: 0.8125rem;
+    font-weight: 750;
+    line-height: 1.1;
+    color: color-mix(in oklab, var(--color-paper) 78%, transparent);
+    text-decoration: none;
+    transition:
+      background-color 160ms var(--ease-out-expo),
+      color 160ms var(--ease-out-expo);
+  }
+  .nav-item .nav-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nav-item .nav-count {
+    display: none;
+  }
+  .nav-item.nav-active {
+    color: var(--color-paper);
+    box-shadow: inset 0 -3px 0 var(--color-lime);
+  }
+  .nav-item.nav-active svg {
+    color: var(--color-lime);
+  }
+  @media (min-width: 1024px) {
+    .nav-item {
+      flex-direction: row;
+      justify-content: flex-start;
+      gap: 0.8rem;
+      min-height: 3rem;
+      padding: 0 0.875rem;
+      border-radius: 0.75rem;
+      font-size: 1.0625rem;
+      font-weight: 700;
+    }
+    .nav-item .nav-count {
+      display: inline;
+      margin-left: auto;
+      padding-left: 0.75rem;
+      font-size: 0.95rem;
+      font-weight: 650;
+      opacity: 0.7;
+    }
+    .nav-item:hover {
+      background: rgb(255 255 255 / 0.07);
+      color: var(--color-paper);
     }
     .nav-item.nav-active {
-      background: transparent;
-      color: var(--color-paper);
-      box-shadow: inset 0 -3px 0 var(--color-lime);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      box-shadow: 0 10px 24px -16px rgb(0 0 0 / 0.8);
+    }
+    .nav-item.nav-active svg {
+      color: var(--color-ink);
+    }
+    .nav-item.nav-active .nav-count {
+      opacity: 0.6;
+    }
+  }
+
+  /* Ringo floating at the foot of the rail, with slow ripples. */
+  .rail-art {
+    display: none;
+  }
+  @media (min-width: 1024px) and (min-height: 760px) {
+    .rail-art {
+      position: relative;
+      display: block;
+      flex: none;
+      margin-top: -1.5rem;
+      pointer-events: none;
+      -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 22%);
+      mask-image: linear-gradient(180deg, transparent 0%, #000 22%);
+    }
+    .rail-art img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+  }
+  .rail-ripples {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .rail-ripples ellipse {
+    fill: none;
+    stroke: var(--color-lime);
+    stroke-width: 1.2;
+    vector-effect: non-scaling-stroke;
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: rail-ripple 9s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  }
+  .rail-ripples ellipse:nth-child(2) {
+    animation-delay: 3s;
+  }
+  .rail-ripples ellipse:nth-child(3) {
+    animation-delay: 6s;
+  }
+  @keyframes rail-ripple {
+    0% {
+      transform: scale(0.55);
+      opacity: 0;
+    }
+    8% {
+      opacity: 0.38;
+    }
+    70% {
+      opacity: 0;
+    }
+    100% {
+      transform: scale(1.7);
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rail-ripples {
+      display: none;
     }
   }
   .scrollbar-none {
@@ -613,6 +747,210 @@
     font-weight: 800;
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Two-way switch (Today / All): a pill track with an ink thumb. */
+  .segmented {
+    display: inline-flex;
+    padding: 0.2rem;
+    border-radius: 999px;
+    background: var(--color-paper-3);
+  }
+  .segmented button {
+    min-height: 2.25rem;
+    padding: 0 0.95rem;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-weight: 750;
+    color: var(--color-ink-3);
+    transition:
+      background-color 180ms var(--ease-out-expo),
+      color 180ms var(--ease-out-expo);
+  }
+  .segmented button[aria-pressed='true'] {
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+  .segmented button:not([aria-pressed='true']):hover {
+    color: var(--color-ink);
+  }
+
+  /* Outcome proportion bar: thin, 2px surface gaps, rounded data ends. */
+  .mix-bar {
+    display: flex;
+    gap: 2px;
+    height: 0.875rem;
+  }
+  .mix-bar > span {
+    min-width: 6px;
+    flex-basis: 0;
+  }
+  .mix-bar > span:first-child {
+    border-radius: 4px 0 0 4px;
+  }
+  .mix-bar > span:last-child {
+    border-radius: 0 4px 4px 0;
+  }
+  .mix-bar > span:only-child {
+    border-radius: 4px;
+  }
+  .mix-key {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 3px;
+    flex: none;
+  }
+
+  /* Tabs for details one click away. */
+  .tab-row {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+    border-bottom: 2px solid var(--color-ink);
+    scrollbar-width: none;
+  }
+  .tab-row::-webkit-scrollbar {
+    display: none;
+  }
+  .tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: none;
+    min-height: 3rem;
+    padding: 0 1rem;
+    border-radius: 0.75rem 0.75rem 0 0;
+    font-size: 1.0625rem;
+    font-weight: 750;
+    color: var(--color-ink-3);
+    transition:
+      background-color 160ms var(--ease-out-expo),
+      color 160ms var(--ease-out-expo);
+  }
+  .tab:hover {
+    background: var(--color-paper-2);
+    color: var(--color-ink);
+  }
+  .tab[aria-selected='true'] {
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+  .tab-count {
+    font-size: 0.95rem;
+    font-weight: 650;
+    opacity: 0.72;
+  }
+  /* Settings: an index of sections, then label-left / content-right rows. */
+  .settings-index {
+    position: sticky;
+    top: 7.75rem;
+    z-index: 5;
+    display: flex;
+    gap: 0.25rem;
+    margin-top: 1.5rem;
+    padding: 0.35rem;
+    overflow-x: auto;
+    border-radius: 999px;
+    background: var(--color-paper-3);
+    width: fit-content;
+    max-width: 100%;
+    scrollbar-width: none;
+  }
+  @media (min-width: 1024px) {
+    .settings-index {
+      top: 1rem;
+    }
+  }
+  .settings-index::-webkit-scrollbar {
+    display: none;
+  }
+  .settings-index a {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
+    padding: 0 1rem;
+    border-radius: 999px;
+    font-size: 1rem;
+    font-weight: 750;
+    color: var(--color-ink-3);
+    text-decoration: none;
+    transition: background-color 160ms var(--ease-out-expo);
+  }
+  .settings-index a:hover {
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+  .settings-section {
+    display: grid;
+    gap: 1.25rem 3rem;
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--color-ink);
+    scroll-margin-top: 9rem;
+  }
+  @media (min-width: 1024px) {
+    .settings-section {
+      grid-template-columns: minmax(15rem, 20rem) minmax(0, 1fr);
+      scroll-margin-top: 5rem;
+    }
+  }
+  .settings-block {
+    margin-top: 3rem;
+    scroll-margin-top: 9rem;
+  }
+  @media (min-width: 1024px) {
+    .settings-block {
+      scroll-margin-top: 5rem;
+    }
+  }
+
+  /* Details one click away: a ruled row with a turning chevron. */
+  .disclosure {
+    border-top: 2px solid var(--color-ink);
+    border-bottom: 1px solid var(--color-paper-3);
+    padding-bottom: 0.25rem;
+  }
+  .disclosure > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 3.25rem;
+    font-size: 1.1875rem;
+    font-weight: 800;
+    cursor: pointer;
+    list-style: none;
+  }
+  .disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+  .disclosure > summary::after {
+    content: '';
+    width: 0.6rem;
+    height: 0.6rem;
+    margin-right: 0.35rem;
+    border-right: 2.5px solid currentColor;
+    border-bottom: 2.5px solid currentColor;
+    transform: translateY(-25%) rotate(45deg);
+    transition: transform 220ms var(--ease-out-expo);
+  }
+  .disclosure[open] > summary::after {
+    transform: translateY(25%) rotate(-135deg);
+  }
+  .disclosure[open] {
+    padding-bottom: 1rem;
+  }
+
+  .more-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.75rem;
+    font-size: 1rem;
+    font-weight: 750;
+    color: var(--color-ink);
   }
 
   /* Outcome as words + icon, coloured text only (no pill) */

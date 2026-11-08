@@ -1,3 +1,4 @@
+import { Access, ReadOnlyNote } from '../../core/access';
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LucideCheck, LucideCircleDashed, LucideLockKeyhole } from '@lucide/angular';
@@ -13,7 +14,14 @@ import { PhoneDemoControl } from '../phone-demo-control';
  */
 @Component({
   selector: 'app-handoff-setup',
-  imports: [RouterLink, LucideCheck, LucideCircleDashed, LucideLockKeyhole, PhoneDemoControl],
+  imports: [
+    RouterLink,
+    LucideCheck,
+    LucideCircleDashed,
+    LucideLockKeyhole,
+    PhoneDemoControl,
+    ReadOnlyNote,
+  ],
   template: `
     <section
       class="rounded-[var(--radius-card)] border-2 border-ink"
@@ -79,7 +87,9 @@ import { PhoneDemoControl } from '../phone-demo-control';
               </li>
             }
           </ul>
-          @if (phoneDemo(); as demo) {
+          @if (access.readOnly) {
+            <app-read-only-note class="mt-4 block" />
+          } @else if (phoneDemo(); as demo) {
             @if (demo.can_arm || demo.state === 'armed') {
               <div class="mt-4">
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -112,6 +122,7 @@ import { PhoneDemoControl } from '../phone-demo-control';
   `,
 })
 export class HandoffSetup {
+  readonly access = inject(Access);
   private readonly store = inject(ConsoleStore);
   readonly name = computed(() => this.store.state()?.profile?.display_name ?? 'Sarah');
   readonly steps = computed(() => [
