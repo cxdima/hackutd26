@@ -14,31 +14,34 @@ import { OutcomeChip } from './outcome-chip';
     <a
       [routerLink]="['/console/calls', call().id]"
       queryParamsHandling="preserve"
-      class="group grid gap-x-5 gap-y-2 rounded-xl px-4 py-4 text-ink no-underline transition-colors hover:bg-paper-2 sm:grid-cols-[8.5rem_1fr_auto] sm:items-center"
+      class="group block min-w-0 rounded-xl px-3.5 py-3 text-ink no-underline transition-colors hover:bg-paper-2"
       [class.!bg-paper-3]="selected()"
       [attr.aria-current]="selected() ? 'page' : null"
     >
-      <span class="flex flex-col">
-        <time class="text-[1rem] font-bold" [attr.datetime]="call().startedAt">{{ when() }}</time>
-        <span class="text-[0.95rem] text-muted"
-          >{{ age() }}{{ call().durationSeconds !== undefined ? ' · ' + duration() : '' }}</span
+      <span class="flex items-center justify-between gap-3">
+        <app-outcome-chip [outcome]="call().outcome" />
+        <svg
+          lucideChevronRight
+          [size]="18"
+          class="shrink-0 text-muted transition-transform group-hover:translate-x-0.5"
+          aria-hidden="true"
+        ></svg>
+      </span>
+      <span class="mt-1.5 block text-[1.0625rem] leading-snug" [class.line-clamp-2]="compact()">{{
+        call().headline
+      }}</span>
+      <span class="mt-1 block text-[0.95rem] text-muted"
+        ><time
+          class="tabular whitespace-nowrap font-semibold text-ink-3"
+          [attr.datetime]="call().startedAt"
+          >{{ when() }}</time
         >
+        · <span class="whitespace-nowrap">For {{ call().name }}</span> ·
+        <span class="whitespace-nowrap">{{ age() }}</span>
+        @if (call().durationSeconds !== undefined) {
+          · <span class="tabular whitespace-nowrap">{{ duration() }}</span>
+        }
       </span>
-      <span class="min-w-0">
-        <span class="flex flex-wrap items-center gap-2">
-          <app-outcome-chip [outcome]="call().outcome" />
-          <span class="text-[0.95rem] font-semibold text-muted">for {{ call().name }}</span>
-        </span>
-        <span class="mt-1.5 block text-[1.0625rem] leading-snug" [class.line-clamp-2]="compact()">{{
-          call().headline
-        }}</span>
-      </span>
-      <svg
-        lucideChevronRight
-        [size]="20"
-        class="hidden text-muted transition-transform group-hover:translate-x-0.5 sm:block"
-        aria-hidden="true"
-      ></svg>
     </a>
   `,
 })

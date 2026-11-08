@@ -359,3 +359,42 @@ proptest! {
         prop_assert!(session.accept(&offer.id, "CA-sarah", now()).is_err());
     }
 }
+
+#[test]
+fn reported_unknown_object_is_not_an_unresolved_present_request() {
+    for act in [SpeechAct::Quotation, SpeechAct::Negation] {
+        let mut s = session();
+        assess_text(
+            &mut s,
+            "A stranger asked for something private; I refused and am reporting it.",
+            &Observation {
+                speech_act: act,
+                requested_object: RequestedObject::Unknown,
+                direction: Direction::None,
+            },
+        );
+        assert!(!s.blocked);
+        assert!(
+            !s.ambiguous,
+            "A categorical report does not seek an unknown object from Sarah"
+        );
+    }
+    let mut s = session();
+    assess_text(
+        &mut s,
+        "Please give me the code.",
+        &Observation {
+            speech_act: SpeechAct::Request,
+            requested_object: RequestedObject::Unknown,
+            direction: Direction::CallerRequestsFromSarah,
+        },
+    );
+    assert!(
+        s.ambiguous,
+        "Unspecified requested code still requires clarification"
+    );
+    assert!(
+        s.make_offer("Unexplained code", "sarah-action", now())
+            .is_err()
+    );
+}

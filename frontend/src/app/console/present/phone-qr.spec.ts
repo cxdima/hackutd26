@@ -9,9 +9,9 @@ describe('PhoneQr', () => {
     return fixture;
   }
 
-  it('encodes only a tel: link to the inbound number', () => {
+  it('encodes only a TEL: dial link to the inbound number', () => {
     const fixture = render('+15555550134');
-    expect(fixture.componentInstance.payload()).toBe('tel:+15555550134');
+    expect(fixture.componentInstance.payload()).toBe('TEL:+15555550134');
     expect(fixture.nativeElement.querySelector('svg path')).not.toBeNull();
   });
 

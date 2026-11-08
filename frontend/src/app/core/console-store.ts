@@ -39,6 +39,9 @@ function timeout(ms: number, signal?: AbortSignal): AbortSignal {
   return signal ? AbortSignal.any([signal, AbortSignal.timeout(ms)]) : AbortSignal.timeout(ms);
 }
 
+export const PHONE_DEMO_ARM = '/api/demo/phone-demo/arm';
+export const PHONE_DEMO_DISARM = '/api/demo/phone-demo/disarm';
+
 /**
  * Authenticated console state. The operator token lives only in this service's
  * memory: never localStorage, sessionStorage, cookies or a URL. Reloading or
@@ -53,6 +56,8 @@ export class ConsoleStore implements OnDestroy {
   readonly session = signal<'token' | 'local' | null>(null);
   /** True while the one automatic connection attempt is running. */
   readonly autoConnecting = signal(false);
+  /** The local server did not answer the last attempt. */
+  readonly unreachable = signal(false);
   private autoTried = false;
 
   private auth(): Record<string, string> {
@@ -173,15 +178,24 @@ export class ConsoleStore implements OnDestroy {
       this.lastSequence = 0;
       this.stale.set(false);
       this.error.set('');
+      this.unreachable.set(false);
       this.startClock();
       this.controller = new AbortController();
       void this.stream(this.controller.signal, generation);
       return true;
     } catch {
+      if (generation === this.generation) this.unreachable.set(true);
       return false;
     } finally {
       if (generation === this.generation) this.autoConnecting.set(false);
     }
+  }
+
+  /** Another attempt at the local server (manual or periodic). */
+  retryLocal(): Promise<boolean> {
+    if (this.source() !== 'none') return Promise.resolve(false);
+    this.autoTried = false;
+    return this.connectLocal();
   }
 
   enterDemo(): void {
@@ -492,6 +506,20 @@ export class ConsoleStore implements OnDestroy {
     } finally {
       if (generation === this.generation) this.busy.set(null);
     }
+  }
+
+  /**
+   * Arms "ring my phone on the next call" for ten minutes. An explicit operator
+   * click only; live servers only, never in the demo. Places no call by itself.
+   */
+  armPhoneDemo(): Promise<boolean> {
+    if (this.source() !== 'live') return Promise.resolve(false);
+    return this.action(PHONE_DEMO_ARM, { contact_id: 'sarah', ttl_seconds: 600 });
+  }
+
+  disarmPhoneDemo(armId: string): Promise<boolean> {
+    if (this.source() !== 'live' || !armId) return Promise.resolve(false);
+    return this.action(PHONE_DEMO_DISARM, { arm_id: armId });
   }
 
   async loadProfile(household: string, signal?: AbortSignal): Promise<Profile> {

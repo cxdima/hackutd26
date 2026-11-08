@@ -148,6 +148,43 @@ impl Twilio {
         ]);
         form
     }
+    /// Starts a dual-channel recording of an in-progress call (live only).
+    pub(crate) async fn start_recording(
+        &self,
+        call_sid: &str,
+        callback: &str,
+    ) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.config.mode == ExecutionMode::Live,
+            "Replay cannot record calls"
+        );
+        anyhow::ensure!(
+            call_sid.starts_with("CA") && call_sid.len() == 34,
+            "Invalid call identity"
+        );
+        let response = self
+            .client
+            .post(format!(
+                "https://api.twilio.com/2010-04-01/Accounts/{}/Calls/{call_sid}/Recordings.json",
+                self.config.account_sid
+            ))
+            .basic_auth(&self.config.account_sid, Some(&self.config.auth_token))
+            .form(&[
+                ("RecordingChannels", "dual"),
+                ("RecordingStatusCallback", callback),
+                ("RecordingStatusCallbackMethod", "POST"),
+                ("RecordingStatusCallbackEvent", "completed"),
+            ])
+            .send()
+            .await
+            .map_err(|_| anyhow::anyhow!("Recording request failed"))?;
+        anyhow::ensure!(
+            response.status().is_success(),
+            "Recording not started ({})",
+            response.status().as_u16()
+        );
+        Ok(())
+    }
     pub(crate) async fn fixture_recording(&self, recording: &str) -> anyhow::Result<Vec<u8>> {
         anyhow::ensure!(
             self.config.mode == ExecutionMode::Live,

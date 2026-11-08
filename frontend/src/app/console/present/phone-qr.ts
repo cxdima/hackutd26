@@ -4,7 +4,7 @@ import { isE164 } from '../../core/format';
 
 /**
  * A QR code that opens a tel: link to FirstRing's own inbound number. It
- * encodes only "tel:+<digits>": never a token, dashboard URL or personal number.
+ * encodes only "TEL:+<digits>": never a token, dashboard URL or personal number.
  */
 @Component({
   selector: 'app-phone-qr',
@@ -27,7 +27,8 @@ import { isE164 } from '../../core/format';
 export class PhoneQr {
   readonly number = input.required<string>();
   /** The exact payload, exposed for tests. */
-  readonly payload = computed(() => (isE164(this.number()) ? `tel:${this.number()}` : ''));
+  // "TEL:" is the QR phone-number convention phone cameras offer to dial (not message).
+  readonly payload = computed(() => (isE164(this.number()) ? `TEL:${this.number()}` : ''));
   readonly path = computed(() => {
     const payload = this.payload();
     if (!payload) return undefined;

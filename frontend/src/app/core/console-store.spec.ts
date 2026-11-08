@@ -65,6 +65,32 @@ describe('ConsoleStore', () => {
     expect(store.calls().length).toBeGreaterThan(0);
   });
 
+  it('arms the phone demo only from a live session, with the exact body and no token', async () => {
+    store.enterDemo();
+    expect(await store.armPhoneDemo()).toBe(false);
+    expect(await store.disarmPhoneDemo('arm-1')).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+    store.lock();
+
+    const { state } = buildDemo();
+    const live = { ...state, execution_mode: 'live', data_origin: 'synthetic', sessions: [] };
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/state' || url.startsWith('/api/demo/phone-demo')
+        ? Promise.resolve(json(live))
+        : Promise.resolve(new Response(new ReadableStream(), { status: 200 })),
+    );
+    expect(await store.connectLocal()).toBe(true);
+    expect(await store.armPhoneDemo()).toBe(true);
+    const arm = fetchMock.mock.calls.find(([url]) => url === '/api/demo/phone-demo/arm');
+    const init = arm![1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe('{"contact_id":"sarah","ttl_seconds":600}');
+    expect(init.headers).not.toHaveProperty('Authorization');
+    expect(await store.disarmPhoneDemo('arm-1')).toBe(true);
+    const disarm = fetchMock.mock.calls.find(([url]) => url === '/api/demo/phone-demo/disarm');
+    expect((disarm![1] as RequestInit).body).toBe('{"arm_id":"arm-1"}');
+  });
+
   it('plays a fictional rehearsal call in the demo view without any network request', () => {
     vi.useFakeTimers();
     store.enterDemo();

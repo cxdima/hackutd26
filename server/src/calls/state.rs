@@ -573,7 +573,11 @@ impl Session {
         self.assessed_version = version;
         self.assessments.push(serde_json::json!({"turn_version":version,"generation_id":generation,"observation":observation,"evidence_refs":evidence}));
         self.ambiguous = observation.speech_act == SpeechAct::Unclear
-            || observation.requested_object == RequestedObject::Unknown
+            || (observation.requested_object == RequestedObject::Unknown
+                && !(matches!(
+                    observation.speech_act,
+                    SpeechAct::Quotation | SpeechAct::Negation
+                ) && observation.direction == Direction::None))
             || observation.direction == Direction::Unclear;
         let risky = observation.speech_act == SpeechAct::Request
             && observation.direction == Direction::CallerRequestsFromSarah

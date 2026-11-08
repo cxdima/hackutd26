@@ -24,10 +24,7 @@ import {
         <h3 id="rep-heading" class="text-[1.25rem] font-extrabold">Reported-number history</h3>
         @if (result()?.kind === 'ok') {
           @if (fixture()) {
-            <span class="bug bug-example">Example · fictional reports</span>
-          } @else if (demoScope()) {
-            <span class="bug bug-example">Demo-scoped reports</span>
-          }
+          } @else if (demoScope()) {}
         }
       </div>
       @switch (result()?.kind) {

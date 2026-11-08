@@ -217,9 +217,16 @@ impl App {
         } else {
             None
         };
+        let reputation = crate::reputation::ReputationService::configured(
+            store.clone(),
+            config.mode,
+            std::env::var("REPUTATION_HMAC_KEY").ok().as_deref(),
+            std::env::var("REPUTATION_SCOPE").ok().as_deref(),
+        )?
+        .map(Arc::new);
         let app = Self {
             model_availability: crate::model_availability::ModelAvailability::from_env(),
-            reputation: None,
+            reputation,
             speech,
             config,
             store,

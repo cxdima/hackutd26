@@ -50,7 +50,12 @@ import { gsap, Motion } from '../../shared/motion';
 
       <div class="grid gap-x-10" [class.lg:grid-cols-12]="ink" [class.lg:items-start]="ink">
         <div class="relative mt-8" [class.lg:col-span-7]="ink" #art>
-          <svg viewBox="0 0 1000 300" class="block w-full" aria-hidden="true">
+          <svg
+            viewBox="0 0 1000 300"
+            class="block w-full"
+            [class.lg:max-h-[30vh]]="ink"
+            aria-hidden="true"
+          >
             @for (r of arcs; track r) {
               <circle
                 [attr.cx]="220"

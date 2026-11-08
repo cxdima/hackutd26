@@ -66,6 +66,9 @@ pub fn router(app: App) -> Router {
         .route("/voice/whisper/{id}", post(whisper))
         .route("/voice/choice/{id}", post(choice))
         .route("/voice/conference-status", post(conference_status))
+        .route("/voice/recording-status", post(recording_status))
+        .route("/voice/clone-recorded", post(clone_recorded))
+        .route("/voice/clone-recording", post(clone_recording))
         .route("/voice/fixture/{action}/{step}", post(fixture_turn))
         .route(
             "/voice/fixture-partial/{action}/{step}",
@@ -78,6 +81,14 @@ pub fn router(app: App) -> Router {
         .route_layer(middleware::from_fn_with_state(app.clone(), signed));
     let api = Router::new()
         .route("/api/state", get(state))
+        .route("/api/session/{id}/recording", get(recording_audio))
+        .route("/api/session/{id}/recording/info", get(recording_info))
+        .route("/api/voice/clone", get(clone_status))
+        .route("/api/voice/clone/arm", post(clone_arm))
+        .route("/api/voice/clone/activate", post(clone_activate))
+        .route("/api/voice/clone/deactivate", post(clone_deactivate))
+        .route("/api/voice/clone/delete", post(clone_delete))
+        .route("/api/voice/clone/preview", get(clone_preview))
         .route("/api/reputation", get(crate::reputation_http::list))
         .route(
             "/api/reputation/reports",
@@ -129,12 +140,41 @@ pub fn router(app: App) -> Router {
         .route("/health/ready", get(ready))
         .route("/media/fixture/{capability}/{clip}", get(fixture_audio))
         .route("/media/speech/{capability}", get(speech_audio))
+        .route("/media/voice/{capability}", get(voice_media))
         .merge(voice)
         .merge(api)
         .fallback_service(crate::console_http::frontend_service())
         .with_state(app)
 }
+/// The console opened on this computer (a loopback peer with no proxy or tunnel
+/// forwarding headers) is the operator; no token to paste. Requests arriving
+/// through the public tunnel always carry Cloudflare forwarding headers and
+/// still need the bearer token. `CONSOLE_LOCAL_TRUST=off` disables this.
+pub fn local_console(req: &Request) -> bool {
+    if std::env::var("CONSOLE_LOCAL_TRUST").as_deref() == Ok("off") {
+        return false;
+    }
+    let loopback = req
+        .extensions()
+        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+        .is_some_and(|info| info.0.ip().is_loopback());
+    let forwarded = [
+        "cf-connecting-ip",
+        "cf-ray",
+        "cdn-loop",
+        "x-forwarded-for",
+        "x-forwarded-host",
+        "forwarded",
+        "x-real-ip",
+    ]
+    .iter()
+    .any(|name| req.headers().contains_key(*name));
+    loopback && !forwarded
+}
 async fn admin(State(app): State<App>, req: Request, next: Next) -> Response {
+    if local_console(&req) {
+        return next.run(req).await;
+    }
     let provided = req
         .headers()
         .get(header::AUTHORIZATION)
@@ -269,6 +309,9 @@ fn xml(text: String) -> Response {
         .into_response()
 }
 async fn incoming(State(app): State<App>, Extension(form): Extension<FormData>) -> ApiResult {
+    if let Some(twiml) = crate::voice_clone::intercept(&app, form.field("CallSid")).await? {
+        return Ok(xml(twiml));
+    }
     let binding =
         crate::audio_fixture::bind_inbound(&app, form.field("CallSid"), form.field("From")).await?;
     if binding == 2 {
@@ -290,6 +333,12 @@ async fn incoming(State(app): State<App>, Extension(form): Extension<FormData>) 
         app.store.append(Some(&session), "system", "dependency.failed", json!({"dependency":"reputation","operation":"capture_identity","detail":error.to_string()}), session.execution_mode).await?;
     }
     crate::phone_demo::bind_signed_inbound(&app.store, &app.config, &session).await?;
+    crate::call_recording::start(
+        app.clone(),
+        session.id.clone(),
+        form.field("CallSid").into(),
+    );
+    let _ = crate::voice_clone::refresh(&app).await;
     if binding == 1 {
         crate::audio_fixture::watch_inbound(app.clone(), form.field("CallSid").into());
     }
@@ -299,12 +348,18 @@ async fn incoming(State(app): State<App>, Extension(form): Extension<FormData>) 
         )));
     }
     if app.config.transport == "relay" {
-        let profile: crate::profile::Profile = serde_json::from_value(snapshot["profile"].clone())?;
+        let mut profile: crate::profile::Profile =
+            serde_json::from_value(snapshot["profile"].clone())?;
+        if crate::call_recording::enabled() {
+            profile.greeting = format!("{} This call is recorded.", profile.greeting);
+        }
+        // An activated owner voice speaks the greeting itself once Relay connects.
+        let greet = crate::voice_clone::active_voice(&session.household_id).is_none();
         return Ok(xml(crate::providers::relay::connect_twiml_for(
             &app.config.public_base_url,
             snapshot["relay_token"].as_str().unwrap_or_default(),
             &profile,
-            true,
+            greet,
         )));
     }
     if app.config.transport == "gather" {
@@ -595,6 +650,7 @@ async fn state(State(app): State<App>) -> ApiResult {
     {"id":"relay","status":if c.relay_configured(){"configured"}else{"pending"},"detail":"Local signed-WebSocket inputs only; onboarding and real phone protocol test pending"},
     {"id":"smoke_test","status":if c.smoke_authorized{"configured"}else{"pending"},"detail":"Exactly one authorized outbound attempt to Sarah/Phone B"},
     {"id":"private_handoff_demo","status":if phone_demo.state=="armed" && phone_demo.recipient_enrolled && phone_demo.outbound_configured && c.mode==crate::config::ExecutionMode::Live {"configured"}else{"disabled"},"detail":"One operator arm authorizes only its bound session; independent of the Phone B transport probe"},
+    {"id":"handoff","status":if phone_demo.state=="armed" && phone_demo.recipient_enrolled && phone_demo.outbound_configured {"configured"}else{"disabled"},"detail":if !phone_demo.recipient_enrolled {"Physical recipient not enrolled; no private call can start"} else if phone_demo.state=="armed" {"One private phone demo is armed; connection and audible summary remain unverified"} else {"Private calling is not armed; an explicit operator action is required"}},
     {"id":"family","status":if c.family_enabled{"configured"}else{"disabled"},"detail":"Family calls require separate enrollment and authorization"},
     {"id":"reputation","status":if app.reputation.is_some(){"configured"}else{"disabled"},"detail":"Scoped presented-number reports; demo profiles simulate independence, never verify caller identity"},
     {"id":"voice_clone","status":"disabled","detail":"Preset assistant voice; no clone endpoint verified"}
@@ -1066,4 +1122,184 @@ struct Replay {
 }
 async fn replay(State(app): State<App>, Json(p): Json<Replay>) -> ApiResult {
     Ok(Json(crate::replay::run(&app, &p.scenario).await?).into_response())
+}
+
+async fn recording_status(
+    State(app): State<App>,
+    Query(q): Query<HashMap<String, String>>,
+    Extension(f): Extension<FormData>,
+) -> ApiResult {
+    if f.field("RecordingStatus") == "completed"
+        && let Some(session) = q.get("session_id")
+    {
+        let seconds = f.field("RecordingDuration").parse().unwrap_or(0);
+        crate::call_recording::completed(&app, session, f.field("RecordingSid"), seconds).await?;
+    }
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+async fn clone_recorded() -> ApiResult {
+    Ok(xml(crate::voice_clone::recorded_twiml()))
+}
+async fn clone_recording(
+    State(app): State<App>,
+    Query(q): Query<HashMap<String, String>>,
+    Extension(f): Extension<FormData>,
+) -> ApiResult {
+    if f.field("RecordingStatus") == "completed"
+        && let Some(household) = q.get("household")
+    {
+        crate::voice_clone::process_recording(
+            app.clone(),
+            household.clone(),
+            f.field("RecordingSid").into(),
+            f.field("RecordingDuration").parse().unwrap_or(0),
+        );
+    }
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+async fn recording_info(State(app): State<App>, Path(id): Path<String>) -> ApiResult {
+    let info = crate::call_recording::info(&app, &id).await?;
+    Ok((
+        [(header::CACHE_CONTROL, "no-store")],
+        Json(json!({"available": info.is_some(), "recording": info.map(|v| json!({"duration_seconds": v["duration_seconds"], "channels": v["channels"]}))})),
+    )
+        .into_response())
+}
+async fn recording_audio(State(app): State<App>, Path(id): Path<String>) -> Response {
+    let Ok(Some(info)) = crate::call_recording::info(&app, &id).await else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error":"No recording for this call"})),
+        )
+            .into_response();
+    };
+    match app
+        .twilio
+        .fixture_recording(info["recording_sid"].as_str().unwrap_or_default())
+        .await
+    {
+        Ok(bytes) => (
+            [
+                (header::CONTENT_TYPE, "audio/mpeg"),
+                (header::CACHE_CONTROL, "private, no-store"),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(error) => (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({"error": error.to_string()})),
+        )
+            .into_response(),
+    }
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CloneArm {
+    household_id: Option<String>,
+    speaker_name: String,
+    consent: bool,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CloneTarget {
+    household_id: Option<String>,
+}
+async fn clone_household(app: &App, requested: Option<&str>) -> anyhow::Result<String> {
+    Ok(match requested {
+        Some(id) => id.to_string(),
+        None => app
+            .store
+            .metadata("selected_household")
+            .await?
+            .unwrap_or_else(|| "sarah".into()),
+    })
+}
+async fn clone_status(
+    State(app): State<App>,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult {
+    let household = clone_household(&app, q.get("household").map(String::as_str)).await?;
+    let value = crate::voice_clone::load(&app, &household).await?;
+    Ok((
+        [(header::CACHE_CONTROL, "no-store")],
+        Json(crate::voice_clone::view(value.as_ref(), &household)),
+    )
+        .into_response())
+}
+async fn clone_arm(State(app): State<App>, Json(p): Json<CloneArm>) -> ApiResult {
+    if !p.consent {
+        return Err(anyhow::anyhow!("Consent is required").into());
+    }
+    let household = clone_household(&app, p.household_id.as_deref()).await?;
+    let value = crate::voice_clone::arm(&app, &household, &p.speaker_name).await?;
+    Ok(Json(crate::voice_clone::view(Some(&value), &household)).into_response())
+}
+async fn clone_activate(State(app): State<App>, Json(p): Json<CloneTarget>) -> ApiResult {
+    let household = clone_household(&app, p.household_id.as_deref()).await?;
+    let value = crate::voice_clone::set_active(&app, &household, true).await?;
+    Ok(Json(crate::voice_clone::view(Some(&value), &household)).into_response())
+}
+async fn clone_deactivate(State(app): State<App>, Json(p): Json<CloneTarget>) -> ApiResult {
+    let household = clone_household(&app, p.household_id.as_deref()).await?;
+    let value = crate::voice_clone::set_active(&app, &household, false).await?;
+    Ok(Json(crate::voice_clone::view(Some(&value), &household)).into_response())
+}
+async fn clone_delete(State(app): State<App>, Json(p): Json<CloneTarget>) -> ApiResult {
+    let household = clone_household(&app, p.household_id.as_deref()).await?;
+    let value = crate::voice_clone::delete(&app, &household).await?;
+    Ok(Json(crate::voice_clone::view(Some(&value), &household)).into_response())
+}
+async fn clone_preview(
+    State(app): State<App>,
+    Query(q): Query<HashMap<String, String>>,
+) -> Response {
+    let result = async {
+        let household = clone_household(&app, q.get("household").map(String::as_str)).await?;
+        let value = crate::voice_clone::load(&app, &household)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("No enrolled voice"))?;
+        let voice = value
+            .voice_id
+            .ok_or_else(|| anyhow::anyhow!("The voice is not ready"))?;
+        let profile = crate::profile::Profile::load(&app.store, &household).await?;
+        crate::voice_clone::synthesize(
+            &voice,
+            &format!(
+                "Hi, this is FirstRing answering for {}. What's the call about?",
+                profile.display_name
+            ),
+        )
+        .await
+    }
+    .await;
+    match result {
+        Ok(bytes) => (
+            [
+                (header::CONTENT_TYPE, "audio/mpeg"),
+                (header::CACHE_CONTROL, "private, no-store"),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(error) => (
+            StatusCode::CONFLICT,
+            Json(json!({"error": error.to_string()})),
+        )
+            .into_response(),
+    }
+}
+async fn voice_media(Path(capability): Path<String>) -> Response {
+    match crate::voice_clone::get_media(&capability) {
+        Some(bytes) => (
+            [
+                (header::CONTENT_TYPE, "audio/mpeg"),
+                (header::CACHE_CONTROL, "private, no-store"),
+                (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+            ],
+            bytes,
+        )
+            .into_response(),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
 }

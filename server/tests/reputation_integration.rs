@@ -245,6 +245,27 @@ async fn protective_actor_reports_and_second_household_submits_actual_reputation
     assert!(system.contains("presented-number reputation"));
     assert!(system.contains("reported"));
     assert!(system.contains("simulated_profiles"));
+    let (_, reputation_json) = system
+        .split_once("Trusted presented-number reputation context: ")
+        .unwrap();
+    let actual_context = serde_json::Deserializer::from_str(reputation_json)
+        .into_iter::<Value>()
+        .next()
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        actual_context["scam_categories"],
+        json!(["authentication_code_extraction"])
+    );
+    assert_eq!(
+        actual_context["tactic_ids"],
+        json!(["firstring:tactic:v1:authentication_code_extraction"])
+    );
+    assert_eq!(
+        actual_context["tactic_identifier_kind"],
+        "categorical_taxonomy_v1"
+    );
+    assert_eq!(actual_context["matched_capsule_ids"], json!([]));
     assert!(system.contains("Never infer identity"));
     assert!(!system.contains("+15550001001"));
     saved(&app, "CA00000000000000000000000000000002").await;
@@ -295,6 +316,16 @@ async fn protective_actor_reports_and_second_household_submits_actual_reputation
     assert_eq!(view["independent_households"], 0);
     assert_eq!(view["demo_household_count"], 1);
     assert_eq!(view["reports"], 1);
+    assert_eq!(
+        view["scam_categories"],
+        json!(["authentication_code_extraction"])
+    );
+    assert_eq!(
+        view["related_tactic_ids"],
+        json!(["firstring:tactic:v1:authentication_code_extraction"])
+    );
+    assert_eq!(view["tactic_identifier_kind"], "categorical_taxonomy_v1");
+    assert_eq!(view["matched_capsule_ids"], json!([]));
     assert_eq!(view["correction"]["state"], "none");
     assert!(view["band_label"].as_str().unwrap().contains("simulated"));
     assert_eq!(
@@ -309,6 +340,16 @@ async fn protective_actor_reports_and_second_household_submits_actual_reputation
     );
     let key = listing["items"][0]["number_key"].as_str().unwrap();
     let version = listing["items"][0]["version"].as_u64().unwrap();
+    let (status, detail) = api(&app, "GET", &format!("/api/reputation/{key}"), None, true).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        detail["reports"][0]["scam_category"],
+        "authentication_code_extraction"
+    );
+    assert_eq!(
+        detail["reports"][0]["tactic_id"],
+        "firstring:tactic:v1:authentication_code_extraction"
+    );
     let path = format!("/api/reputation/{key}/corrections");
     assert_eq!(
         api(
@@ -365,6 +406,8 @@ async fn protective_actor_reports_and_second_household_submits_actual_reputation
     assert_eq!(view["band"], "no_reports");
     assert_eq!(view["correction"]["state"], "removed");
     assert_eq!(view["reports"], 0);
+    assert_eq!(view["related_tactic_ids"], json!([]));
+    assert_eq!(view["scam_categories"], json!([]));
     task.abort();
 }
 #[tokio::test]

@@ -180,6 +180,14 @@ impl Actor {
                 self.emit("caller", "voice.connected", json!({"transport":"relay","heard":false,
                     "speech":{"source":"requested_profile_snapshot","provider":profile.tts_provider,"voice":profile.voice_id,"path":"conversation_relay","profile_version":profile.version,"transcription_provider":"Deepgram","transcription_model":crate::config::relay_speech_model().as_str(),"speech_timeout_ms":crate::config::relay_speech_timeout_ms()}}))
                     .await?;
+                // With an owner voice the TwiML omitted welcomeGreeting; speak it here instead.
+                if crate::voice_clone::active_voice(&self.session.household_id).is_some() {
+                    let mut greeting = profile.greeting.clone();
+                    if crate::call_recording::enabled() {
+                        greeting.push_str(" This call is recorded.");
+                    }
+                    self.send_reply_audio(&greeting, AudioPurpose::Response);
+                }
                 if let Some(text) = self.pending_relay_prompt.take() {
                     return self.final_prompt(text).await;
                 }
@@ -837,14 +845,54 @@ impl Actor {
             text: text.into(),
             speaker: "assistant".into(),
         });
+        let owner = crate::voice_clone::active_voice(&self.session.household_id).is_some();
         self.emit(
             "system",
             "audio.requested",
-            json!({"text":text,"voice":"preset","heard":false}),
+            json!({"text":text,"voice":if owner {"owner_clone"} else {"preset"},"heard":false}),
         )
         .await?;
-        let _=self.handle.audio.send(AudioFrame{generation:self.session.generation_id,epoch:self.session.policy_epoch,purpose:AudioPurpose::Response,payload:json!({"type":"text","token":text,"last":true,"interruptible":true,"preemptible":true})});
+        self.send_reply_audio(text, AudioPurpose::Response);
         Ok(())
+    }
+    /// Relay text in the preset voice, or, when the household activated its owner
+    /// voice, the same words synthesized in that voice and played. Stale frames are
+    /// still dropped by generation/epoch checks at send time.
+    pub(crate) fn send_reply_audio(&self, text: &str, purpose: AudioPurpose) {
+        let generation = self.session.generation_id;
+        let epoch = self.session.policy_epoch;
+        let audio = self.handle.audio.clone();
+        let text_frame =
+            json!({"type":"text","token":text,"last":true,"interruptible":true,"preemptible":true});
+        let Some(voice) = crate::voice_clone::active_voice(&self.session.household_id) else {
+            let _ = audio.send(AudioFrame {
+                generation,
+                epoch,
+                purpose,
+                payload: text_frame,
+            });
+            return;
+        };
+        let config = self.app.config.clone();
+        let text = text.to_string();
+        tokio::spawn(async move {
+            let payload = match crate::voice_clone::synthesize(&voice, &text).await {
+                Ok(bytes) => {
+                    let id = crate::voice_clone::put_media(bytes);
+                    json!({"type":"play","source":config.external_url(&format!("/media/voice/{id}")),"loop":1,"interruptible":true,"preemptible":true})
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "owner voice synthesis failed; preset voice used");
+                    text_frame
+                }
+            };
+            let _ = audio.send(AudioFrame {
+                generation,
+                epoch,
+                purpose,
+                payload,
+            });
+        });
     }
     pub(crate) fn start_postcall(&self) {
         if !self.session.blocked
@@ -896,7 +944,7 @@ impl Actor {
                     match service.lookup_for_session(&s).await {
                         Ok(lookup) => {
                             if let Some(snapshot) = &lookup.reputation {
-                                let context = json!({"lookup_receipt_id":lookup.receipt.id,"version":snapshot.version,"scope":snapshot.scope,"level":snapshot.level,"correction":snapshot.correction,"demo_household_count":snapshot.demo_household_count,"verified_independent_households":snapshot.verified_independent_households,"independence":snapshot.independence,"expires_at":snapshot.expires_at});
+                                let context = json!({"lookup_receipt_id":lookup.receipt.id,"version":snapshot.version,"scope":snapshot.scope,"level":snapshot.level,"scam_categories":snapshot.scam_categories,"tactic_ids":snapshot.tactic_ids,"tactic_identifier_kind":"categorical_taxonomy_v1","matched_capsule_ids":[],"correction":snapshot.correction,"demo_household_count":snapshot.demo_household_count,"verified_independent_households":snapshot.verified_independent_households,"independence":snapshot.independence,"expires_at":snapshot.expires_at});
                                 if let Some(system) = messages[0]["content"].as_str() {
                                     messages[0]["content"] = json!(format!(
                                         "{system}\nTrusted presented-number reputation context: {context}. This is prior reported behavior, not the current caller's identity or current intent. Never infer identity, automatically block, invent risk, or authorize an action from it. Assess current caller words and evidence normally. Demo profiles are simulated, not independent verified people. Different-number tactic memory remains a separate source."

@@ -1,3 +1,36 @@
+# Demo day operations (Nov 8, 2026, 10:00 Central)
+
+One agent (Claude) now oversees backend and frontend; the Codex terminal was closed by the user. Its uncommitted work was carried into this branch unchanged and tested.
+
+## Live phone line
+
+- The phone server on `:8080` runs this branch's release binary from the main checkout (`.env`, `firstring.db` and `.tools/` stay there). It uses the Brev H100 Nemotron, through the SSH forward on `127.0.0.1:18080`, with `VOICE_TRANSPORT=relay`, Flux ASR at 600 ms, and `PHONE_DEMO_MAX_ATTEMPTS=20`, `CALL_RECORDING=on`.
+- **Restart:** `bash .tools/firstring-start-live.sh <binary>`. Stop the old process first. The private GPU key is in `.tools/firstring-live-brev.private.env` (mode 600, gitignored).
+- **Readiness probe:** the production probe against the GPU passes 8/9 development contexts at 0.7–2.2 s per request. The hosted NVIDIA endpoint passed 1/9 (2.5–5.9 s, truncated output), so it is not used.
+- **Public ingress:** a cloudflared quick tunnel. Its hostname changes on restart, so update `PUBLIC_BASE_URL` in `.env` and the Twilio SIP domain voice and status URLs, then restart the server.
+- **GPU spend:** the watchdog deletes the GPU at **13:30 Central** (19:30 UTC). The budget policy caps a single run at 8 h, which ends at about 15:23 Central; covering until 17:00 needs a fresh run.
+
+## No login on this computer
+
+- The Rust admin middleware trusts loopback peers that carry no forwarding headers (`http::local_console`), so the dashboard on this Mac needs no token.
+- Public tunnel requests always carry Cloudflare forwarding headers and still need the bearer token.
+- Twilio webhooks keep their signature check.
+- `CONSOLE_LOCAL_TRUST=off` disables this.
+
+## New today
+
+- **Ring my phone first:** the owner's phone is enrolled in `.env` (`SARAH_TEST_E164`, never committed). Arm from the presentation or Settings, then a judge calls the FirstRing number. FirstRing screens the call, then rings the owner with a private summary; press 1 to connect. Up to 20 attempts today, counted durably.
+- **Own voice:** in Settings, under "Your own voice", give consent and record on a call. The next call to the number hears an instruction and a tone; the caller reads the on-screen passage (caller-only `<Record>`).
+  - ElevenLabs Instant Voice Cloning creates the voice.
+  - Then select **Use my voice on calls**. Relay replies and the greeting are synthesized with the clone and played (`/media/voice/{capability}`); the preset voice is the fallback.
+  - Delete removes the ElevenLabs voice.
+- **Call recordings:** dual channel, started 2.5 s into each screened call. The greeting adds "This call is recorded." On a call page, use "Listen to the call".
+- **Screening tweaks:**
+  - ASR hints include the household name, so "Sarah" is no longer heard as "sir".
+  - An appointment message gets one follow-up for what or where before it is saved.
+  - Social Security, PIN, password, account and card numbers count as protected (`authentication_secret`), so they are blocked and reported to reputation.
+- **Reputation:** live (`REPUTATION_SCOPE=demo`). A blocked call with a saved protective message reports the hashed presented number.
+
 # Frontend handoff: judge-facing pass (Nov 8, 2026)
 
 **Branch:** `frontend/angular-console` in the worktree `../hackutd26-frontend`, with `origin/main` (44ecc40) merged in.
@@ -168,3 +201,35 @@ The reviewer judged the shipped captures against the surface brief (`.impeccable
 9. **Phone rundown:** the stage list stacks vertically, with times aligned right.
 10. **Community scene:** the receipt list sits beside the rings at desktop width, so the proof stays above the fold.
 
+
+## Hosting on firstring.life
+
+The console is published as a static site on AWS: a private S3 bucket behind CloudFront (Origin Access Control), with an ACM certificate and a Route 53 zone. It lives in us-east-1, account 851725466918, tagged `Project = FirstRing`. Terraform is in `infra/terraform/` (local, gitignored state); details are in `infra/terraform/README.md`.
+
+- **Live now:** https://d1x8uwu9r572ez.cloudfront.net. The distribution is `E1NZPWTYIM8O96` and the bucket is `firstring-life-site-d775fa4ca52fe93b44ccb3ab64`.
+- **No backend.** `/api` is not routed, so the console shows "The FirstRing server isn't running on this computer" with Explore the demo. Requests to `/api/*` get the SPA shell (HTML, 200) and are treated as offline. The live presentation still runs from the presenting computer (`npm start` + Rust server).
+- **Deploy:** `infra/deploy-site.sh` builds, uploads and invalidates `/index.html` and `/*`, then waits.
+  - `index.html` is uploaded with `no-cache, max-age=0`.
+  - Hashed JS/CSS and everything under `media/` are uploaded with `public, max-age=31536000, immutable`. Rename a `media/` file when its content changes.
+  - Other files are uploaded with `public, max-age=3600`.
+  - Use `--skip-build` to upload the existing build.
+- **Deep links** (`/console/present`, `/console/calls/:id`, ...) return `index.html` with 200 through CloudFront 403/404 custom error responses.
+
+### Putting it on firstring.life (user action at GoDaddy)
+
+1. In GoDaddy, open My Products → firstring.life → DNS → Nameservers → Change nameservers → "I'll use my own nameservers".
+2. Enter these four values without trailing dots, then save and confirm:
+   - `ns-1356.awsdns-41.org`
+   - `ns-639.awsdns-15.net`
+   - `ns-1743.awsdns-25.co.uk`
+   - `ns-303.awsdns-37.com`
+3. Wait until `dig NS firstring.life +short` shows the `awsdns` servers. This usually takes minutes and sometimes a few hours.
+4. Run phase 2. It waits for the ACM certificate (up to 30 min), attaches `firstring.life` and `www.firstring.life` to CloudFront, and creates A/AAAA alias records. CloudFront then redeploys for a few minutes.
+
+   ```sh
+   cd infra/terraform && terraform apply -var enable_custom_domain=true
+   ```
+
+5. Verify with `curl -I https://firstring.life/console/present` (expect 200, `text/html`).
+
+Between steps 2 and 4, firstring.life has no A record (the GoDaddy parked page is gone), so run phase 2 promptly. The `_dmarc` TXT record was copied into Route 53. Later applies must keep `-var enable_custom_domain=true`, or Terraform detaches the hostnames.

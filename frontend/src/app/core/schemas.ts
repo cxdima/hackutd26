@@ -175,6 +175,31 @@ export const tacticSchema = z.object({
 });
 export type Tactic = z.infer<typeof tacticSchema>;
 
+/**
+ * "Ring my phone on the next call": a one-shot, expiring arm the operator sets
+ * with an explicit click. Strings stay open so a new server state never breaks the console.
+ */
+export const phoneDemoSchema = z.object({
+  state: z.string(),
+  arm_id: z.string().nullable().optional(),
+  session_id: z.string().nullable().optional(),
+  household_id: z.string().nullable().optional(),
+  contact_id: z.string().optional(),
+  expires_at: z.string().nullable().optional(),
+  action_id: z.string().nullable().optional(),
+  remaining_attempts: z.number().int().nonnegative().optional(),
+  recipient_enrolled: z.boolean().optional(),
+  outbound_configured: z.boolean().optional(),
+  can_arm: z.boolean(),
+  can_disarm: z.boolean(),
+  scope: z.string().optional(),
+  probe_budget_unchanged: z.boolean().optional(),
+  private_summary_provider: z.string().optional(),
+  private_summary_voice: z.string().optional(),
+  private_summary_source: z.string().optional(),
+});
+export type PhoneDemo = z.infer<typeof phoneDemoSchema>;
+
 export const stateSchema = z.object({
   execution_mode: executionModeSchema,
   data_origin: z.string(),
@@ -236,6 +261,7 @@ export const stateSchema = z.object({
       reason: z.string(),
     })
     .optional(),
+  phone_demo: phoneDemoSchema.optional(),
   /** Status stays an open string: a new server status must not break the console. */
   capabilities: z.array(z.object({ id: z.string(), status: z.string(), detail: z.string() })),
   sessions: z.array(sessionSchema),

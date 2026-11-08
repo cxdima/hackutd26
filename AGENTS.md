@@ -31,7 +31,7 @@ Current primary provider documentation determines API syntax and account capabil
 - A feasible official Nemotron LoRA pilot is now authorized within that same total budget, after a valid native-tool baseline. Verify exact-model training memory/precision, adapter export and serving compatibility first; inference fit alone is insufficient. Use reviewed synthetic trajectories with scenario-family splits and untouched frozen held-out data. Record actual optimizer steps and artifacts; prompt changes/inference are not weight training. Reuse useful allocated compute, export results, and stop/delete by the budget deadline.
 - Use the master guide's current Nemotron model/tool contract, subject to a real access probe. The NVIDIA speech skill does not configure LLM tool calling.
 - Do not build a SIP/RTP server, raw-audio pipeline, distributed workflow system, vector database or second model for the core. No post-bridge AI monitoring claim.
-- Frontend: per the user's Nov 8 decision, new frontend work uses Angular + Tailwind in `frontend/` (see `docs/frontend-handoff.md`); the React/Vite console in `web/` is retained until integration. Readable live actions and real evidence matter more than decorative animation.
+- Frontend: the user-selected Angular/Tailwind app in `frontend/` is owned by Claude. Integrate its committed work without redesign; retain React/Vite `web/` at `/legacy-console` until verified. Readable live actions and real evidence matter more than decoration.
 
 ## State and execution invariants
 
