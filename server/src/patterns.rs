@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use sqlx::{Row, Sqlite, Transaction};
 use tokio::{sync::broadcast, task::JoinHandle};
 
-const HOUSEHOLDS: [(&str, &str); 2] = [("sarah", "Sarah"), ("maya", "Maya")];
+const HOUSEHOLDS: [(&str, &str); 2] = [("sarah", "Sarah"), ("maya", "Maya and Jimmy")];
 
 #[derive(Clone, Serialize, Deserialize)]
 struct StoredCapsule {

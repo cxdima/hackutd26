@@ -10,6 +10,11 @@ import type { CallEvent, ConsoleState, Tactic } from './schemas';
  * or identity.
  */
 
+/** “Maya and Jimmy were ready”, “Sarah was ready”. */
+export function verb(name: string | undefined): 'was' | 'were' {
+  return name && / and /.test(name) ? 'were' : 'was';
+}
+
 export type StoryStageId = 'identified' | 'committed' | 'available' | 'consulted' | 'outcome';
 export type StoryStatus = 'done' | 'pending' | 'unavailable';
 
@@ -159,7 +164,7 @@ export function buildCommunityStories(
     const available: StoryStage = targetEvent
       ? {
           id: 'available',
-          label: `${nameOf(targetHousehold)} was ready`,
+          label: `${nameOf(targetHousehold)} ${verb(nameOf(targetHousehold))} ready`,
           status: 'done',
           detail: `${nameOf(targetHousehold)}’s FirstRing applied warning version ${String(targetEvent.payload['version'])}.`,
           at: targetEvent.occurred_at,
@@ -220,7 +225,7 @@ export function buildCommunityStories(
     const targetName = nameOf(targetHousehold ?? laterCall?.session.household_id);
     const headline =
       sourceName && consulted.status === 'done' && targetName
-        ? `${sourceName} spotted it. ${targetName} was ready.`
+        ? `${sourceName} spotted it. ${targetName} ${verb(targetName)} ready.`
         : available.status === 'done' && targetName
           ? `A shared warning is ready for ${targetName}.`
           : 'A shared warning is being prepared.';

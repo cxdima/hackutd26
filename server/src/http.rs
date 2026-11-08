@@ -69,6 +69,7 @@ pub fn router(app: App) -> Router {
         .route("/voice/recording-status", post(recording_status))
         .route("/voice/clone-recorded", post(clone_recorded))
         .route("/voice/clone-recording", post(clone_recording))
+        .route("/voice/trusted-done", post(trusted_done))
         .route("/voice/fixture/{action}/{step}", post(fixture_turn))
         .route(
             "/voice/fixture-partial/{action}/{step}",
@@ -89,6 +90,9 @@ pub fn router(app: App) -> Router {
         .route("/api/voice/clone/deactivate", post(clone_deactivate))
         .route("/api/voice/clone/delete", post(clone_delete))
         .route("/api/voice/clone/preview", get(clone_preview))
+        .route("/api/callers", get(crate::reputation_http::callers))
+        .route("/api/trusted", get(trusted_list).post(trusted_add))
+        .route("/api/trusted/remove", post(trusted_remove))
         .route("/api/reputation", get(crate::reputation_http::list))
         .route(
             "/api/reputation/reports",
@@ -325,6 +329,16 @@ async fn incoming(State(app): State<App>, Extension(form): Extension<FormData>) 
     }
     let (_, snapshot) = app.incoming(form.field("CallSid")).await?;
     let session: Session = serde_json::from_value(snapshot.clone())?;
+    // Trusted callers skip AI screening, recording and reputation entirely.
+    if binding == 0
+        && snapshot["inbound_ended"] != true
+        && let Some(caller) =
+            crate::trusted::find(&app.store, &session.household_id, form.field("From")).await?
+    {
+        return Ok(xml(
+            crate::trusted::passthrough(&app, &session, &caller).await?
+        ));
+    }
     if let Some(reputation) = &app.reputation
         && let Err(error) = reputation
             .capture_identity(&session, Some(form.field("From")))
@@ -417,6 +431,55 @@ async fn ack(
         })
         .await?;
     Ok(xml(v["twiml"].as_str().unwrap_or_default().into()))
+}
+async fn trusted_done(
+    State(app): State<App>,
+    Query(q): Query<HashMap<String, String>>,
+    Extension(f): Extension<FormData>,
+) -> ApiResult {
+    if let Some(id) = q.get("session_id") {
+        crate::trusted::completed(
+            &app,
+            id,
+            f.field("DialCallStatus"),
+            f.field("DialCallDuration"),
+        )
+        .await?;
+    }
+    Ok(xml("<Response><Hangup/></Response>".into()))
+}
+#[derive(Deserialize)]
+struct TrustedQuery {
+    household: Option<String>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TrustedAdd {
+    household_id: String,
+    name: String,
+    #[serde(default)]
+    relation: String,
+    number: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TrustedRemove {
+    household_id: String,
+    id: String,
+}
+async fn trusted_list(State(app): State<App>, Query(q): Query<TrustedQuery>) -> ApiResult {
+    let household = q.household.unwrap_or_else(|| "sarah".into());
+    let entries = crate::trusted::list(&app.store, &household).await?;
+    Ok(Json(crate::trusted::view(&household, &entries, &app.config)).into_response())
+}
+async fn trusted_add(State(app): State<App>, Json(r): Json<TrustedAdd>) -> ApiResult {
+    let entries =
+        crate::trusted::add(&app.store, &r.household_id, &r.name, &r.relation, &r.number).await?;
+    Ok(Json(crate::trusted::view(&r.household_id, &entries, &app.config)).into_response())
+}
+async fn trusted_remove(State(app): State<App>, Json(r): Json<TrustedRemove>) -> ApiResult {
+    let entries = crate::trusted::remove(&app.store, &r.household_id, &r.id).await?;
+    Ok(Json(crate::trusted::view(&r.household_id, &entries, &app.config)).into_response())
 }
 async fn status(
     State(app): State<App>,

@@ -391,6 +391,42 @@ impl ReputationService {
         }
         Ok(snapshots)
     }
+    /// Presented callers with the calls they made and their current reputation.
+    /// Read-only: identities are HMAC keys with a two-digit display suffix.
+    pub async fn callers(&self, mode: ExecutionMode) -> anyhow::Result<Vec<Value>> {
+        let rows = sqlx::query("SELECT session_id,number_key,display_suffix FROM reputation_identities WHERE scope=? AND mode=? AND number_key IS NOT NULL ORDER BY rowid")
+            .bind(scope_name(self.scope))
+            .bind(mode_name(mode))
+            .fetch_all(&self.store.pool)
+            .await?;
+        let mut order: Vec<String> = vec![];
+        let mut groups: std::collections::HashMap<String, (String, Vec<String>)> =
+            std::collections::HashMap::new();
+        for row in rows {
+            let key: String = row.get("number_key");
+            let suffix: Option<String> = row.get("display_suffix");
+            let entry = groups.entry(key.clone()).or_insert_with(|| {
+                order.push(key.clone());
+                (suffix.unwrap_or_default(), vec![])
+            });
+            entry.1.push(row.get("session_id"));
+        }
+        let now = (self.now)().to_rfc3339();
+        let mut items = vec![];
+        for key in order {
+            let (suffix, sessions) = groups.remove(&key).unwrap_or_default();
+            let mut conn = self.store.pool.acquire().await?;
+            let snapshot = self.load(&mut conn, &self.entry_id(mode, &key)).await?;
+            let reports: i64 = sqlx::query_scalar("SELECT count(*) FROM reputation_reports WHERE entry_id=? AND retracted=0 AND expires_at>?")
+                .bind(self.entry_id(mode, &key))
+                .bind(&now)
+                .fetch_one(&mut *conn)
+                .await?;
+            let reputation = snapshot.map(|s| json!({"level":s.level,"reports":reports,"scam_categories":s.scam_categories,"tactic_ids":s.tactic_ids,"first_reported_at":s.first_reported_at,"last_reported_at":s.last_reported_at,"expires_at":s.expires_at,"correction":s.correction,"demo_household_count":s.demo_household_count,"verified_independent_households":s.verified_independent_households,"version":s.version,"explanation":s.explanation}));
+            items.push(json!({"number_key":key,"display_suffix":suffix,"session_ids":sessions,"reputation":reputation,"identity_verified":false}));
+        }
+        Ok(items)
+    }
     pub async fn detail(&self, mode: ExecutionMode, key: &str) -> anyhow::Result<Option<Value>> {
         let id = self.entry_id(mode, key);
         let mut tx = self.store.pool.begin().await?;

@@ -33,7 +33,7 @@ impl Profile {
     pub fn default_for(household: &str) -> anyhow::Result<Self> {
         let name = match household {
             "sarah" => "Sarah",
-            "maya" => "Maya",
+            "maya" => "Maya and Jimmy",
             _ => anyhow::bail!("Unknown household"),
         };
         Ok(Self {

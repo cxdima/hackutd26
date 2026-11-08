@@ -1,4 +1,5 @@
 import { displayName } from './evidence';
+import { ringsFirstName } from './household';
 import { describeObservation, isProtectedRequest, OBJECT_LABEL, toolLabel } from './language';
 import {
   modelObservationSchema,
@@ -178,7 +179,7 @@ export function buildCallRecord(
       headline = `Asked for ${OBJECT_LABEL[protectedRequest?.requested_object ?? 'unknown']}. FirstRing declined${session.message ? ' and saved a note for you' : ''}.`;
       break;
     case 'connected':
-      headline = `${name} heard a private summary, pressed 1 and was connected to the caller.`;
+      headline = `${ringsFirstName(session.household_id, name)} heard a private summary, pressed 1 and was connected to the caller.`;
       break;
     case 'message_saved':
       headline = session.message?.summary ?? 'Message saved.';

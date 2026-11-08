@@ -7,7 +7,12 @@ import {
   LucidePhoneOff,
   LucideUsers,
 } from '@lucide/angular';
+import { RouterLink } from '@angular/router';
+import { CallerDirectory } from '../core/caller-directory';
+import { STANDING_LABEL, type Standing } from '../core/callers';
 import { traceStats, type CallRecord } from '../core/calls';
+import { ringsFirstName } from '../core/household';
+import { turnRows } from '../core/turns';
 import { ConsoleStore } from '../core/console-store';
 import {
   confirmedMatches,
@@ -26,13 +31,14 @@ import { CallRecording } from './call-recording';
 import { DecisionSpine } from './decision-spine';
 import { HandoffTimeline } from './handoff-timeline';
 import { ModelEvidence } from './model-evidence';
-import { OutcomeChip } from './outcome-chip';
+import { OutcomeText } from './outcome-chip';
 import { ReputationPanel } from './reputation-panel';
 
 @Component({
   selector: 'app-call-detail',
   imports: [
-    OutcomeChip,
+    RouterLink,
+    OutcomeText,
     DecisionSpine,
     CallRecording,
     HandoffTimeline,
@@ -50,148 +56,309 @@ import { ReputationPanel } from './reputation-panel';
     @let s = c.session;
     <article aria-labelledby="call-title">
       <header>
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <app-outcome-chip [outcome]="c.outcome" />
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <app-outcome-text [outcome]="c.outcome" [short]="false" />
           <p class="text-[1rem] text-muted">
-            <time [attr.datetime]="c.startedAt">{{ when() }}</time> {{ zone() }} ·
-            <span class="tabular">{{ duration() }}</span> · for {{ c.name }} · {{ modeLabel() }}
+            <time [attr.datetime]="c.startedAt">{{ when() }}</time> {{ zone() }} · {{ c.name }}’s
+            line · {{ modeLabel() }}
           </p>
         </div>
         <h1
           id="call-title"
-          class="mt-4 max-w-[34ch] text-[clamp(1.6rem,1.2rem+1.3vw,2.4rem)] leading-[1.12] font-extrabold tracking-[-0.02em] text-balance"
+          class="mt-3 max-w-[40ch] text-[2rem] leading-[1.12] font-extrabold tracking-[-0.02em] text-balance"
         >
           {{ c.headline }}
         </h1>
-        <p class="mt-2 text-[1rem] text-muted">
-          Caller identity is unverified. Caller ID is a clue, not proof.
-        </p>
-      </header>
-
-      <section class="mt-8 border-t-2 border-ink" aria-label="Summary">
-        <dl>
-          <div class="grid gap-x-8 gap-y-1 border-b border-paper-3 py-5 md:grid-cols-[13rem_1fr]">
-            <dt class="text-[1.0625rem] font-bold text-muted">The caller wanted</dt>
-            <dd>
-              <p class="max-w-[60ch] text-[1.1875rem] font-semibold leading-snug">
-                {{ requestSentence() }}
-              </p>
-              @if (understanding(); as u) {
-                @if (u.claimed_identity) {
-                  <p class="mt-1.5 text-[1rem] text-ink-3">
-                    Said they were “{{ u.claimed_identity }}”. Not verified.
-                  </p>
+        <dl
+          class="mt-6 grid grid-cols-2 gap-x-8 gap-y-4 border-y-2 border-ink py-4 md:grid-cols-3 xl:grid-cols-6"
+        >
+          <div>
+            <dt class="text-[0.95rem] font-semibold text-muted">Caller</dt>
+            <dd class="font-bold">
+              @if (caller(); as who) {
+                @if (who.captured) {
+                  <a
+                    [routerLink]="['/console/callers', who.id]"
+                    queryParamsHandling="preserve"
+                    class="text-ink"
+                    >{{ who.label }}</a
+                  >
+                  <span
+                    class="block text-[0.95rem]"
+                    [class]="
+                      who.standing === 'reported' || who.standing === 'warned'
+                        ? 'text-magenta-ink'
+                        : 'font-semibold text-muted'
+                    "
+                    >{{ standing(who.standing)
+                    }}{{ who.calls.length > 1 ? ' · ' + who.calls.length + ' calls' : '' }}</span
+                  >
+                } @else {
+                  Number not captured
                 }
-                @if (u.missing_information.length && c.outcome !== 'blocked') {
-                  <p class="mt-1 text-[1rem] text-ink-3">
-                    Still unclear: {{ u.missing_information.join('; ') }}
-                  </p>
-                }
+              } @else {
+                Unverified
               }
             </dd>
           </div>
-          <div class="grid gap-x-8 gap-y-1 border-b border-paper-3 py-5 md:grid-cols-[13rem_1fr]">
-            <dt class="text-[1.0625rem] font-bold text-muted">FirstRing</dt>
-            <dd class="max-w-[60ch] text-[1.1875rem] font-semibold leading-snug">
-              {{ didSentence() }}
-            </dd>
+          <div>
+            <dt class="text-[0.95rem] font-semibold text-muted">Length</dt>
+            <dd class="tabular font-bold">{{ duration() }}</dd>
           </div>
-          @if (s.message; as message) {
-            <div class="grid gap-x-8 gap-y-1 border-b border-paper-3 py-5 md:grid-cols-[13rem_1fr]">
-              <dt class="text-[1.0625rem] font-bold text-muted">
-                Saved message{{ earlierMessage() ? ' (earlier turn)' : '' }}
-              </dt>
-              <dd>
-                <blockquote class="max-w-[60ch] text-[1.25rem] font-semibold leading-snug">
-                  “{{ message.summary }}”
-                </blockquote>
-                <p class="mt-1.5 text-[0.95rem] text-muted">
-                  Private to you. Saved for review; not a delivery receipt.
-                </p>
-              </dd>
-            </div>
-          }
-          <div class="grid gap-x-8 gap-y-1 border-b border-paper-3 py-5 md:grid-cols-[13rem_1fr]">
-            <dt class="text-[1.0625rem] font-bold text-muted">Do you need to act?</dt>
-            <dd
-              class="max-w-[60ch] text-[1.1875rem] font-semibold leading-snug"
-              [class.text-magenta-ink]="action().needed && c.outcome === 'in_progress'"
-            >
-              {{ action().text }}
-            </dd>
+          <div>
+            <dt class="text-[0.95rem] font-semibold text-muted">Caller turns</dt>
+            <dd class="tabular font-bold">{{ c.callerTurns }}</dd>
           </div>
-        </dl>
-      </section>
-
-      @if (matches().length) {
-        <section class="mt-6 rounded-xl bg-magenta-wash p-5" aria-labelledby="matches-heading">
-          <h2 id="matches-heading" class="text-[1.125rem] font-extrabold text-magenta-ink">
-            Similar shared tactic on this call
-          </h2>
-          @for (match of matches(); track match.id) {
-            <p class="mt-2 text-[1.0625rem]">
-              {{ actionLabel(match.requested_action) }} ·
-              {{ pretextLabel(match.pretext_category) }} · warning v{{ match.version }} ({{
-                match.supporting_count
-              }}
-              matching capsule{{ match.supporting_count === 1 ? '' : 's' }}). A similar tactic, not
-              an identified person.
-            </p>
-          }
-        </section>
-      }
-
-      <section class="mt-10" aria-labelledby="transcript-heading">
-        <h2 id="transcript-heading" class="text-[1.5rem] font-extrabold">Transcript</h2>
-        <p class="mt-1 max-w-[64ch] text-[1rem] text-muted">
-          Closed-caption style. Lines marked “evidence” were quoted by the model to justify its
-          assessment.
-        </p>
-        <ol class="caption-band on-ink mt-4 space-y-3 p-5 sm:p-6">
-          @for (turn of s.turns; track turn.id) {
-            <li class="max-w-[62ch] text-[1.125rem] leading-snug">
-              <span class="caption-speaker mr-2" [class.!text-lime]="turn.speaker !== 'caller'"
-                >&gt;&gt; {{ turn.speaker === 'caller' ? 'Caller' : 'FirstRing' }}</span
-              >
-              {{ turn.text }}
-              @if (evidenceIds().has(turn.id)) {
-                <span
-                  class="ml-2 whitespace-nowrap rounded bg-paper/12 px-1.5 py-0.5 text-[0.8125rem] font-extrabold uppercase tracking-[0.06em] text-paper"
-                  >Evidence</span
+          <div>
+            <dt class="text-[0.95rem] font-semibold text-muted">AI requests</dt>
+            <dd class="tabular font-bold">
+              {{ stats().modelRequests }}
+              @if (stats().modelRequests) {
+                <span class="block text-[0.95rem] font-semibold text-muted"
+                  >{{ ms(stats().modelMs / stats().modelRequests) }} average</span
                 >
               }
-            </li>
-          } @empty {
-            <li class="text-[1.0625rem] text-paper/80">No words were transcribed on this call.</li>
-          }
-          @if (partial(); as text) {
-            <li class="text-[1.125rem] leading-snug text-paper/70">
-              <span class="caption-speaker mr-2">&gt;&gt; Caller (still speaking)</span>{{ text }}
-            </li>
-          }
-        </ol>
-        <p class="mt-3 text-[1rem] text-muted">Recorded calls can be played back below.</p>
-        <app-call-recording [sessionId]="c.id" />
-      </section>
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[0.95rem] font-semibold text-muted">Rings first</dt>
+            <dd class="font-bold">{{ recipient() }}’s phone</dd>
+          </div>
+          <div>
+            <dt class="text-[0.95rem] font-semibold text-muted">Receipts</dt>
+            <dd class="tabular font-bold">{{ c.events.length }}</dd>
+          </div>
+        </dl>
+      </header>
 
-      <section class="mt-12" aria-labelledby="spine-heading">
-        <h2 id="spine-heading" class="text-[1.5rem] font-extrabold">
-          What FirstRing saw, and why it acted
+      <div class="mt-8 grid gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_26rem]">
+        <section class="min-w-0" aria-labelledby="transcript-heading">
+          <h2 id="transcript-heading" class="text-[1.375rem] font-extrabold">Conversation</h2>
+          <p class="mt-1 text-[1rem] text-muted">
+            What the speech recognizer heard and what FirstRing said back. Lines marked “quoted as
+            evidence” are the ones the AI cited for its decision.
+          </p>
+          <ol class="mt-4 divide-y divide-paper-3 border-y border-paper-3">
+            @for (turn of s.turns; track turn.id) {
+              <li class="grid gap-x-4 gap-y-1 py-3 sm:grid-cols-[7.5rem_minmax(0,1fr)]">
+                <span
+                  class="text-[0.95rem] font-extrabold"
+                  [class]="turn.speaker === 'caller' ? 'text-ink' : 'text-lime-ink'"
+                  >{{ turn.speaker === 'caller' ? 'Caller' : 'FirstRing' }}</span
+                >
+                <p class="max-w-[70ch] text-[1.0625rem] leading-snug">
+                  {{ turn.text }}
+                  @if (evidenceIds().has(turn.id)) {
+                    <span class="ml-1 whitespace-nowrap text-[0.95rem] font-bold text-magenta-ink"
+                      >· quoted as evidence</span
+                    >
+                  }
+                </p>
+              </li>
+            } @empty {
+              <li class="py-4 text-[1.0625rem] text-ink-3">
+                No words were transcribed on this call.
+              </li>
+            }
+            @if (partial(); as text) {
+              <li class="grid gap-x-4 py-3 text-ink-3 sm:grid-cols-[7.5rem_minmax(0,1fr)]">
+                <span class="text-[0.95rem] font-extrabold">Caller, still speaking</span>
+                <p class="text-[1.0625rem] leading-snug">{{ text }}</p>
+              </li>
+            }
+          </ol>
+          <app-call-recording [sessionId]="c.id" />
+        </section>
+
+        <aside class="min-w-0 space-y-8" aria-label="Summary">
+          <section aria-labelledby="summary-heading">
+            <h2 id="summary-heading" class="text-[1.375rem] font-extrabold">Summary</h2>
+            <dl class="mt-3 divide-y divide-paper-3 border-y border-paper-3">
+              <div class="py-3">
+                <dt class="text-[0.95rem] font-semibold text-muted">The caller wanted</dt>
+                <dd class="text-[1.0625rem] font-semibold leading-snug">{{ requestSentence() }}</dd>
+                @if (understanding(); as u) {
+                  @if (u.claimed_identity) {
+                    <dd class="mt-1 text-[1rem] text-ink-3">
+                      Said they were “{{ u.claimed_identity }}”. Not verified.
+                    </dd>
+                  }
+                  @if (u.missing_information.length && c.outcome !== 'blocked') {
+                    <dd class="mt-1 text-[1rem] text-ink-3">
+                      Still unclear: {{ u.missing_information.join('; ') }}
+                    </dd>
+                  }
+                }
+              </div>
+              <div class="py-3">
+                <dt class="text-[0.95rem] font-semibold text-muted">FirstRing</dt>
+                <dd class="text-[1.0625rem] font-semibold leading-snug">{{ didSentence() }}</dd>
+              </div>
+              @if (s.message; as message) {
+                <div class="py-3">
+                  <dt class="text-[0.95rem] font-semibold text-muted">
+                    Saved message{{ earlierMessage() ? ' (earlier turn)' : '' }}
+                  </dt>
+                  <dd>
+                    <blockquote class="text-[1.125rem] font-semibold leading-snug">
+                      “{{ message.summary }}”
+                    </blockquote>
+                    <p class="mt-1 text-[0.95rem] text-muted">
+                      Private to the family. Saved for review; not a delivery receipt.
+                    </p>
+                  </dd>
+                </div>
+              }
+              <div class="py-3">
+                <dt class="text-[0.95rem] font-semibold text-muted">Does anyone need to act?</dt>
+                <dd
+                  class="text-[1.0625rem] font-semibold leading-snug"
+                  [class.text-magenta-ink]="action().needed && c.outcome === 'in_progress'"
+                >
+                  {{ action().text }}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          @if (matches().length) {
+            <section aria-labelledby="matches-heading">
+              <h2 id="matches-heading" class="text-[1.125rem] font-extrabold text-magenta-ink">
+                Matches a shared warning
+              </h2>
+              @for (match of matches(); track match.id) {
+                <p class="mt-2 text-[1rem]">
+                  {{ actionLabel(match.requested_action) }} ·
+                  {{ pretextLabel(match.pretext_category) }} · warning v{{ match.version }} ({{
+                    match.supporting_count
+                  }}
+                  matching capsule{{ match.supporting_count === 1 ? '' : 's' }}). A similar tactic,
+                  not an identified person.
+                </p>
+              }
+            </section>
+          }
+
+          <app-reputation-panel [sessionId]="c.id" />
+        </aside>
+      </div>
+
+      <section class="mt-12" aria-labelledby="turns-heading">
+        <h2 id="turns-heading" class="text-[1.375rem] font-extrabold">
+          What the AI saw and decided, turn by turn
         </h2>
-        <div class="mt-4"><app-decision-spine [call]="c" /></div>
+        <p class="mt-1 max-w-[75ch] text-[1rem] text-muted">
+          Each caller turn goes to NVIDIA Nemotron, which proposes tools. Rust checks every proposal
+          against fixed rules before anything happens, so the AI cannot hand out a code, take a
+          payment or call anyone on its own.
+        </p>
+        <div class="table-scroll mt-4">
+          <table class="data-table min-w-[64rem]">
+            <thead>
+              <tr>
+                <th scope="col" class="num">#</th>
+                <th scope="col" class="w-[22%]">Caller said</th>
+                <th scope="col" class="w-[24%]">AI understood</th>
+                <th scope="col" class="w-[18%]">Safety rule</th>
+                <th scope="col" class="w-[24%]">FirstRing did</th>
+                <th scope="col" class="num">AI time</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (t of turns(); track t.index) {
+                <tr>
+                  <td class="num font-bold">{{ t.index || '—' }}</td>
+                  <td>
+                    @if (t.said) {
+                      <q class="text-[1rem]">{{ t.said }}</q>
+                    } @else {
+                      <span class="text-muted">Call answered</span>
+                    }
+                  </td>
+                  <td>
+                    @for (line of t.understood; track line) {
+                      <p class="text-[1rem]">{{ line }}</p>
+                    } @empty {
+                      <span class="text-muted">—</span>
+                    }
+                    @if (t.proposed.length) {
+                      <p class="mt-1 text-[0.95rem] text-muted">
+                        Proposed: {{ t.proposed.join(', ') }}
+                      </p>
+                    }
+                  </td>
+                  <td>
+                    @if (t.decision; as d) {
+                      <p
+                        class="text-[1rem] font-bold"
+                        [class]="
+                          d.verdict === 'protected'
+                            ? 'text-magenta-ink'
+                            : d.verdict === 'allowed'
+                              ? 'text-lime-ink'
+                              : 'text-amber-ink'
+                        "
+                      >
+                        {{
+                          d.verdict === 'protected'
+                            ? 'Protected request: refused'
+                            : d.verdict === 'allowed'
+                              ? 'Nothing protected: help continued'
+                              : 'Not assessed'
+                        }}
+                      </p>
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
+                  <td>
+                    @for (line of t.did; track line) {
+                      <p class="text-[1rem]">{{ line }}</p>
+                    }
+                    @for (line of t.replied; track line) {
+                      <p class="text-[1rem] text-ink-3">Said: “{{ line }}”</p>
+                    }
+                    @for (line of t.failures; track line) {
+                      <p class="text-[1rem] font-semibold text-amber-ink">{{ line }}</p>
+                    }
+                    @if (!t.did.length && !t.replied.length && !t.failures.length) {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
+                  <td class="num">
+                    @if (t.modelRequests) {
+                      {{ ms(t.modelMs) }}
+                      <span class="block text-[0.95rem] text-muted"
+                        >{{ t.modelRequests }} request{{ t.modelRequests === 1 ? '' : 's' }}</span
+                      >
+                    } @else {
+                      —
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="6" class="!py-6 text-[1.0625rem] text-ink-3">
+                    No turns were recorded for this call.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
       </section>
 
       @if (handoff()) {
         <section class="mt-12" aria-labelledby="handoff-heading">
           <h2 id="handoff-heading" class="text-[1.5rem] font-extrabold">Private permission</h2>
           <p class="mt-1 max-w-[65ch] text-[1rem] text-muted">
-            FirstRing asks {{ c.name }} on their own phone before connecting anyone. Each step below
-            appears only when its receipt arrives.
+            FirstRing asks {{ recipient() }} on their own phone before connecting anyone. Each step
+            below appears only when its receipt arrives.
           </p>
           @if (s.offer; as offer) {
             <div class="mt-4 rounded-xl bg-paper-2 p-4">
               <p class="text-[0.95rem] font-bold text-muted">
-                Private summary for {{ c.name }} · offer {{ offer.status }}
+                Private summary for {{ recipient() }} · offer {{ offer.status }}
               </p>
               <p class="mt-1 text-[1.0625rem] font-semibold">{{ offer.summary }}</p>
               <p class="mt-1 text-[0.95rem] text-muted">
@@ -257,9 +424,16 @@ import { ReputationPanel } from './reputation-panel';
         </section>
       }
 
-      <div class="mt-12"><app-reputation-panel [sessionId]="c.id" /></div>
-
       <details class="mt-12 rounded-[var(--radius-card)] border-2 border-paper-3">
+        <summary
+          class="flex min-h-14 cursor-pointer items-center justify-between gap-4 px-5 text-[1.125rem] font-extrabold"
+        >
+          Every receipt, in order
+        </summary>
+        <div class="px-5 pb-6"><app-decision-spine [call]="c" /></div>
+      </details>
+
+      <details class="mt-4 rounded-[var(--radius-card)] border-2 border-paper-3">
         <summary
           class="flex min-h-14 cursor-pointer items-center justify-between gap-4 px-5 text-[1.125rem] font-extrabold"
         >
@@ -371,7 +545,13 @@ export class CallDetail {
   readonly confirmEnd = signal(false);
   readonly shortId = shortId;
 
+  private readonly directory = inject(CallerDirectory);
   readonly understanding = computed(() => this.call().session.understanding?.understanding);
+  readonly caller = computed(() => this.directory.forCall(this.call().id));
+  readonly recipient = computed(() =>
+    ringsFirstName(this.call().session.household_id, this.call().name),
+  );
+  readonly turns = computed(() => turnRows(this.call()));
   readonly action = computed(() => personAction(this.call()));
   readonly handoff = computed(() => handoffView(this.call()));
   /** Handoff legs are shown in the permission timeline; the rest (tests, family) here. */
@@ -425,7 +605,7 @@ export class CallDetail {
       case 'blocked':
         return 'Declined the protected request and ended the call politely. Nothing private was shared.';
       case 'connected':
-        return `Asked ${c.name} privately, played a summary, and connected the call only after ${c.name} pressed 1.`;
+        return `Rang ${this.recipient()} privately, played a summary, and connected the call only after ${this.recipient()} pressed 1.`;
       case 'message_saved':
         return 'Took a message and ended the call politely.';
       case 'needs_review':
@@ -500,6 +680,9 @@ export class CallDetail {
     return `Phone B: ${phoneB.reason}${budget}`;
   });
 
+  standing(value: Standing) {
+    return STANDING_LABEL[value];
+  }
   time(at: string) {
     return formatDateTime(at, this.call().timezone);
   }

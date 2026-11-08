@@ -212,6 +212,28 @@ async fn protective_actor_reports_and_second_household_submits_actual_reputation
     saved(&app, "CA00000000000000000000000000000001").await;
     let (_, listing) = api(&app, "GET", "/api/reputation", None, true).await;
     assert_eq!(listing["items"].as_array().unwrap().len(), 1);
+    // Callers: one presented number, its calls and its current reputation,
+    // keyed by the HMAC identity and never by the raw number.
+    assert_eq!(
+        api(&app, "GET", "/api/callers", None, false).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    let (status, callers) = api(&app, "GET", "/api/callers", None, true).await;
+    assert_eq!(status, StatusCode::OK);
+    let items = callers["items"].as_array().unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0]["display_suffix"], "01");
+    assert_eq!(items[0]["reputation"]["level"], "reported");
+    assert_eq!(
+        items[0]["reputation"]["scam_categories"],
+        json!(["authentication_code_extraction"])
+    );
+    assert_eq!(items[0]["session_ids"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        items[0]["number_key"], listing["items"][0]["number_key"],
+        "callers and reputation share one identity"
+    );
+    assert!(!callers.to_string().contains("5550001001"));
     assert_eq!(listing["items"][0]["level"], "reported");
     assert_eq!(listing["items"][0]["verified_independent_households"], 0);
     let first = requests.recv().await.unwrap();

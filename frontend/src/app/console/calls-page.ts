@@ -1,181 +1,219 @@
 import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
-import { LucideArrowLeft, LucideSearch } from '@lucide/angular';
-import type { Outcome } from '../core/calls';
+import { Router, RouterLink } from '@angular/router';
+import { LucideArrowLeft, LucideChevronRight, LucideSearch } from '@lucide/angular';
+import { CallerDirectory } from '../core/caller-directory';
+import { STANDING_LABEL } from '../core/callers';
+import type { CallRecord, Outcome } from '../core/calls';
 import { ConsoleStore } from '../core/console-store';
+import { formatDateTime, formatDuration } from '../core/format';
 import { SelectMenu, type SelectOption } from '../shared/select-menu';
 import { CallDetail } from './call-detail';
-import { CallRow } from './call-row';
+import { OUTCOME_SHORT, OutcomeText } from './outcome-chip';
 
 type Filter = 'all' | Outcome;
 
-/** Short outcome names for the filter; the full wording stays on each row. */
-const FILTER_LABEL: Record<Outcome, string> = {
-  in_progress: 'On the line now',
-  blocked: 'Blocked',
-  connected: 'Connected',
-  message_saved: 'Message saved',
-  needs_review: 'Needs review',
-  no_message: 'No message',
-  incomplete: 'Incomplete',
-};
+const ORDER: Outcome[] = [
+  'in_progress',
+  'blocked',
+  'connected',
+  'message_saved',
+  'needs_review',
+  'no_message',
+  'incomplete',
+];
 
 @Component({
   selector: 'app-calls-page',
   imports: [
     FormsModule,
     RouterLink,
-    CallRow,
     CallDetail,
     SelectMenu,
+    OutcomeText,
     LucideSearch,
     LucideArrowLeft,
+    LucideChevronRight,
   ],
   template: `
-    <div class="grid grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-12">
-      <!-- The list scrolls on its own at lg; the inline padding keeps focus rings inside its clip box. -->
-      <section
-        class="scroll-cue min-w-0 lg:sticky lg:top-[5.5rem] lg:col-span-4 lg:-ml-2 lg:block lg:max-h-[calc(100dvh-6.5rem)] lg:self-start lg:overflow-x-hidden lg:overflow-y-auto lg:pr-2 lg:pl-2"
-        [class.hidden]="!!id()"
-        aria-labelledby="calls-heading"
+    @if (id()) {
+      <a routerLink="/console/calls" queryParamsHandling="preserve" class="btn btn-quiet mb-6"
+        ><svg lucideArrowLeft [size]="17" aria-hidden="true"></svg> All calls</a
       >
-        @if (id()) {
-          <h2
-            id="calls-heading"
-            class="text-[2rem] leading-[1.05] font-extrabold tracking-[-0.03em]"
-          >
-            Calls
-          </h2>
-        } @else {
-          <h1
-            id="calls-heading"
-            class="text-[2rem] leading-[1.05] font-extrabold tracking-[-0.03em]"
-          >
-            Calls
-          </h1>
-        }
-        <div class="mt-4 space-y-3">
-          <div>
-            <label for="call-search" class="visually-hidden">Search calls</label>
-            <div class="relative">
-              <svg
-                lucideSearch
-                [size]="19"
-                class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted"
-                aria-hidden="true"
-              ></svg>
-              <input
-                id="call-search"
-                type="search"
-                class="field !pl-11"
-                placeholder="Search calls"
-                [ngModel]="query()"
-                (ngModelChange)="query.set($event)"
-              />
-            </div>
-          </div>
-          <div class="@container">
-            <div
-              class="grid gap-2"
-              [class]="households().length > 1 ? 'grid-cols-1 @[23rem]:grid-cols-2' : 'grid-cols-1'"
-            >
-              <div class="min-w-0">
-                <span id="outcome-filter-label" class="visually-hidden">Outcome</span>
-                <app-select-menu
-                  inputId="outcome-filter"
-                  labelledBy="outcome-filter-label"
-                  [options]="filters()"
-                  [value]="filter()"
-                  (valueChange)="filter.set($any($event))"
-                />
-              </div>
-              @if (households().length > 1) {
-                <div class="min-w-0">
-                  <span id="household-filter-label" class="visually-hidden">Answered for</span>
-                  <app-select-menu
-                    inputId="household-filter"
-                    labelledBy="household-filter-label"
-                    [options]="householdOptions()"
-                    [value]="household()"
-                    (valueChange)="household.set($event ?? 'all')"
-                  />
-                </div>
-              }
-            </div>
-          </div>
+      @if (selected(); as call) {
+        <app-call-detail [call]="call" />
+      } @else {
+        <div class="rounded-[var(--radius-card)] bg-paper-2 p-8">
+          <p class="text-[1.25rem] font-extrabold">This call isn’t in the current snapshot.</p>
+          <p class="mt-2 text-[1.0625rem] text-ink-3">
+            It may have been reset on the server, or it belongs to a different data source.
+          </p>
         </div>
-        <p class="mt-4 text-[0.95rem] font-semibold text-muted" role="status">
-          {{ visible().length }} of {{ store.calls().length }} calls
-        </p>
-        <ul class="mt-2 divide-y divide-paper-3">
-          @for (call of visible(); track call.id) {
-            <li><app-call-row [call]="call" [selected]="call.id === id()" /></li>
-          } @empty {
-            <li class="rounded-xl bg-paper-2 p-5 text-[1.0625rem]">
-              @if (store.calls().length) {
-                No calls match.
-                <button type="button" class="font-bold underline" (click)="reset()">
-                  Clear filters
-                </button>
-              } @else {
-                No calls have been received yet.
-              }
-            </li>
+      }
+    } @else {
+      <header class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 class="text-[2.25rem] leading-[1.05] font-extrabold tracking-[-0.03em]">Calls</h1>
+          <p class="mt-2 text-[1.0625rem] text-ink-3">
+            Every call FirstRing answered, newest first. Open one to see what the AI heard, what it
+            decided and why.
+          </p>
+        </div>
+        <dl class="flex flex-wrap gap-x-8 gap-y-2">
+          @for (s of summary(); track s.label) {
+            <div>
+              <dt class="text-[0.95rem] font-semibold text-muted">{{ s.label }}</dt>
+              <dd class="tabular text-[1.5rem] font-extrabold" [class]="s.cls">{{ s.value }}</dd>
+            </div>
           }
-        </ul>
-        <!-- Overflow cue: the sticky list scrolls on its own; the fade shows that more calls follow. -->
-        <div
-          class="pointer-events-none sticky bottom-0 -mt-12 hidden h-12 bg-linear-to-t from-paper to-transparent lg:block"
-          aria-hidden="true"
-        ></div>
-        <div class="hidden h-6 lg:block" aria-hidden="true"></div>
-      </section>
+        </dl>
+      </header>
 
-      <section
-        class="min-w-0 lg:col-span-8 lg:block"
-        [class.hidden]="!id()"
-        aria-label="Call detail"
-      >
-        @if (id()) {
-          <a
-            routerLink="/console/calls"
-            queryParamsHandling="preserve"
-            class="btn btn-quiet mb-6 lg:hidden"
-            ><svg lucideArrowLeft [size]="17" aria-hidden="true"></svg> All calls</a
-          >
-        }
-        @if (selected(); as call) {
-          <app-call-detail [call]="call" />
-        } @else if (id()) {
-          <div class="rounded-[var(--radius-card)] bg-paper-2 p-8">
-            <p class="text-[1.25rem] font-extrabold">This call isn’t in the current snapshot.</p>
-            <p class="mt-2 text-[1.0625rem] text-ink-3">
-              It may have been reset on the server, or it belongs to a different data source.
-            </p>
-          </div>
-        } @else {
-          <div
-            class="hidden rounded-[var(--radius-card)] border-2 border-dashed border-rule p-10 text-center lg:block"
-          >
-            <p class="text-[1.25rem] font-extrabold">Choose a call</p>
-            <p class="mt-2 text-[1.0625rem] text-ink-3">
-              You’ll see the transcript, what FirstRing heard, the rule it applied, and every
-              receipt.
-            </p>
-          </div>
-        }
-      </section>
-    </div>
+      <div class="mt-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_14rem_14rem]">
+        <div class="relative">
+          <label for="call-search" class="visually-hidden">Search calls</label>
+          <svg
+            lucideSearch
+            [size]="19"
+            class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted"
+            aria-hidden="true"
+          ></svg>
+          <input
+            id="call-search"
+            type="search"
+            class="field !pl-11"
+            placeholder="Search words, names or outcomes"
+            [ngModel]="query()"
+            (ngModelChange)="query.set($event)"
+          />
+        </div>
+        <div class="min-w-0">
+          <span id="outcome-filter-label" class="visually-hidden">Outcome</span>
+          <app-select-menu
+            inputId="outcome-filter"
+            labelledBy="outcome-filter-label"
+            [options]="filters()"
+            [value]="filter()"
+            (valueChange)="filter.set($any($event))"
+          />
+        </div>
+        <div class="min-w-0">
+          <span id="household-filter-label" class="visually-hidden">Line</span>
+          <app-select-menu
+            inputId="household-filter"
+            labelledBy="household-filter-label"
+            [options]="householdOptions()"
+            [value]="household()"
+            (valueChange)="household.set($event ?? 'all')"
+          />
+        </div>
+      </div>
+
+      <p class="mt-4 text-[0.95rem] font-semibold text-muted" role="status">
+        Showing {{ visible().length }} of {{ store.calls().length }} calls
+      </p>
+
+      <div class="table-scroll mt-2">
+        <table class="data-table min-w-[56rem]">
+          <caption class="visually-hidden">
+            Calls answered by FirstRing
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">When</th>
+              <th scope="col">Line</th>
+              <th scope="col">Caller</th>
+              <th scope="col" class="w-[38%]">What the caller wanted</th>
+              <th scope="col">Outcome</th>
+              <th scope="col" class="num">Turns</th>
+              <th scope="col" class="num">Length</th>
+              <th scope="col"><span class="visually-hidden">Open</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (call of visible(); track call.id) {
+              <tr class="row-link" (click)="open(call)">
+                <td class="whitespace-nowrap">
+                  <a
+                    [routerLink]="['/console/calls', call.id]"
+                    queryParamsHandling="preserve"
+                    class="font-bold text-ink no-underline hover:underline"
+                    (click)="$event.stopPropagation()"
+                    >{{ when(call) }}</a
+                  >
+                </td>
+                <td class="whitespace-nowrap">{{ call.name }}</td>
+                <td class="whitespace-nowrap">
+                  @if (caller(call.id); as c) {
+                    <span class="font-semibold">{{ c.captured ? c.label : 'Not captured' }}</span>
+                    @if (c.captured) {
+                      <span
+                        class="block text-[0.95rem]"
+                        [class]="
+                          c.standing === 'reported' || c.standing === 'warned'
+                            ? 'font-bold text-magenta-ink'
+                            : 'text-muted'
+                        "
+                        >{{ standing(c.standing) }}</span
+                      >
+                    }
+                  } @else {
+                    <span class="text-muted">—</span>
+                  }
+                </td>
+                <td>
+                  <span class="line-clamp-2 max-w-[60ch]">{{ call.request }}</span>
+                </td>
+                <td><app-outcome-text [outcome]="call.outcome" /></td>
+                <td class="num">{{ call.callerTurns }}</td>
+                <td class="num">{{ duration(call) }}</td>
+                <td class="w-8 text-muted">
+                  <svg lucideChevronRight [size]="18" aria-hidden="true"></svg>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="8" class="!py-8 text-center text-[1.0625rem]">
+                  @if (store.calls().length) {
+                    No calls match.
+                    <button type="button" class="font-bold underline" (click)="reset()">
+                      Clear filters
+                    </button>
+                  } @else {
+                    No calls yet. When someone calls the line, it appears here within a second.
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
   `,
 })
 export class CallsPage {
   readonly store = inject(ConsoleStore);
+  private readonly directory = inject(CallerDirectory);
+  private readonly router = inject(Router);
   readonly id = input<string>();
   readonly query = signal('');
   readonly filter = signal<Filter>('all');
   readonly household = signal('all');
 
+  readonly summary = computed(() => {
+    const calls = this.store.calls();
+    const count = (o: Outcome) => calls.filter((c) => c.outcome === o).length;
+    return [
+      { label: 'Calls', value: calls.length, cls: '' },
+      { label: 'Blocked', value: count('blocked'), cls: 'text-magenta-ink' },
+      {
+        label: 'Messages saved',
+        value: count('message_saved'),
+        cls: 'text-lime-ink',
+      },
+      { label: 'Connected', value: count('connected'), cls: 'text-lime-ink' },
+    ];
+  });
   readonly households = computed(() => {
     const seen = new Map<string, string>();
     for (const call of this.store.calls()) seen.set(call.session.household_id, call.name);
@@ -183,28 +221,19 @@ export class CallsPage {
   });
   readonly filters = computed(() => {
     const calls = this.store.calls();
-    const order: Outcome[] = [
-      'in_progress',
-      'blocked',
-      'connected',
-      'message_saved',
-      'needs_review',
-      'no_message',
-      'incomplete',
-    ];
     const options: SelectOption[] = [
-      { value: 'all', label: 'All calls', meta: String(calls.length) },
+      { value: 'all', label: 'All outcomes', meta: String(calls.length) },
     ];
-    for (const outcome of order) {
+    for (const outcome of ORDER) {
       const count = calls.filter((c) => c.outcome === outcome).length;
       if (count || outcome === 'blocked' || outcome === 'message_saved')
-        options.push({ value: outcome, label: FILTER_LABEL[outcome], meta: String(count) });
+        options.push({ value: outcome, label: OUTCOME_SHORT[outcome], meta: String(count) });
     }
     return options;
   });
   readonly householdOptions = computed<SelectOption[]>(() => [
-    { value: 'all', label: 'For everyone' },
-    ...this.households().map((h) => ({ value: h.id, label: `For ${h.name}` })),
+    { value: 'all', label: 'All lines' },
+    ...this.households().map((h) => ({ value: h.id, label: `${h.name}’s line` })),
   ]);
   readonly visible = computed(() => {
     const q = this.query().trim().toLowerCase();
@@ -217,6 +246,7 @@ export class CallsPage {
         call.headline,
         call.request,
         call.name,
+        OUTCOME_SHORT[call.outcome],
         ...call.session.turns.map((t) => t.text),
         call.session.message?.summary ?? '',
       ]
@@ -238,6 +268,21 @@ export class CallsPage {
     });
   }
 
+  caller(id: string) {
+    return this.directory.forCall(id);
+  }
+  standing(value: keyof typeof STANDING_LABEL) {
+    return STANDING_LABEL[value];
+  }
+  when(call: CallRecord) {
+    return formatDateTime(call.startedAt ?? call.lastActivityAt, call.timezone);
+  }
+  duration(call: CallRecord) {
+    return formatDuration(call.durationSeconds);
+  }
+  open(call: CallRecord) {
+    void this.router.navigate(['/console/calls', call.id], { queryParamsHandling: 'preserve' });
+  }
   reset() {
     this.query.set('');
     this.filter.set('all');

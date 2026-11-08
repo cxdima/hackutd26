@@ -26,6 +26,16 @@ export const routes: Routes = [
         loadComponent: () => import('./console/calls-page').then((m) => m.CallsPage),
       },
       {
+        path: 'callers',
+        title: 'Callers · FirstRing',
+        loadComponent: () => import('./console/callers-page').then((m) => m.CallersPage),
+      },
+      {
+        path: 'callers/:id',
+        title: 'Caller · FirstRing',
+        loadComponent: () => import('./console/callers-page').then((m) => m.CallersPage),
+      },
+      {
         path: 'community',
         title: 'Community · FirstRing',
         loadComponent: () => import('./console/community-page').then((m) => m.CommunityPage),

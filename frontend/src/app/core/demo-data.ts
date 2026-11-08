@@ -22,7 +22,7 @@ const MAYA = {
   ...SARAH,
   household_id: 'maya' as const,
   version: 1,
-  display_name: 'Maya',
+  display_name: 'Maya and Jimmy',
   timezone: 'America/New_York',
 };
 
@@ -1034,7 +1034,7 @@ export function buildDemo(now = Date.now()): { state: ConsoleState; events: Call
     sessions,
     community: [
       { household_id: 'sarah', display_name: 'Sarah', last_applied_version: 2 },
-      { household_id: 'maya', display_name: 'Maya', last_applied_version: 2 },
+      { household_id: 'maya', display_name: 'Maya and Jimmy', last_applied_version: 2 },
     ],
     tactics: [
       {

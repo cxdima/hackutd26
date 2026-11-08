@@ -11,6 +11,7 @@ pub mod providers;
 pub mod store;
 
 pub mod tools;
+pub mod trusted;
 
 pub mod http;
 

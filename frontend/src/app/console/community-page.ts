@@ -1,8 +1,9 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { LucideChevronDown, LucideClock3, LucideShieldAlert } from '@lucide/angular';
+import { Component, computed, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { LucideShieldAlert } from '@lucide/angular';
 import { buildCommunityStories } from '../core/community-story';
 import { ConsoleStore } from '../core/console-store';
-import { formatDateTime, relativeAge, relativeUntil } from '../core/format';
+import { relativeAge, relativeUntil } from '../core/format';
 import {
   ACTION_LABEL,
   humanize,
@@ -10,254 +11,188 @@ import {
   PRETEXT_LABEL,
   TACTIC_LABEL,
 } from '../core/language';
+import { household as familyHousehold } from '../core/household';
 import type { Tactic } from '../core/schemas';
 import { CommunityStoryView } from './present/community-story';
 
 @Component({
   selector: 'app-community-page',
-  imports: [LucideShieldAlert, LucideClock3, LucideChevronDown, CommunityStoryView],
+  imports: [RouterLink, LucideShieldAlert, CommunityStoryView],
   template: `
     @let state = store.state()!;
-    <div class="grid gap-10 lg:grid-cols-12">
-      <div class="lg:col-span-8">
-        <h1
-          class="text-[clamp(2rem,1.6rem+1.6vw,2.9rem)] leading-[1.05] font-extrabold tracking-[-0.03em]"
-        >
-          Community
-        </h1>
-        <p class="mt-3 max-w-[60ch] text-lede text-ink-3">
-          Shared warnings describe a trick, not a person. Each one lists what was asked for, the
-          pretext and the pressure, then expires.
-        </p>
+    <header>
+      <h1 class="text-[2.25rem] leading-[1.05] font-extrabold tracking-[-0.03em]">Community</h1>
+      <p class="mt-2 max-w-[75ch] text-[1.0625rem] text-ink-3">
+        Sarah’s line and Maya and Jimmy’s line belong to one FirstRing network. When one line blocks
+        a scam, it shares a warning that describes the trick (what was asked for, the excuse and the
+        pressure), never the words, names or numbers. Every line applies it, so the same trick from
+        a new number is caught the first time. Warnings expire.
+      </p>
+    </header>
 
-        @if (story(); as s) {
-          <section class="mt-10" aria-labelledby="story-heading">
-            <div
-              class="flex flex-wrap items-center justify-between gap-3 border-b-2 border-ink pb-3"
-            >
-              <h2 id="story-heading" class="text-[1.5rem] font-extrabold">How a warning travels</h2>
-            </div>
-            <div class="mt-6">
-              <app-community-story [story]="s" [timezone]="state.profile?.timezone" />
-            </div>
-          </section>
-        }
-
-        <section class="mt-12" aria-labelledby="active-heading">
-          <div class="border-b-2 border-ink pb-3">
-            <h2 id="active-heading" class="text-[1.5rem] font-extrabold">
-              Same tactic, different number
-            </h2>
-            <p class="mt-1 max-w-[64ch] text-[1.0625rem] text-ink-3">
-              Active shared warnings. A later call matches one by what it asks for, so a new number
-              does not hide a repeated trick. A match never says two calls came from the same
-              person.
-            </p>
-          </div>
-          <ul class="mt-5 space-y-5">
-            @for (tactic of tactics(); track tactic.id) {
-              <li class="overflow-hidden rounded-[var(--radius-card)] border-2 border-paper-3">
-                <div
-                  class="flex flex-wrap items-center justify-between gap-3 bg-ink px-5 py-3 text-paper"
-                >
-                  <h3 class="flex items-center gap-2 text-[1.1875rem] font-extrabold">
-                    <svg
-                      lucideShieldAlert
-                      [size]="20"
-                      class="text-magenta-on-ink"
-                      aria-hidden="true"
-                    ></svg>
-                    {{ label(tactic.tactic, TACTIC) }}
-                  </h3>
-                  <span class="text-[1rem] font-semibold text-paper/85"
-                    >Warning v{{ tactic.version }}</span
-                  >
-                </div>
-                <dl class="grid gap-x-6 gap-y-3 p-5 sm:grid-cols-2">
-                  <div>
-                    <dt class="text-[0.9375rem] font-bold text-muted">Asks the person to</dt>
-                    <dd class="text-[1.0625rem] font-semibold">
-                      {{ label(tactic.requested_action, ACTION) }}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt class="text-[0.9375rem] font-bold text-muted">Pretext</dt>
-                    <dd class="text-[1.0625rem] font-semibold">
-                      {{ label(tactic.pretext_category, PRETEXT) }}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt class="text-[0.9375rem] font-bold text-muted">Pressure</dt>
-                    <dd class="text-[1.0625rem] font-semibold">
-                      {{ label(tactic.pressure_category, PRESSURE) }}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt class="text-[0.9375rem] font-bold text-muted">Safer next step</dt>
-                    <dd class="text-[1.0625rem] font-semibold">
-                      {{ label(tactic.recommended_action ?? 'independent_contact', ACTION) }}
-                    </dd>
-                  </div>
-                </dl>
-                <div
-                  class="border-t border-paper-3 px-5 py-4 text-[1rem] text-ink-3 [&_p]:max-w-[68ch]"
-                >
-                  <p><strong class="text-ink">Why it was flagged:</strong> {{ why(tactic) }}</p>
-                  <p class="mt-1 flex items-center gap-2">
-                    <svg lucideClock3 [size]="16" aria-hidden="true"></svg> Expires
-                    {{ expiry(tactic.expires_at)
-                    }}{{
-                      tactic.provenance
-                        ? ' · source: ' + tactic.provenance.replaceAll('_', ' ')
-                        : ''
-                    }}
-                  </p>
-                </div>
-              </li>
-            } @empty {
-              <li class="rounded-xl bg-paper-2 p-6">
-                <p class="text-[1.125rem] font-bold">No active shared warnings.</p>
-                <p class="mt-1 text-[1.0625rem] text-ink-3">
-                  Warnings appear when a blocked call produces a tactic capsule, and disappear when
-                  they expire.
-                </p>
-              </li>
+    <section class="mt-8" aria-labelledby="compare-heading">
+      <h2 id="compare-heading" class="visually-hidden">Warnings compared with caller reputation</h2>
+      <div class="table-scroll">
+        <table class="data-table min-w-[48rem]">
+          <thead>
+            <tr>
+              <th scope="col"></th>
+              <th scope="col">Shared warnings (this page)</th>
+              <th scope="col">Caller reputation</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of compare; track row.label) {
+              <tr>
+                <th scope="row" class="text-left text-[1rem] font-bold whitespace-nowrap">
+                  {{ row.label }}
+                </th>
+                <td>{{ row.warning }}</td>
+                <td>{{ row.reputation }}</td>
+              </tr>
             }
-          </ul>
-        </section>
-
-        <section class="mt-12" aria-labelledby="reputation-heading">
-          <div class="flex flex-wrap items-center justify-between gap-3 border-b-2 border-ink pb-3">
-            <h2 id="reputation-heading" class="text-[1.5rem] font-extrabold">
-              Reported-number history
-            </h2>
-          </div>
-          <p class="mt-4 max-w-[64ch] text-[1.0625rem] text-ink-3">
-            A separate idea from tactic warnings: history about one number, counted by independent
-            households, with recency, expiry and corrections. No history means “No reports yet”,
-            never “safe”, and a number can be spoofed or reassigned.
-          </p>
-          @if (reputationConnected()) {
-            <p class="mt-3 max-w-[64ch] text-[1.0625rem] text-ink-3">
-              The server provides it. Each call page shows that number’s history next to the call.
-            </p>
-          } @else if (store.isDemo()) {
-            <p class="mt-3 max-w-[64ch] text-[1.0625rem] text-ink-3">
-              Demo calls show fictional, demonstration-only reports on their call pages.
-            </p>
-          } @else {
-            <p class="mt-3 max-w-[64ch] text-[1.0625rem] text-ink-3">
-              This server does not provide it yet, so no number history is shown and nothing is
-              computed in the browser. The proposed contract is in
-              <code class="rounded bg-paper-2 px-1.5 py-0.5 text-[0.95rem]"
-                >frontend/docs/reputation-contract.md</code
-              >. Shared tactic warnings above still work and expire on their own.
-            </p>
-          }
-          <button
-            type="button"
-            class="btn btn-quiet mt-5"
-            [attr.aria-expanded]="showExample()"
-            aria-controls="reputation-example"
-            (click)="showExample.set(!showExample())"
-          >
-            {{ showExample() ? 'Hide' : 'Show' }} the example progression
-            <svg
-              lucideChevronDown
-              [size]="18"
-              [class.rotate-180]="showExample()"
-              aria-hidden="true"
-            ></svg>
-          </button>
-          @if (showExample()) {
-            <div
-              id="reputation-example"
-              class="mt-5 rounded-[var(--radius-card)] border-2 border-dashed border-ink-3 p-5"
-            >
-              <p
-                class="flex items-center gap-2 text-[1rem] font-extrabold uppercase tracking-[0.08em]"
-              >
-                Example · fictional number (555) 010-2234
-              </p>
-              <ol class="mt-4 grid gap-3 sm:grid-cols-4">
-                @for (stage of exampleStages; track stage.title; let i = $index) {
-                  <li
-                    class="rounded-xl p-4"
-                    [class]="i === exampleStages.length - 1 ? 'bg-magenta-wash' : 'bg-paper-2'"
-                  >
-                    <p class="text-[0.95rem] font-extrabold tabular text-muted">
-                      Stage {{ i + 1 }}
-                    </p>
-                    <p class="mt-1 text-[1.0625rem] font-extrabold">{{ stage.title }}</p>
-                    <p class="mt-1 text-[1rem] text-ink-3">{{ stage.text }}</p>
-                  </li>
-                }
-              </ol>
-              <p class="mt-4 text-[1rem] text-ink-3">
-                Caller ID can be faked, so even at the last stage a warning never claims who placed
-                the call.
-              </p>
-            </div>
-          }
-        </section>
+          </tbody>
+        </table>
       </div>
-
-      <aside
-        class="space-y-6 lg:sticky lg:top-24 lg:col-span-4 lg:self-start"
-        aria-label="Participating households"
+      <a
+        routerLink="/console/callers"
+        queryParamsHandling="preserve"
+        class="mt-3 inline-block text-[1rem] font-bold text-ink"
+        >See caller reputation and history</a
       >
-        <section
-          class="rounded-[var(--radius-card)] bg-paper-2 p-5 sm:p-6"
-          aria-labelledby="households-heading"
-        >
-          <h2 id="households-heading" class="text-[1.1875rem] font-extrabold">
-            Participating households
-          </h2>
-          <p class="mt-1 text-[1rem] text-ink-3">
-            The version each household’s FirstRing has actually applied, from its stored receipt.
-          </p>
-          <ul class="mt-4 space-y-3">
-            @for (household of state.community; track household.household_id) {
-              <li class="flex items-center justify-between gap-3 rounded-xl bg-paper px-4 py-3">
-                <span class="text-[1.0625rem] font-bold">{{ household.display_name }}</span>
-                <span class="tabular text-[1rem] font-semibold">{{
-                  household.last_applied_version
-                    ? 'Applied v' + household.last_applied_version
-                    : 'Nothing applied yet'
-                }}</span>
-              </li>
-            }
-          </ul>
-        </section>
-        <section
-          class="rounded-[var(--radius-card)] border-2 border-paper-3 p-5 sm:p-6"
-          aria-labelledby="receipts-heading"
-        >
-          <h2 id="receipts-heading" class="text-[1.1875rem] font-extrabold">
-            Recent community receipts
-          </h2>
-          <ul class="mt-3 space-y-2.5">
-            @for (event of receipts(); track event.id) {
-              <li class="text-[1rem]">
-                <strong>{{
-                  event.type === 'tactic.created'
-                    ? 'Warning shared'
-                    : event.type === 'community.applied'
-                      ? 'Applied by ' + household(event.payload['household_id'])
-                      : 'Similar tactic matched on a call'
-                }}</strong>
-                <span class="block text-muted"
-                  >{{ age(event.received_at) }} · #{{ event.sequence }}</span
-                >
-              </li>
+    </section>
+
+    @if (story(); as s) {
+      <section class="mt-12" aria-labelledby="story-heading">
+        <h2 id="story-heading" class="border-b-2 border-ink pb-2 text-[1.375rem] font-extrabold">
+          How the latest warning travelled
+        </h2>
+        <div class="mt-6">
+          <app-community-story [story]="s" [timezone]="state.profile?.timezone" />
+        </div>
+      </section>
+    }
+
+    <section class="mt-12" aria-labelledby="active-heading">
+      <h2 id="active-heading" class="border-b-2 border-ink pb-2 text-[1.375rem] font-extrabold">
+        Active warnings
+      </h2>
+      <div class="table-scroll">
+        <table class="data-table min-w-[64rem]">
+          <thead>
+            <tr>
+              <th scope="col">Trick</th>
+              <th scope="col">Asks the person to</th>
+              <th scope="col">Excuse</th>
+              <th scope="col">Pressure</th>
+              <th scope="col">Safer next step</th>
+              <th scope="col" class="num">Version</th>
+              <th scope="col">Expires</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (tactic of tactics(); track tactic.id) {
+              <tr>
+                <td class="font-bold">
+                  <span class="inline-flex items-center gap-2 text-magenta-ink">
+                    <svg lucideShieldAlert [size]="17" aria-hidden="true"></svg>
+                    {{ label(tactic.tactic, TACTIC) }}
+                  </span>
+                  <span class="block text-[0.95rem] font-semibold text-muted">{{
+                    why(tactic)
+                  }}</span>
+                </td>
+                <td>{{ label(tactic.requested_action, ACTION) }}</td>
+                <td>{{ label(tactic.pretext_category, PRETEXT) }}</td>
+                <td>{{ label(tactic.pressure_category, PRESSURE) }}</td>
+                <td>{{ label(tactic.recommended_action ?? 'independent_contact', ACTION) }}</td>
+                <td class="num">v{{ tactic.version }}</td>
+                <td class="whitespace-nowrap">{{ expiry(tactic.expires_at) }}</td>
+              </tr>
             } @empty {
-              <li class="text-[1rem] text-ink-3">
-                No community receipts received in this session.
-              </li>
+              <tr>
+                <td colspan="7" class="!py-6 text-[1.0625rem] text-ink-3">
+                  No active warnings. One appears when a blocked call produces a warning, and it
+                  disappears when it expires.
+                </td>
+              </tr>
             }
-          </ul>
-        </section>
-      </aside>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="mt-12 grid gap-10 xl:grid-cols-2">
+      <section aria-labelledby="households-heading">
+        <h2
+          id="households-heading"
+          class="border-b-2 border-ink pb-2 text-[1.375rem] font-extrabold"
+        >
+          Lines in the network
+        </h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">Line</th>
+              <th scope="col">Who</th>
+              <th scope="col">Warnings applied</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (h of state.community; track h.household_id) {
+              <tr>
+                <td class="font-bold whitespace-nowrap">{{ h.display_name }}</td>
+                <td>{{ people(h.household_id) }}</td>
+                <td class="tabular">
+                  {{
+                    h.last_applied_version
+                      ? 'Up to v' + h.last_applied_version
+                      : 'Nothing applied yet'
+                  }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+
+      <section aria-labelledby="receipts-heading">
+        <h2 id="receipts-heading" class="border-b-2 border-ink pb-2 text-[1.375rem] font-extrabold">
+          Recent activity
+        </h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">When</th>
+              <th scope="col">What happened</th>
+              <th scope="col" class="num">Receipt</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (event of receipts(); track event.id) {
+              <tr>
+                <td class="whitespace-nowrap">{{ age(event.received_at) }}</td>
+                <td>
+                  {{
+                    event.type === 'tactic.created'
+                      ? 'Warning shared'
+                      : event.type === 'community.applied'
+                        ? 'Applied by ' + household(event.payload['household_id'])
+                        : 'Same trick matched on a call'
+                  }}
+                </td>
+                <td class="num">#{{ event.sequence }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="3" class="!py-6 text-ink-3">
+                  No community activity received in this session.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
     </div>
   `,
 })
@@ -267,30 +202,35 @@ export class CommunityPage {
   readonly ACTION = ACTION_LABEL;
   readonly PRETEXT = PRETEXT_LABEL;
   readonly PRESSURE = PRESSURE_LABEL;
-  readonly showExample = signal(false);
-  readonly exampleStages = [
+  readonly compare = [
     {
-      title: 'One report',
-      text: 'A blocked call creates one minimized report. Nothing changes for anyone else yet.',
+      label: 'Describes',
+      warning: 'A trick: what was asked for, the excuse and the pressure',
+      reputation: 'A phone number, kept as a one-way code',
     },
     {
-      title: 'Independent agreement',
-      text: 'Two other households report the same tactic. Each household counts once.',
+      label: 'Created when',
+      warning: 'A line blocks a protected request',
+      reputation: 'A line blocks a protected request from that number',
     },
     {
-      title: 'Warning',
-      text: 'New calls from the number are labeled “reported number” and screened carefully.',
+      label: 'Catches',
+      warning: 'The same trick from any number',
+      reputation: 'The same number calling again, on any line',
     },
     {
-      title: 'Stronger screening',
-      text: 'Participating FirstRing services decline its requests sooner. Carriers are not involved.',
+      label: 'Never contains',
+      warning: 'Words, names or numbers from the call',
+      reputation: 'The number itself or anything the caller said',
+    },
+    {
+      label: 'Expires',
+      warning: 'After its time to live (24 hours here)',
+      reputation: 'After 14 days',
     },
   ];
   readonly story = computed(
     () => buildCommunityStories(this.store.state(), this.store.events(), this.store.calls())[0],
-  );
-  readonly reputationConnected = computed(() =>
-    ['configured', 'verified'].includes(this.store.capability('reputation')?.status ?? ''),
   );
   readonly tactics = computed(() =>
     [...(this.store.state()?.tactics ?? [])].sort((a, b) => b.version - a.version),
@@ -313,11 +253,15 @@ export class CommunityPage {
   }
   why(tactic: Tactic) {
     if (tactic.provenance === 'designated_synthetic_test')
-      return `Created by a designated synthetic test to exercise sharing, not by a real call. It describes a caller asking the person to “${humanize(tactic.requested_action, ACTION_LABEL).toLowerCase()}”.`;
-    return `On a call, someone asked the person to “${humanize(tactic.requested_action, ACTION_LABEL).toLowerCase()}”, which FirstRing never does for a caller. The request was reduced to these categories before sharing; no words, names or numbers were kept.`;
+      return 'Created by a designated test to exercise sharing, not by a real call.';
+    return 'From a blocked call. Reduced to categories before sharing.';
   }
   expiry(at: string) {
-    return `${formatDateTime(at, this.store.state()?.profile?.timezone)} (${relativeUntil(at, this.store.now())})`;
+    return relativeUntil(at, this.store.now());
+  }
+  people(id: string) {
+    const h = familyHousehold(id);
+    return h ? h.people.map((p) => `${p.name} (${p.relation})`).join(', ') : '—';
   }
   household(id: unknown) {
     return (

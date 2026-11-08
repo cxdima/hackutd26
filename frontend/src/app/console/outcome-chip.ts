@@ -70,3 +70,42 @@ export class OutcomeChip {
   readonly label = computed(() => OUTCOME_LABEL[this.outcome()]);
   readonly cls = computed(() => OUTCOME_CHIP[this.outcome()]);
 }
+
+export const OUTCOME_SHORT: Record<Outcome, string> = {
+  in_progress: 'On the line now',
+  blocked: 'Blocked',
+  connected: 'Connected',
+  message_saved: 'Message saved',
+  needs_review: 'Needs review',
+  no_message: 'No message',
+  incomplete: 'Incomplete',
+};
+
+const OUTCOME_TEXT_CLASS: Record<Outcome, string> = {
+  in_progress: 'text-ink',
+  blocked: 'outcome-blocked',
+  connected: 'outcome-ok',
+  message_saved: 'outcome-ok',
+  needs_review: 'outcome-review',
+  no_message: 'outcome-neutral',
+  incomplete: 'outcome-neutral',
+};
+
+/** Outcome for tables: icon + short words in the outcome's text colour, no pill. */
+@Component({
+  selector: 'app-outcome-text',
+  imports: [OutcomeIcon],
+  template: `
+    <span class="outcome" [class]="cls()">
+      <app-outcome-icon [outcome]="outcome()" [size]="16" />
+      {{ short() ? shortLabel() : label() }}
+    </span>
+  `,
+})
+export class OutcomeText {
+  readonly outcome = input.required<Outcome>();
+  readonly short = input(true);
+  readonly label = computed(() => OUTCOME_LABEL[this.outcome()]);
+  readonly shortLabel = computed(() => OUTCOME_SHORT[this.outcome()]);
+  readonly cls = computed(() => OUTCOME_TEXT_CLASS[this.outcome()]);
+}

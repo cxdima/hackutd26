@@ -93,6 +93,19 @@ pub async fn list(State(app): State<App>, Query(q): Query<ListQuery>) -> Respons
         Err(e) => failure(e),
     }
 }
+pub async fn callers(State(app): State<App>) -> Response {
+    let service = match service(&app) {
+        Ok(s) => s,
+        Err(error) => return reply(StatusCode::SERVICE_UNAVAILABLE, json!({"error":error})),
+    };
+    match service.callers(app.config.mode).await {
+        Ok(items) => reply(
+            StatusCode::OK,
+            json!({"items":items,"scope":service.scope(),"execution_mode":app.config.mode,"meaning":"Presented caller ID can be spoofed; a number key groups calls, it does not identify a person."}),
+        ),
+        Err(e) => failure(e),
+    }
+}
 pub async fn detail(State(app): State<App>, Path(key): Path<String>) -> Response {
     let service = match service(&app) {
         Ok(s) => s,

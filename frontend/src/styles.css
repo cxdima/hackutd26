@@ -511,6 +511,130 @@
   .prose-plain p + p {
     margin-top: 0.9em;
   }
+
+  /* Console sidebar navigation */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 3rem;
+    padding: 0 0.875rem;
+    border-radius: 0.75rem;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: color-mix(in oklab, var(--color-paper) 82%, transparent);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 150ms ease-out, color 150ms ease-out;
+  }
+  .nav-item:hover {
+    background: rgb(255 255 255 / 0.08);
+    color: var(--color-paper);
+  }
+  .nav-item.nav-active {
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+  @media (max-width: 1023.98px) {
+    .nav-item {
+      border-radius: 0;
+      min-height: 3.25rem;
+      padding: 0 0.875rem;
+      box-shadow: inset 0 -3px 0 transparent;
+    }
+    .nav-item.nav-active {
+      background: transparent;
+      color: var(--color-paper);
+      box-shadow: inset 0 -3px 0 var(--color-lime);
+    }
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Data tables: ruled rows, slate headers, tabular figures */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+  .data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-paper);
+    border-bottom: 2px solid var(--color-ink);
+    padding: 0.625rem 0.75rem;
+    text-align: left;
+    font-size: 0.8125rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    white-space: nowrap;
+  }
+  .data-table tbody td {
+    border-bottom: 1px solid var(--color-paper-3);
+    padding: 0.75rem;
+    vertical-align: top;
+  }
+  .data-table tbody tr.row-link {
+    cursor: pointer;
+    transition: background-color 120ms ease-out;
+  }
+  .data-table tbody tr.row-link:hover {
+    background: var(--color-paper-2);
+  }
+  .data-table tbody tr.row-selected {
+    background: var(--color-paper-3);
+  }
+  .data-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .data-table th.num {
+    text-align: right;
+  }
+  .table-scroll {
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ink-3) var(--color-paper-3);
+  }
+
+  /* Plain stat figures (no cards): label above a large tabular number */
+  .stat-figure {
+    font-size: 2.25rem;
+    line-height: 1.05;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Outcome as words + icon, coloured text only (no pill) */
+  .outcome {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .outcome-blocked {
+    color: var(--color-magenta-ink);
+  }
+  .outcome-ok {
+    color: var(--color-lime-ink);
+  }
+  .outcome-review {
+    color: var(--color-amber-ink);
+  }
+  .outcome-neutral {
+    color: var(--color-ink-3);
+  }
 }
 
 @layer utilities {

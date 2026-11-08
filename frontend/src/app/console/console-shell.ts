@@ -8,12 +8,25 @@ import {
   RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
-import { LucideMonitorPlay, LucidePanelRightOpen, LucideX } from '@lucide/angular';
+import {
+  LucideContactRound,
+  LucideLayoutDashboard,
+  LucideMonitorPlay,
+  LucideNetwork,
+  LucidePanelRightOpen,
+  LucidePhone,
+  LucideSettings2,
+  LucideX,
+} from '@lucide/angular';
+import { CallerDirectory } from '../core/caller-directory';
 import { ConsoleStore } from '../core/console-store';
-import { formatTime } from '../core/format';
+import { formatPhone, formatTime, isE164 } from '../core/format';
+import { household } from '../core/household';
 import { Wordmark } from '../shared/wordmark';
 import { ConnectPanel } from './connect-panel';
 import { OperatorPanel } from './operator-panel';
+
+type NavIcon = 'overview' | 'calls' | 'callers' | 'community' | 'settings';
 
 @Component({
   selector: 'app-console-shell',
@@ -27,6 +40,11 @@ import { OperatorPanel } from './operator-panel';
     LucideX,
     LucidePanelRightOpen,
     LucideMonitorPlay,
+    LucideLayoutDashboard,
+    LucidePhone,
+    LucideContactRound,
+    LucideNetwork,
+    LucideSettings2,
   ],
   template: `
     @if (presenting()) {
@@ -34,118 +52,139 @@ import { OperatorPanel } from './operator-panel';
       <router-outlet />
     } @else {
       <a class="skip-link" href="#console-main">Skip to dashboard content</a>
-      <header class="on-ink sticky top-0 z-40 bg-ink text-paper">
-        <div
-          class="mx-auto flex min-h-[4.25rem] max-w-[90rem] items-center gap-4 px-4 sm:px-6 lg:px-8"
+      <div class="min-h-dvh lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <aside
+          class="on-ink sticky top-0 z-40 bg-ink text-paper lg:flex lg:h-dvh lg:flex-col"
+          aria-label="Dashboard"
         >
-          <a routerLink="/" class="shrink-0 rounded-lg" aria-label="FirstRing home"
-            ><app-wordmark [inverse]="true"
-          /></a>
+          <div class="flex min-h-16 items-center gap-3 px-4 lg:min-h-0 lg:px-5 lg:pt-6">
+            <a routerLink="/" class="shrink-0 rounded-lg" aria-label="FirstRing home"
+              ><app-wordmark [inverse]="true"
+            /></a>
+            @if (connected()) {
+              <div class="ml-auto flex items-center gap-2 lg:hidden">
+                <a
+                  routerLink="/console/present"
+                  queryParamsHandling="preserve"
+                  class="btn btn-quiet !min-h-10 !px-3 no-underline"
+                  ><svg lucideMonitorPlay [size]="17" aria-hidden="true"></svg
+                  ><span class="hidden sm:inline">Present</span></a
+                >
+                <button
+                  type="button"
+                  class="btn btn-quiet !min-h-10 !px-3"
+                  [attr.aria-expanded]="operatorOpen()"
+                  aria-controls="operator-panel"
+                  (click)="toggleOperator()"
+                >
+                  <svg lucidePanelRightOpen [size]="17" aria-hidden="true"></svg>
+                  <span class="sr-only">Operator detail</span>
+                </button>
+                @if (store.isDemo()) {
+                  <button type="button" class="btn btn-quiet !min-h-10 !px-3" (click)="exitDemo()">
+                    <svg lucideX [size]="17" aria-hidden="true"></svg>
+                    <span class="sr-only">Exit demo</span>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+
           @if (connected()) {
-            <nav class="ml-4 hidden lg:block" aria-label="Dashboard">
-              <ul class="flex items-center gap-1">
-                @for (item of nav; track item.path) {
-                  <li>
+            <div class="hidden px-5 pt-6 lg:block">
+              <p class="text-[0.95rem] font-semibold text-muted-on-ink">FirstRing answers for</p>
+              <p class="mt-0.5 text-[1.125rem] font-extrabold">{{ lineName() }}</p>
+              @if (lineNumber(); as n) {
+                <p class="tabular text-[1rem] font-semibold text-paper/80">{{ n }}</p>
+              }
+            </div>
+
+            <nav class="border-t border-white/10 lg:mt-6 lg:border-0" aria-label="Sections">
+              <ul
+                class="scrollbar-none flex overflow-x-auto px-2 lg:block lg:space-y-1 lg:overflow-visible lg:px-3"
+              >
+                @for (item of nav(); track item.path) {
+                  <li class="shrink-0">
                     <a
                       [routerLink]="item.path"
-                      routerLinkActive="!bg-paper !text-ink"
+                      routerLinkActive="nav-active"
                       [routerLinkActiveOptions]="{ exact: item.exact }"
                       queryParamsHandling="preserve"
-                      class="block rounded-full px-4 py-2.5 text-[1.0625rem] font-bold text-paper/85 no-underline hover:bg-white/10 hover:text-paper"
-                      >{{ item.label }}</a
+                      class="nav-item"
                     >
+                      @switch (item.icon) {
+                        @case ('overview') {
+                          <svg lucideLayoutDashboard [size]="19" aria-hidden="true"></svg>
+                        }
+                        @case ('calls') {
+                          <svg lucidePhone [size]="19" aria-hidden="true"></svg>
+                        }
+                        @case ('callers') {
+                          <svg lucideContactRound [size]="19" aria-hidden="true"></svg>
+                        }
+                        @case ('community') {
+                          <svg lucideNetwork [size]="19" aria-hidden="true"></svg>
+                        }
+                        @default {
+                          <svg lucideSettings2 [size]="19" aria-hidden="true"></svg>
+                        }
+                      }
+                      <span>{{ item.label }}</span>
+                      @if (item.count !== undefined) {
+                        <span class="tabular ml-auto pl-3 text-[0.95rem] font-semibold opacity-70"
+                          >{{ item.count }}<span class="sr-only"> {{ item.countLabel }}</span></span
+                        >
+                      }
+                    </a>
                   </li>
                 }
               </ul>
             </nav>
-          }
-          <div class="ml-auto flex items-center gap-2 sm:gap-3">
-            @if (store.connection() === 'paused') {
-              <span class="text-[0.95rem] font-semibold text-paper/70" role="status"
-                >Reconnecting…</span
-              >
-            }
-            @if (connected()) {
+
+            <div class="mt-auto hidden space-y-2 px-3 pb-5 lg:block">
               <a
                 routerLink="/console/present"
                 queryParamsHandling="preserve"
-                class="btn btn-quiet hidden no-underline sm:inline-flex"
+                class="btn btn-primary w-full no-underline"
               >
                 <svg lucideMonitorPlay [size]="17" aria-hidden="true"></svg> Present
               </a>
               <button
                 type="button"
-                class="btn btn-quiet hidden whitespace-nowrap sm:inline-flex lg:max-xl:!px-3.5"
-                [attr.aria-expanded]="operatorOpen()"
-                aria-controls="operator-panel"
-                (click)="toggleOperator()"
-              >
-                <svg lucidePanelRightOpen [size]="17" aria-hidden="true"></svg>
-                <span class="lg:max-xl:sr-only">Operator detail</span>
-              </button>
-              @if (store.isDemo()) {
-                <button
-                  type="button"
-                  class="btn btn-quiet whitespace-nowrap !px-3 sm:!px-4"
-                  (click)="exitDemo()"
-                >
-                  <svg lucideX [size]="17" aria-hidden="true"></svg
-                  ><span class="hidden sm:inline">Exit demo</span
-                  ><span class="sm:hidden">Exit</span>
-                </button>
-              }
-            }
-          </div>
-        </div>
-        @if (connected()) {
-          <nav class="border-t border-white/10 lg:hidden" aria-label="Dashboard">
-            <ul class="mx-auto grid max-w-[90rem] grid-cols-4">
-              @for (item of nav; track item.path) {
-                <li>
-                  <a
-                    [routerLink]="item.path"
-                    routerLinkActive="!text-ink !bg-lime"
-                    [routerLinkActiveOptions]="{ exact: item.exact }"
-                    queryParamsHandling="preserve"
-                    class="flex min-h-13 items-center justify-center px-1 text-[1rem] font-bold text-paper/85 no-underline"
-                    >{{ item.label }}</a
-                  >
-                </li>
-              }
-            </ul>
-            <div class="grid grid-cols-2 border-t border-white/10 sm:hidden">
-              <a
-                routerLink="/console/present"
-                queryParamsHandling="preserve"
-                class="flex min-h-12 items-center justify-center gap-2 text-[1rem] font-bold text-paper no-underline"
-              >
-                <svg lucideMonitorPlay [size]="17" aria-hidden="true"></svg> Present
-              </a>
-              <button
-                type="button"
-                class="flex min-h-12 items-center justify-center gap-2 border-l border-white/10 text-[1rem] font-bold"
+                class="btn btn-quiet w-full"
                 [attr.aria-expanded]="operatorOpen()"
                 aria-controls="operator-panel"
                 (click)="toggleOperator()"
               >
                 <svg lucidePanelRightOpen [size]="17" aria-hidden="true"></svg> Operator detail
               </button>
+              @if (store.isDemo()) {
+                <button type="button" class="btn btn-quiet w-full" (click)="exitDemo()">
+                  <svg lucideX [size]="17" aria-hidden="true"></svg> Exit demo
+                </button>
+              }
+              <p class="px-2 pt-2 text-[0.95rem] text-muted-on-ink" role="status">
+                {{ connectionText() }}
+              </p>
             </div>
-          </nav>
-        }
-      </header>
+          }
+        </aside>
 
-      <main
-        id="console-main"
-        tabindex="-1"
-        class="mx-auto min-h-[70vh] max-w-[90rem] px-4 py-8 outline-none sm:px-6 sm:py-10 lg:px-8"
-      >
-        @if (connected()) {
-          <router-outlet />
-        } @else {
-          <app-connect-panel (demo)="enterDemo()" />
-        }
-      </main>
+        <main id="console-main" tabindex="-1" class="min-w-0 outline-none">
+          <div class="mx-auto max-w-[96rem] px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
+            @if (connected()) {
+              @if (store.connection() === 'paused') {
+                <p class="mb-4 text-[1rem] font-semibold text-amber-ink lg:hidden" role="status">
+                  Reconnecting…
+                </p>
+              }
+              <router-outlet />
+            } @else {
+              <app-connect-panel (demo)="enterDemo()" />
+            }
+          </div>
+        </main>
+      </div>
 
       @if (operatorOpen() && connected()) {
         <app-operator-panel id="operator-panel" (closed)="closeOperator()" />
@@ -155,25 +194,77 @@ import { OperatorPanel } from './operator-panel';
 })
 export class ConsoleShell {
   readonly store = inject(ConsoleStore);
+  private readonly directory = inject(CallerDirectory);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  readonly nav = [
-    { path: '/console', label: 'Overview', exact: true },
-    { path: '/console/calls', label: 'Calls', exact: false },
-    { path: '/console/community', label: 'Community', exact: true },
-    { path: '/console/settings', label: 'Settings', exact: true },
-  ];
   readonly connected = computed(() => this.store.source() !== 'none' && !!this.store.state());
+  readonly nav = computed(() => {
+    const calls = this.store.calls().length;
+    const flagged = this.directory
+      .callers()
+      .filter((c) => c.standing === 'reported' || c.standing === 'warned').length;
+    const items: {
+      path: string;
+      label: string;
+      exact: boolean;
+      icon: NavIcon;
+      count?: number;
+      countLabel?: string;
+    }[] = [
+      { path: '/console', label: 'Overview', exact: true, icon: 'overview' },
+      {
+        path: '/console/calls',
+        label: 'Calls',
+        exact: false,
+        icon: 'calls',
+        count: calls,
+        countLabel: 'calls',
+      },
+      {
+        path: '/console/callers',
+        label: 'Callers',
+        exact: false,
+        icon: 'callers',
+        count: flagged || undefined,
+        countLabel: 'reported',
+      },
+      { path: '/console/community', label: 'Community', exact: true, icon: 'community' },
+      { path: '/console/settings', label: 'Settings', exact: true, icon: 'settings' },
+    ];
+    return items;
+  });
+  readonly lineName = computed(() => {
+    const state = this.store.state();
+    const id = state?.profile?.household_id ?? state?.selected_household;
+    const name = state?.profile?.display_name ?? household(id)?.name ?? 'your household';
+    return `${name}’s line`;
+  });
+  readonly lineNumber = computed(() => {
+    const raw = this.store.state()?.phone_display;
+    return isE164(raw) ? formatPhone(raw) : null;
+  });
+  readonly connectionText = computed(() => {
+    switch (this.store.connection()) {
+      case 'demo':
+        return 'Demo data. No phone line or model is connected.';
+      case 'paused':
+        return 'Reconnecting… the last snapshot stays on screen.';
+      case 'replay':
+        return 'Replay mode: authored scenarios, no real calls.';
+      default: {
+        const at = this.store.lastReceiptAt();
+        return at
+          ? `Live. Last update ${formatTime(at, this.store.state()?.profile?.timezone, true)}.`
+          : 'Live. Waiting for the first update.';
+      }
+    }
+  });
   readonly operatorOpen = signal(false);
   private readonly url = signal(this.router.url);
   /** The presentation view is chrome-less: it draws its own bug, banners and controls. */
   readonly presenting = computed(
     () => this.connected() && this.url().split('?')[0].startsWith('/console/present'),
   );
-  readonly lastReceipt = computed(() => {
-    const at = this.store.lastReceiptAt();
-    return at ? formatTime(at, this.store.state()?.profile?.timezone, true) : '';
-  });
   private returnFocus?: HTMLElement;
 
   constructor() {
@@ -202,11 +293,6 @@ export class ConsoleShell {
   exitDemo() {
     this.store.lock();
     void this.store.retryLocal();
-    void this.router.navigate(['/console']);
-  }
-
-  lock() {
-    this.store.lock();
     void this.router.navigate(['/console']);
   }
 

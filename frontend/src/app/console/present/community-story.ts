@@ -180,7 +180,15 @@ import { gsap, Motion } from '../../shared/motion';
                 s.targetName ?? 'Another household'
               }}</span>
               <span class="block text-[1rem]" [class]="ink ? 'text-muted-on-ink' : 'text-muted'">{{
-                done('consulted') ? 'was ready' : done('available') ? 'is ready' : 'not yet'
+                done('consulted')
+                  ? plural()
+                    ? 'were ready'
+                    : 'was ready'
+                  : done('available')
+                    ? plural()
+                      ? 'are ready'
+                      : 'is ready'
+                    : 'not yet'
               }}</span>
             </p>
           </div>
@@ -259,6 +267,7 @@ export class CommunityStoryView {
   private previous = new Set<string>();
 
   readonly sourceKnown = computed(() => !!this.story().sourceName);
+  readonly plural = computed(() => / and /.test(this.story().targetName ?? ''));
   readonly sourceNote = computed(() =>
     this.story().provenance === 'designated_synthetic_test' ? 'a designated test' : 'not linked',
   );
