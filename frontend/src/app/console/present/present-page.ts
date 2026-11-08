@@ -179,11 +179,13 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
         </details>
         <ng-template #showing>
           <div class="flex min-w-0 flex-1 items-center gap-2">
-            <span class="text-[0.95rem] font-bold text-muted-on-ink" aria-hidden="true"
+            <span
+              class="text-[0.95rem] font-bold text-muted-on-ink sm:max-2xl:hidden"
+              aria-hidden="true"
               >Showing</span
             >
             <app-select-menu
-              class="flex-1 sm:w-[19rem] sm:flex-none"
+              class="flex-1 sm:w-[15.5rem] sm:flex-none 2xl:w-[19rem]"
               tone="ink"
               ariaLabel="Showing"
               describedBy="follow-help"
