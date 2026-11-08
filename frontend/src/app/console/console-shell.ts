@@ -235,6 +235,12 @@ export class ConsoleShell {
     });
     const query = this.route.snapshot.queryParamMap;
     if (query.get('view') === 'demo' && this.store.source() === 'none') this.store.enterDemo();
+    // On this computer the dev server may hold the operator token; try it once, quietly.
+    else if (
+      this.store.source() === 'none' &&
+      !(globalThis as { __FIRSTRING_NO_AUTOCONNECT__?: boolean }).__FIRSTRING_NO_AUTOCONNECT__
+    )
+      void this.store.connectLocal();
     effect(() => {
       if (!this.connected()) this.operatorOpen.set(false);
     });

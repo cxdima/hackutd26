@@ -41,6 +41,7 @@ import {
   presentFocus,
 } from '../../core/live';
 import { resolvePresentation } from '../../core/present-selection';
+import { replayDuration, replayRecord } from '../../core/replay';
 import { gsap, Motion } from '../../shared/motion';
 import { Wordmark } from '../../shared/wordmark';
 import { DecisionSpine } from '../decision-spine';
@@ -232,7 +233,26 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
             </p>
           </div>
         }
-        @if (resolution().newer; as newer) {
+        @if (replay(); as r) {
+          <div
+            class="flex flex-wrap items-center gap-3 bg-paper px-4 py-3 text-ink sm:px-8"
+            role="status"
+          >
+            <p class="text-[1.0625rem]">
+              <span class="bug mr-2 bg-ink text-paper">Replay</span>
+              <strong>Recorded call from {{ clock(replaySource()?.startedAt) }}.</strong>
+              Its actual receipts, replayed at real speed. Not a live call.
+            </p>
+            <div class="flex gap-2">
+              @if (!replayDone()) {
+                <button type="button" class="btn btn-quiet" (click)="skipReplay()">
+                  <svg lucideSkipForward [size]="16" aria-hidden="true"></svg> Skip to end
+                </button>
+              }
+              <button type="button" class="btn btn-ink" (click)="stopReplay()">Stop replay</button>
+            </div>
+          </div>
+        } @else if (resolution().newer; as newer) {
           <div
             class="flex flex-wrap items-center gap-3 bg-paper px-4 py-3 text-ink sm:px-8"
             role="status"
@@ -335,17 +355,43 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                     </li>
                   }
                 </ul>
-                @if (resolution().latest; as latest) {
-                  <p class="mt-6 text-[1.0625rem] text-muted-on-ink">
-                    Earlier calls stay off this screen.
-                    <button
-                      type="button"
-                      class="ml-1 font-bold text-paper underline underline-offset-4"
-                      (click)="ui.pin(latest.id)"
-                    >
-                      Show the latest call ({{ clock(latest.startedAt) }})
-                    </button>
-                  </p>
+                @if (highlights().length) {
+                  <section class="mt-10 max-w-[44rem]" aria-labelledby="highlights-heading">
+                    <h2 id="highlights-heading" class="text-[1.25rem] font-extrabold">
+                      Recorded calls to show
+                    </h2>
+                    <p class="mt-1 max-w-[60ch] text-[1rem] text-muted-on-ink">
+                      Earlier calls never take over this screen. Show one, or replay its actual
+                      receipts at real speed.
+                    </p>
+                    <ul class="mt-3 border-t border-white/15">
+                      @for (h of highlights(); track h.call.id) {
+                        <li
+                          class="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-white/10 py-3"
+                        >
+                          <div class="min-w-0 flex-1">
+                            <p class="text-[1.0625rem] font-bold">{{ h.title }}</p>
+                            <p class="text-[0.95rem] text-muted-on-ink">
+                              {{ clock(h.call.startedAt) }} · for {{ h.call.name }} ·
+                              {{ clip(h.call.request) }}
+                            </p>
+                          </div>
+                          <div class="flex gap-2">
+                            <button type="button" class="btn btn-quiet" (click)="ui.pin(h.call.id)">
+                              Show
+                            </button>
+                            <button
+                              type="button"
+                              class="btn btn-primary !min-h-11"
+                              (click)="startReplay(h.call.id)"
+                            >
+                              <svg lucidePlay [size]="16" aria-hidden="true"></svg> Replay
+                            </button>
+                          </div>
+                        </li>
+                      }
+                    </ul>
+                  </section>
                 }
               </div>
               <div class="flex flex-col items-center gap-6 lg:col-span-5">
@@ -429,7 +475,9 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                 <p
                   class="flex flex-wrap items-center gap-x-3 gap-y-2 text-[1.0625rem] font-bold text-muted-on-ink"
                 >
-                  @if (f.live) {
+                  @if (replay()) {
+                    <span class="chip bg-paper text-ink">Replay · recorded call</span>
+                  } @else if (f.live) {
                     <span class="chip chip-live">On the line</span>
                   } @else {
                     <span class="chip bg-ink-3 text-paper">{{ outcomeLabel(call.outcome) }}</span>
@@ -443,8 +491,17 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                       ><span aria-hidden="true">· </span>{{ duration(call.durationSeconds) }}</span
                     >
                   }
-                  @if (ui.selection().mode === 'pinned') {
+                  @if (ui.selection().mode === 'pinned' && !replay()) {
                     <span class="bug bug-off">Pinned</span>
+                    @if (!f.live) {
+                      <button
+                        type="button"
+                        class="btn btn-quiet !min-h-10 !py-1"
+                        (click)="startReplay(call.id)"
+                      >
+                        <svg lucidePlay [size]="15" aria-hidden="true"></svg> Replay this call
+                      </button>
+                    }
                   }
                 </p>
 
@@ -755,7 +812,54 @@ export class PresentPage {
   readonly resolution = computed(() =>
     resolvePresentation(this.store.calls(), this.ui.selection(), this.store.now()),
   );
-  readonly shown = computed(() => this.resolution().call);
+  /** A recorded call replayed from its own receipts (display only). */
+  readonly replay = signal<{ id: string; started: number; skipped: boolean } | null>(null);
+  private readonly tick = signal(Date.now());
+  readonly replaySource = computed(() => {
+    const r = this.replay();
+    return r ? this.store.calls().find((c) => c.id === r.id) : undefined;
+  });
+  readonly replayDone = computed(() => {
+    const r = this.replay();
+    const source = this.replaySource();
+    return !!r && !!source && (r.skipped || this.tick() - r.started >= replayDuration(source));
+  });
+  readonly shown = computed(() => {
+    const r = this.replay();
+    const source = this.replaySource();
+    if (r && source)
+      return replayRecord(source, r.skipped ? Number.POSITIVE_INFINITY : this.tick() - r.started);
+    return this.resolution().call;
+  });
+  /** Recorded calls worth showing, most telling first. Only calls with real receipts. */
+  readonly highlights = computed(() => {
+    const calls = this.store.calls().filter((c) => !c.active && c.events.length >= 3);
+    const picks: { call: (typeof calls)[number]; title: string }[] = [];
+    const add = (call: (typeof calls)[number] | undefined, title: string) => {
+      if (call && !picks.some((p) => p.call.id === call.id)) picks.push({ call, title });
+    };
+    add(
+      calls.find((c) => c.outcome === 'blocked' && presentFocus(c).branchAt !== undefined),
+      'The request changed, then it was blocked',
+    );
+    add(
+      calls.find((c) => c.outcome === 'connected'),
+      'Connected after permission',
+    );
+    add(
+      calls.find((c) => c.outcome === 'blocked'),
+      'Suspicious request blocked',
+    );
+    add(
+      calls.find((c) => c.outcome === 'message_saved'),
+      'Message saved',
+    );
+    add(
+      calls.find((c) => c.outcome === 'needs_review'),
+      'Needs review',
+    );
+    return picks.slice(0, 4);
+  });
   readonly focus = computed(() => {
     const call = this.shown();
     return call ? presentFocus(call) : undefined;
@@ -791,6 +895,7 @@ export class PresentPage {
 
   readonly screen = computed<Screen>(() => {
     if (this.ui.scene() === 'community') return 'community';
+    if (this.replay() && this.shown()) return 'call';
     if (this.shown()) return 'call';
     if (this.store.connection() === 'paused') return 'unavailable';
     if (this.resolution().missing) return 'missing';
@@ -883,6 +988,19 @@ export class PresentPage {
 
   constructor() {
     afterNextRender(() => this.rendered.set(true));
+    // Replay clock: ticks only while a replay is running.
+    effect((onCleanup) => {
+      if (!this.replay() || this.replayDone()) return;
+      const timer = setInterval(() => this.tick.set(Date.now()), 200);
+      onCleanup(() => clearInterval(timer));
+    });
+    // Choosing a different call (or following) ends a replay.
+    effect(() => {
+      const selection = this.ui.selection();
+      const r = untracked(() => this.replay());
+      if (r && (selection.mode !== 'pinned' || selection.pinnedId !== r.id))
+        untracked(() => this.replay.set(null));
+    });
     // Motion only when evidence arrives: a caption wipe and an outcome settle.
     let lastCaption = '';
     let lastOutcome = '';
@@ -952,7 +1070,21 @@ export class PresentPage {
 
   reset() {
     this.closeEvidence();
+    this.replay.set(null);
     this.ui.reset(Date.now());
+  }
+
+  startReplay(id: string) {
+    this.ui.pin(id);
+    this.ui.scene.set('call');
+    this.tick.set(Date.now());
+    this.replay.set({ id, started: Date.now(), skipped: false });
+  }
+  skipReplay() {
+    this.replay.update((r) => (r ? { ...r, skipped: true } : r));
+  }
+  stopReplay() {
+    this.replay.set(null);
   }
 
   openEvidence() {

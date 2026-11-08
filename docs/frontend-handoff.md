@@ -10,6 +10,25 @@ This pass touches only:
 
 It did not modify Rust, telephony, model serving, Brev, credentials or call allowances, and it did not restart the running server. The backend terminal's uncommitted work in the main checkout was read, never edited.
 
+## Update: self-connecting console, recorded-call replay, links
+
+Added after a69f39f:
+- **The console connects by itself** on the presenting computer.
+  - `frontend/proxy.conf.mjs` reads `DEMO_ADMIN_TOKEN` server-side from `../.env` (or `FIRSTRING_ENV_FILE`).
+  - It adds the token only to same-origin `/api` requests. Cross-site requests and requests without a browser context still get 401.
+  - The token never enters the bundle, the page, storage or logs.
+  - Production (Rust-served) keeps the token form. Loopback trust in Rust is deliberately not proposed, because the voice tunnel makes loopback addresses unsafe.
+- **Presentation highlights and replay:**
+  - The waiting screen lists the most telling recorded calls.
+  - **Replay** rebuilds a recorded call from its own receipts at real speed, labeled "Replay · recorded call". Verified on the live server with the 1:47 AM "appointment → login number → blocked" test call.
+- **Landing links:** GitHub (https://github.com/cxdima/hackutd26) and Devpost (https://devpost.com/software/firstring) in the footer and the final call to action.
+
+Start for the presentation (the worktree has no `.env` of its own):
+
+```sh
+cd frontend && FIRSTRING_ENV_FILE=/path/to/hackutd26/.env npm start   # after merging into main, plain `npm start`
+```
+
 ## Preview
 
 ```sh

@@ -127,6 +127,25 @@ test.describe('presentation view · fictional rehearsal', () => {
     await expect(page.getByText('Pinned', { exact: true })).toBeVisible();
   });
 
+  test('replays a recorded call from its own receipts, labeled as a replay', async ({ page }) => {
+    const requests = trackRequests(page);
+    await page.goto('/console/present?view=demo');
+    const list = page.getByRole('region', { name: 'Recorded calls to show' });
+    await expect(list.getByText('The request changed, then it was blocked')).toBeVisible();
+    await list.getByRole('button', { name: 'Replay' }).first().click();
+    await expect(
+      page.getByText('Its actual receipts, replayed at real speed. Not a live call.'),
+    ).toBeVisible();
+    await expect(page.getByText('Replay · recorded call')).toBeVisible();
+    // Early in the replay there is no outcome yet.
+    await expect(page.locator('.outcome-graphic')).toContainText('Screening in progress');
+    await page.getByRole('button', { name: 'Skip to end' }).click();
+    await expect(page.locator('.outcome-graphic')).toContainText('Suspicious request blocked');
+    await page.getByRole('button', { name: 'Stop replay' }).click();
+    await expect(page.getByText('Replay · recorded call')).toHaveCount(0);
+    expect(requests.api()).toHaveLength(0);
+  });
+
   test('reduced motion keeps the waiting beacon still', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/console/present?view=demo');

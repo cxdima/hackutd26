@@ -47,6 +47,20 @@ function timeout(ms: number, signal?: AbortSignal): AbortSignal {
 @Injectable({ providedIn: 'root' })
 export class ConsoleStore implements OnDestroy {
   private token = '';
+  /** Local operator session: the dev server adds the token server-side; the browser never holds it. */
+  private localSession = false;
+  /** How this console is authorized, for display only. */
+  readonly session = signal<'token' | 'local' | null>(null);
+  /** True while the one automatic connection attempt is running. */
+  readonly autoConnecting = signal(false);
+  private autoTried = false;
+
+  private auth(): Record<string, string> {
+    return this.token ? { Authorization: `Bearer ${this.token}` } : {};
+  }
+  private authorized(): boolean {
+    return !!this.token || this.localSession;
+  }
   private controller?: AbortController;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private refreshTimer?: ReturnType<typeof setTimeout>;
@@ -117,6 +131,8 @@ export class ConsoleStore implements OnDestroy {
       const initial = await this.loadState(token);
       if (generation !== this.generation) return false;
       this.token = token;
+      this.localSession = false;
+      this.session.set('token');
       this.source.set('live');
       this.state.set(initial);
       this.events.set([]);
@@ -135,11 +151,46 @@ export class ConsoleStore implements OnDestroy {
     }
   }
 
+  /**
+   * One quiet attempt to use the local operator session (the dev server on this
+   * computer adds the token server-side). If the server asks for a token, the
+   * normal form is shown with no error. Never retried after Lock.
+   */
+  async connectLocal(): Promise<boolean> {
+    if (this.autoTried || this.source() !== 'none' || this.connecting()) return false;
+    this.autoTried = true;
+    const generation = ++this.generation;
+    this.autoConnecting.set(true);
+    try {
+      const initial = await this.loadState('');
+      if (generation !== this.generation) return false;
+      this.token = '';
+      this.localSession = true;
+      this.session.set('local');
+      this.source.set('live');
+      this.state.set(initial);
+      this.events.set([]);
+      this.lastSequence = 0;
+      this.stale.set(false);
+      this.error.set('');
+      this.startClock();
+      this.controller = new AbortController();
+      void this.stream(this.controller.signal, generation);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      if (generation === this.generation) this.autoConnecting.set(false);
+    }
+  }
+
   enterDemo(): void {
     this.stop();
     this.stagedPlayed.set([]);
     this.generation++;
     this.token = '';
+    this.localSession = false;
+    this.session.set(null);
     const demo = buildDemo();
     this.source.set('demo');
     this.state.set(demo.state);
@@ -156,6 +207,8 @@ export class ConsoleStore implements OnDestroy {
     this.stop();
     this.stagedPlayed.set([]);
     this.token = '';
+    this.localSession = false;
+    this.session.set(null);
     this.source.set('none');
     this.state.set(null);
     this.events.set([]);
@@ -181,7 +234,7 @@ export class ConsoleStore implements OnDestroy {
     let response: Response;
     try {
       response = await fetch('/api/state', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         signal: timeout(10000, signal),
         cache: 'no-store',
       });
@@ -229,7 +282,7 @@ export class ConsoleStore implements OnDestroy {
     try {
       const response = await fetch('/api/events', {
         headers: {
-          Authorization: `Bearer ${this.token}`,
+          ...this.auth(),
           'Last-Event-ID': String(this.lastSequence),
           Accept: 'text/event-stream',
         },
@@ -344,7 +397,7 @@ export class ConsoleStore implements OnDestroy {
       return { kind: 'unavailable', reason: REPUTATION_UNAVAILABLE };
     try {
       const response = await fetch(`/api/session/${encodeURIComponent(sessionId)}/reputation`, {
-        headers: { Authorization: `Bearer ${this.token}` },
+        headers: this.auth(),
         cache: 'no-store',
         signal: timeout(10000, signal),
       });
@@ -375,7 +428,7 @@ export class ConsoleStore implements OnDestroy {
    * without the endpoint are ignored quietly.
    */
   async backfillSession(sessionId: string, signal?: AbortSignal): Promise<number> {
-    if (this.source() !== 'live' || !this.token) return 0;
+    if (this.source() !== 'live' || !this.authorized()) return 0;
     const page = z.object({
       events: z.array(eventSchema),
       next_after: z.number(),
@@ -389,7 +442,7 @@ export class ConsoleStore implements OnDestroy {
         response = await fetch(
           `/api/session/${encodeURIComponent(sessionId)}/events?after=${after}&limit=500`,
           {
-            headers: { Authorization: `Bearer ${this.token}` },
+            headers: this.auth(),
             cache: 'no-store',
             signal: timeout(10000, signal),
           },
@@ -410,7 +463,7 @@ export class ConsoleStore implements OnDestroy {
 
   /** POSTs an operator control. Never available in demo; success means "request sent", not "done". */
   async action(path: string, body: Record<string, unknown>): Promise<boolean> {
-    if (this.busy() || !this.token || this.source() !== 'live') return false;
+    if (this.busy() || !this.authorized() || this.source() !== 'live') return false;
     const generation = this.generation;
     this.busy.set(path);
     this.error.set('');
@@ -418,7 +471,7 @@ export class ConsoleStore implements OnDestroy {
     try {
       const response = await fetch(path, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+        headers: { ...this.auth(), 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(15000),
       });
@@ -450,7 +503,7 @@ export class ConsoleStore implements OnDestroy {
       throw new Error('Demo profile unavailable.');
     }
     const response = await fetch(`/api/profile/${encodeURIComponent(household)}`, {
-      headers: { Authorization: `Bearer ${this.token}` },
+      headers: this.auth(),
       cache: 'no-store',
       signal: timeout(10000, signal),
     });
@@ -476,7 +529,7 @@ export class ConsoleStore implements OnDestroy {
     };
     const response = await fetch(`/api/profile/${encodeURIComponent(household)}`, {
       method: 'PUT',
-      headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+      headers: { ...this.auth(), 'Content-Type': 'application/json' },
       body: JSON.stringify(fields),
       cache: 'no-store',
       signal: timeout(10000, signal),
@@ -494,7 +547,7 @@ export class ConsoleStore implements OnDestroy {
   /** Read-only automated caller status. Refreshing it never starts or retries a call. */
   async loadFixtureStatus(): Promise<FixtureStatus> {
     const response = await fetch('/api/demo/audio-fixture', {
-      headers: { Authorization: `Bearer ${this.token}` },
+      headers: this.auth(),
       cache: 'no-store',
       signal: AbortSignal.timeout(10000),
     });
@@ -507,7 +560,7 @@ export class ConsoleStore implements OnDestroy {
   /** Fetches the latest automated-caller recording as a private blob URL, only on request. */
   async loadFixtureRecording(): Promise<string> {
     const response = await fetch('/api/demo/audio-fixture/recording', {
-      headers: { Authorization: `Bearer ${this.token}` },
+      headers: this.auth(),
       cache: 'no-store',
       signal: AbortSignal.timeout(20000),
     });

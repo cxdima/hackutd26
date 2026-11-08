@@ -1,6 +1,12 @@
 import { Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideArrowRight, LucideKeyRound, LucideLockKeyhole, LucidePlay } from '@lucide/angular';
+import {
+  LucideArrowRight,
+  LucideKeyRound,
+  LucideLoader,
+  LucideLockKeyhole,
+  LucidePlay,
+} from '@lucide/angular';
 import { ConsoleStore } from '../core/console-store';
 
 /**
@@ -9,7 +15,14 @@ import { ConsoleStore } from '../core/console-store';
  */
 @Component({
   selector: 'app-connect-panel',
-  imports: [FormsModule, LucideKeyRound, LucideArrowRight, LucidePlay, LucideLockKeyhole],
+  imports: [
+    FormsModule,
+    LucideKeyRound,
+    LucideArrowRight,
+    LucidePlay,
+    LucideLockKeyhole,
+    LucideLoader,
+  ],
   template: `
     <div class="grid gap-10 py-6 lg:grid-cols-12 lg:py-12">
       <div class="lg:col-span-6">
@@ -32,45 +45,65 @@ import { ConsoleStore } from '../core/console-store';
       </div>
 
       <div class="space-y-6 lg:col-span-5 lg:col-start-8">
-        <section
-          class="rounded-[var(--radius-card)] border-2 border-ink bg-paper p-6 sm:p-8"
-          aria-labelledby="connect-heading"
-        >
-          <h2 id="connect-heading" class="flex items-center gap-3 text-[1.5rem] font-extrabold">
-            <svg lucideKeyRound [size]="24" aria-hidden="true"></svg> Connect to your FirstRing
-            server
-          </h2>
-          <p class="mt-3 text-[1.0625rem] text-ink-3">
-            Use the operator token configured on the server. Connecting places no call.
-          </p>
-          <form class="mt-6" (ngSubmit)="connect()" novalidate>
-            <label for="operator-token" class="field-label">Operator token</label>
-            <input
-              id="operator-token"
-              name="token"
-              type="password"
-              class="field"
-              autocomplete="off"
-              spellcheck="false"
-              [(ngModel)]="token"
-              [attr.aria-invalid]="!!store.error() && !store.connecting()"
-              aria-describedby="token-help"
-              required
-            />
-            <p id="token-help" class="field-help flex items-center gap-2">
-              <svg lucideLockKeyhole [size]="15" aria-hidden="true"></svg> Kept only in this tab’s
-              memory. Cleared when you lock or reload.
+        @if (store.autoConnecting()) {
+          <section
+            class="rounded-[var(--radius-card)] border-2 border-ink bg-paper p-6 sm:p-8"
+            role="status"
+          >
+            <p class="flex items-center gap-3 text-[1.5rem] font-extrabold">
+              <svg lucideLoader [size]="24" class="animate-spin" aria-hidden="true"></svg>
+              Connecting to your FirstRing server…
             </p>
-            <button
-              type="submit"
-              class="btn btn-ink mt-6 w-full !min-h-14 text-[1.125rem]"
-              [disabled]="!token().trim() || store.connecting()"
-            >
-              {{ store.connecting() ? 'Connecting…' : 'Connect' }}
-              <svg lucideArrowRight [size]="19" aria-hidden="true"></svg>
-            </button>
-          </form>
-        </section>
+            <p class="mt-3 text-[1.0625rem] text-ink-3">
+              Using this computer’s local operator session. Connecting places no call.
+            </p>
+          </section>
+        } @else {
+          <section
+            class="rounded-[var(--radius-card)] border-2 border-ink bg-paper p-6 sm:p-8"
+            aria-labelledby="connect-heading"
+          >
+            <h2 id="connect-heading" class="flex items-center gap-3 text-[1.5rem] font-extrabold">
+              <svg lucideKeyRound [size]="24" aria-hidden="true"></svg> Connect to your FirstRing
+              server
+            </h2>
+            <p class="mt-3 text-[1.0625rem] text-ink-3">
+              Use the operator token configured on the server. Connecting places no call.
+            </p>
+            <form class="mt-6" (ngSubmit)="connect()" novalidate>
+              <label for="operator-token" class="field-label">Operator token</label>
+              <input
+                id="operator-token"
+                name="token"
+                type="password"
+                class="field"
+                autocomplete="off"
+                spellcheck="false"
+                [(ngModel)]="token"
+                [attr.aria-invalid]="!!store.error() && !store.connecting()"
+                aria-describedby="token-help"
+                required
+              />
+              <p id="token-help" class="field-help flex items-center gap-2">
+                <svg lucideLockKeyhole [size]="15" aria-hidden="true"></svg> Kept only in this tab’s
+                memory. Cleared when you lock or reload.
+              </p>
+              <button
+                type="submit"
+                class="btn btn-ink mt-6 w-full !min-h-14 text-[1.125rem]"
+                [disabled]="!token().trim() || store.connecting()"
+              >
+                {{ store.connecting() ? 'Connecting…' : 'Connect' }}
+                <svg lucideArrowRight [size]="19" aria-hidden="true"></svg>
+              </button>
+            </form>
+            <p class="mt-5 text-[1rem] text-muted">
+              On the presenting computer, start the console with
+              <code class="rounded bg-paper-2 px-1.5 py-0.5">npm start</code>
+              from the repository and it connects by itself. No token to paste.
+            </p>
+          </section>
+        }
 
         <section
           class="rounded-[var(--radius-card)] bg-paper-2 p-6 sm:p-8"

@@ -161,6 +161,11 @@ export const test = base.extend<{ apiGuard: void }>({
   apiGuard: [
     async ({ page }, use) => {
       await page.route('**/api/**', (route) => route.abort('blockedbyclient'));
+      // Tests opt in to the local operator session explicitly (see console-live.spec.ts).
+      await page.addInitScript(() => {
+        (globalThis as { __FIRSTRING_NO_AUTOCONNECT__?: boolean }).__FIRSTRING_NO_AUTOCONNECT__ =
+          true;
+      });
       await use();
     },
     { auto: true },

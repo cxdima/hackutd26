@@ -387,7 +387,11 @@ export class OperatorPanel {
 
   readonly disabled = computed(() => !!this.store.busy() || this.store.stale());
   readonly sourceLabel = computed(() =>
-    this.store.isDemo() ? 'Demo fixtures in this browser' : 'Connected FirstRing server',
+    this.store.isDemo()
+      ? 'Demo fixtures in this browser'
+      : this.store.session() === 'local'
+        ? 'Connected FirstRing server · local operator session (the token stays in the dev server)'
+        : 'Connected FirstRing server · operator token in this tab’s memory',
   );
   readonly proofs = computed(() => {
     const evidence = this.store.state()?.evidence;

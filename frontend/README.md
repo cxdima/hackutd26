@@ -12,9 +12,11 @@ npm start            # http://127.0.0.1:4310, proxies /api to http://127.0.0.1:8
 ```
 
 - `/`: landing page. It never calls the API.
-- `/console`: locked until you enter the server's `DEMO_ADMIN_TOKEN`. The token is held in memory only (never localStorage, sessionStorage, cookies or URLs); reloading or locking clears it.
+- `/console`: connects by itself on the presenting computer. The dev proxy (`proxy.conf.mjs`) reads `DEMO_ADMIN_TOKEN` from the repository's `.env`, or from `FIRSTRING_ENV_FILE`, and adds it server-side, only to same-origin `/api` requests from the console's own pages. The browser never holds it. Turn this off with `FIRSTRING_CONSOLE_AUTOCONNECT=off`. Without a local session, the console asks for the token and keeps it in tab memory only (never localStorage, sessionStorage, cookies or URLs).
 - `/console?view=demo`: curated fictional calls, labeled DEMO throughout, replayed in the browser. Nothing in the demo contacts a server, phone line or model.
 - `/console/present`: the projected screen for a live demonstration. It shows the caller's words as a large caption, FirstRing's current step, the outcome and an evidence drawer. "Follow newest call" ignores history; you can pin a call, and "Reset display" clears only what is shown. A tel: QR code shows FirstRing's own inbound number. In `?view=demo` it adds three fictional rehearsal calls: connected, request changes, and Maya was ready.
+
+  "Recorded calls to show" lists the most telling recorded calls, such as a request that changed and was then blocked. **Replay** rebuilds a recorded call from its own receipts at real speed and labels it "Replay · recorded call", so you can present the flow without a live phone.
 - `/console/settings`: profile editor, private permission call readiness from the server, and the optional voice enrollment, which runs as an in-browser example only while the server reports cloning as disabled.
 
 `npm run build` writes the production app to `dist/firstring-web/browser/` (initial bundle about 80 KB transferred; landing and console pages are lazy chunks).

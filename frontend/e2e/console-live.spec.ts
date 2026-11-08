@@ -126,4 +126,42 @@ test.describe('connected dashboard (mocked server)', () => {
     await expect(page.getByText('Request sent.', { exact: false })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Call Phone B' })).toBeDisabled();
   });
+
+  test('connects by itself through the local operator session, holding no token in the page', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      (globalThis as { __FIRSTRING_NO_AUTOCONNECT__?: boolean }).__FIRSTRING_NO_AUTOCONNECT__ =
+        false;
+    });
+    const headers: (string | undefined)[] = [];
+    // Stands in for the dev proxy, which adds the token server-side.
+    await page.route('**/api/state', (route) => {
+      headers.push(route.request().headers()['authorization']);
+      return route.fulfill({ json: liveState() });
+    });
+    await page.route('**/api/events', (route) => hold(route));
+    await page.goto('/console');
+    const console = new ConsolePage(page);
+    await expect(console.bug()).toHaveText(/Live/);
+    await expect(page.getByLabel('Operator token')).toHaveCount(0);
+    expect(headers.every((h) => h === undefined)).toBe(true);
+    const storage = await page.evaluate(
+      () => localStorage.length + sessionStorage.length + document.cookie.length,
+    );
+    expect(storage).toBe(0);
+  });
+
+  test('falls back to the token form without an error when no local session exists', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      (globalThis as { __FIRSTRING_NO_AUTOCONNECT__?: boolean }).__FIRSTRING_NO_AUTOCONNECT__ =
+        false;
+    });
+    await page.route('**/api/state', (route) => route.fulfill({ status: 401, body: '' }));
+    await page.goto('/console');
+    await expect(page.getByLabel('Operator token')).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
 });
