@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { ConsoleState } from "../src/types";
+import type { CallEvent, ConsoleState } from "../src/types";
 const empty: ConsoleState = {
   execution_mode: "replay",
   data_origin: "synthetic",
@@ -87,6 +87,231 @@ const revoked: ConsoleState = {
   ],
   tactics: [],
 };
+
+test("model HTTP receipt remains distinct from a current assessment and audible result", async ({
+  page,
+}, info) => {
+  const snapshot: ConsoleState = {
+    ...empty,
+    transport: "relay",
+    sessions: [
+      {
+        ...revoked.sessions[0],
+        state: "screening",
+        current_action: "Waiting for a complete caller turn",
+        generation_id: 4,
+        turn_version: 2,
+        speech_pending: true,
+        inbound_ended: false,
+        offer: null,
+        legs: [],
+      },
+    ],
+  };
+  const completed: CallEvent = {
+    id: "fixture-model",
+    sequence: 1,
+    session_id: "fixture-session",
+    leg_role: "system",
+    occurred_at: "2026-11-08T03:54:00Z",
+    received_at: "2026-11-08T03:54:00Z",
+    policy_epoch: 2,
+    execution_mode: "replay",
+    data_origin: "synthetic",
+    type: "model.request.completed",
+    payload: {
+      generation_id: 3,
+      turn_version: 1,
+      boundary: "model_http",
+      heard: false,
+      observation: {
+        requested_model: "nvidia/nemotron-3.5-lightning-30b-a3b",
+        response_model: "nvidia/nemotron-3.5-lightning-30b-a3b",
+        elapsed_ms: 998,
+        outcome: "success",
+        error: null,
+      },
+    },
+  };
+  const cancelled: CallEvent = {
+    ...completed,
+    id: "fixture-cancel",
+    sequence: 2,
+    type: "model.cancelled",
+    payload: { generation_id: 3, reason: "caller_speech" },
+  };
+  await page.route("**/api/state", (route) =>
+    route.fulfill({ json: snapshot }),
+  );
+  await page.route("**/api/events", (route) =>
+    route.fulfill({
+      contentType: "text/event-stream",
+      body: [completed, cancelled]
+        .map(
+          (event) =>
+            `id: ${event.sequence}\ndata: ${JSON.stringify(event)}\n\n`,
+        )
+        .join(""),
+    }),
+  );
+  await page.goto("/");
+  await page.getByLabel("Operator token").fill("fixture-operator-token");
+  await page.getByRole("button", { name: "Connect console" }).click();
+  const card = page.getByRole("group", { name: "Model HTTP observation" });
+  await expect(card).toContainText("998 ms");
+  await expect(card).toContainText("Earlier turn or generation");
+  await expect(card).toContainText("Model job later cancelled");
+  await expect(
+    page.getByText("No accepted assessment for the current turn.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: "Live Relay conversation" }),
+  ).toContainText("Pending");
+  await page.screenshot({
+    path: info.outputPath("fixture-model-http-desktop.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await card.scrollIntoViewIfNeeded();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: info.outputPath("fixture-model-http-mobile.png"),
+    fullPage: true,
+  });
+});
+
+test("recorded inbound and model proof do not enable Relay or an unenrolled Phone B", async ({
+  page,
+}, info) => {
+  const snapshot: ConsoleState = {
+    ...empty,
+    execution_mode: "live",
+    transport: "probe",
+    capabilities: [
+      {
+        id: "inbound",
+        status: "configured",
+        detail: "Signing inputs configured",
+      },
+      { id: "relay", status: "configured", detail: "Local Relay inputs only" },
+    ],
+    evidence: {
+      model_protocol: {
+        status: "passed",
+        detail: "Synthetic native tool/result probe completed.",
+      },
+      inbound_phone: {
+        status: "passed",
+        detail: "Recorded signed inbound phone test.",
+      },
+      relay_phone: {
+        status: "pending",
+        detail: "Live Relay listening test still required.",
+      },
+    },
+    phone_b: {
+      enrolled: false,
+      enabled: false,
+      authorized: false,
+      remaining_attempts: 1,
+      can_request: false,
+      reason: "Sarah / Phone B is not enrolled; outbound calling is disabled.",
+    },
+    sessions: [
+      {
+        ...revoked.sessions[0],
+        execution_mode: "live",
+        state: "screening",
+        current_action: "Assessing the caller’s request",
+        inbound_ended: false,
+        offer: null,
+        legs: [],
+        turn_version: 1,
+        assessed_version: 1,
+        generation_id: 2,
+        evidence_quote: "reschedule the clinic visit",
+        turns: [
+          {
+            id: "t1",
+            speaker: "caller",
+            text: "Please reschedule the clinic visit.",
+          },
+        ],
+        assessments: [
+          {
+            turn_version: 1,
+            generation_id: 2,
+            observation: {
+              speech_act: "request",
+              requested_object: "routine_information",
+              direction: "caller_requests_from_sarah",
+            },
+            evidence_refs: [
+              { turn_id: "t1", quote: "reschedule the clinic visit" },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  await page.route("**/api/events", () => new Promise(() => {}));
+  await page.route("**/api/state", (route) =>
+    route.fulfill({ json: snapshot }),
+  );
+  let mutations = 0;
+  await page.route("**/api/demo/**", (route) => {
+    mutations++;
+    return route.abort();
+  });
+  await page.goto("/");
+  await page.getByLabel("Operator token").fill("fixture-operator-token");
+  await page.getByRole("button", { name: "Connect console" }).click();
+  await expect(
+    page.getByRole("group", { name: "Model protocol" }),
+  ).toContainText("Recorded pass");
+  await expect(
+    page.getByRole("group", { name: "Real inbound phone" }),
+  ).toContainText("Recorded pass");
+  await expect(
+    page.getByRole("group", { name: "Live Relay conversation" }),
+  ).toContainText("Pending");
+  await expect(
+    page.getByRole("button", { name: "Call Phone B" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText("Accepted assessment", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "request · routine information · caller requests from Sarah",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByText("No execution result received.", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath("fixture-evidence-desktop.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: info.outputPath("fixture-evidence-mobile.png"),
+    fullPage: true,
+  });
+  expect(mutations).toBe(0);
+});
 
 test("stored message appears privately without a delivery or community claim", async ({
   page,

@@ -324,33 +324,46 @@ async fn state(State(app): State<App>) -> ApiResult {
         .collect::<Vec<_>>();
     let c = &app.config;
     let (community, tactics) = crate::patterns::view(&app.store, c.mode).await?;
+    let evidence = crate::evidence::view(&app.store).await?;
+    let phone_b = crate::evidence::phone_b(c, &app.store).await?;
     let capabilities = json!([
-    {"id":"inbound","status":if c.inbound_configured(){"configured"}else{"pending"},"detail":"Twilio signing credentials and HTTPS origin only; Photon line/profile and actual inbound audio still need verification"},
+    {"id":"inbound","status":if c.inbound_configured(){"configured"}else{"pending"},"detail":"Local signing and HTTPS inputs; recorded phone proof is shown separately"},
     {"id":"outbound","status":if c.outbound_configured(){"configured"}else{"pending"},"detail":"Separate Photon SIP credentials and caller number; endpoint enrollment, authorization and real outbound test remain separate gates"},
-    {"id":"nemotron","status":if c.model_configured(){"configured"}else{"pending"},"detail":"Native tool-call access requires a real probe"},
+    {"id":"nemotron","status":if c.model_configured(){"configured"}else{"pending"},"detail":"Local hosted model inputs; protocol evidence and behavior evaluation are separate"},
     {"id":"relay","status":if c.relay_configured(){"configured"}else{"pending"},"detail":"Local signed-WebSocket inputs only; onboarding and real phone protocol test pending"},
     {"id":"smoke_test","status":if c.smoke_authorized{"configured"}else{"pending"},"detail":"Exactly one authorized outbound attempt to Sarah/Phone B"},
     {"id":"family","status":if c.family_enabled{"configured"}else{"disabled"},"detail":"Family calls require separate enrollment and authorization"},
     {"id":"voice_clone","status":"disabled","detail":"Preset assistant voice; no clone endpoint verified"}
     ]);
-    Ok(Json(json!({"execution_mode":c.mode,"data_origin":"synthetic","transport":c.transport,"phone_display":if c.photon_number.is_empty(){"Not configured"}else{&c.photon_number},"selected_household":app.store.metadata("selected_household").await?.unwrap_or_else(||"sarah".into()),"capabilities":capabilities,"sessions":snapshots,"community":community,"tactics":tactics})).into_response())
+    Ok(Json(json!({"execution_mode":c.mode,"data_origin":"synthetic","transport":c.transport,"phone_display":if c.photon_number.is_empty(){"Not configured"}else{&c.photon_number},"selected_household":app.store.metadata("selected_household").await?.unwrap_or_else(||"sarah".into()),"capabilities":capabilities,"evidence":evidence,"phone_b":phone_b,"sessions":snapshots,"community":community,"tactics":tactics})).into_response())
 }
 async fn ready(State(app): State<App>) -> Response {
     let c = &app.config;
     let ready = c.selected_transport_configured() && !c.admin_token.is_empty();
+    let evidence = crate::evidence::view(&app.store).await.unwrap_or_default();
+    let inbound = evidence["inbound_phone"]["status"] == "passed";
+    let relay = evidence["relay_phone"]["status"] == "passed";
+    let model = evidence["model_protocol"]["status"] == "passed";
+    let selected = ready
+        && c.mode == crate::config::ExecutionMode::Live
+        && match c.transport.as_str() {
+            "probe" => inbound,
+            "relay" => relay && model,
+            _ => false,
+        };
     (
         if ready {
             StatusCode::OK
         } else {
             StatusCode::SERVICE_UNAVAILABLE
         },
-        Json(json!({"configured":ready,"live_verified":false,"execution_mode":c.mode,"transport":c.transport,
+        Json(json!({"configured":ready,"live_verified":selected,"execution_mode":c.mode,"transport":c.transport,"evidence":evidence,
             "capabilities":{
-                "inbound":{"configured":c.inbound_configured(),"live_verified":false},
+                "inbound":{"configured":c.inbound_configured(),"live_verified":inbound},
                 "outbound":{"configured":c.outbound_configured(),"live_verified":false},
-                "relay":{"configured":c.relay_configured(),"live_verified":false},
-                "model":{"configured":c.model_configured(),"live_verified":false}
-            },"meaning":"Local configuration only; provider account capabilities and live outcomes are not verified"})),
+                "relay":{"configured":c.relay_configured(),"live_verified":relay},
+                "model":{"configured":c.model_configured(),"live_verified":model}
+            },"meaning":"Configuration is current; verification fields refer to separately recorded historical evidence, not an availability guarantee"})),
     )
         .into_response()
 }
@@ -443,6 +456,22 @@ async fn conference_status(
 async fn after_relay(State(app): State<App>, Extension(f): Extension<FormData>) -> ApiResult {
     let h = app.by_sid(f.field("CallSid")).await?;
     let s = h.send(Input::Snapshot).await?;
+    let session: Session = serde_json::from_value(s.clone())?;
+    let code = f.field("ErrorCode").parse::<u32>().ok();
+    let status = match f.field("SessionStatus") {
+        "failed" => "failed",
+        "completed" => "completed",
+        "ended" => "ended",
+        _ => "unknown",
+    };
+    app.store.append(Some(&session), "system", "relay.ended", json!({"error_code":code,"status":status,"duration_seconds":f.field("SessionDuration").parse::<u64>().ok()}),session.execution_mode).await?;
+    if s["closing_reason"].as_str() == Some("message_saved") {
+        let closing = h.send(Input::ClosingResponse).await?;
+        return Ok(xml(closing["twiml"]
+            .as_str()
+            .unwrap_or("<Response><Hangup/></Response>")
+            .into()));
+    }
     if s["bridge_committed"] == true {
         return Ok(xml(
             "<Response><Pause length=\"10\"/><Hangup/></Response>".into()
@@ -505,10 +534,15 @@ async fn turn(
             "The assistant is temporarily unavailable. No connection has been made.".into()
         });
     let s = h.send(Input::Snapshot).await?;
-    let twiml = if s["offer"]["status"] == "pending" {
+    let twiml = if s["closing_reason"].as_str() == Some("message_saved") {
+        h.send(Input::ClosingResponse).await?["twiml"]
+            .as_str()
+            .unwrap_or("<Response><Hangup/></Response>")
+            .to_string()
+    } else if s["offer"]["status"] == "pending" {
         // Turn-based fallback: A is paused during private choice, not monitored.
         format!(
-            "<Response><Say>{}</Say><Pause length=\"30\"/><Hangup/></Response>",
+            "<Response><Say voice=\"Polly.Joanna-Neural\" language=\"en-US\">{}</Say><Pause length=\"30\"/><Hangup/></Response>",
             twilio::escape(&reply)
         )
     } else if s["blocked"] == true || s["inbound_ended"] == true {
@@ -535,10 +569,75 @@ async fn relay_ws(State(app): State<App>, ws: WebSocketUpgrade) -> Response {
 }
 async fn relay_socket(app: App, mut socket: WebSocket) {
     use crate::providers::relay::{self, RelayInput};
-    let first = tokio::time::timeout(Duration::from_secs(5), socket.recv()).await;
-    let Ok(Some(Ok(Message::Text(raw)))) = first else {
-        return;
+    let started = std::time::Instant::now();
+    let setup_deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    let mut control_frames = 0_u32;
+    let raw = loop {
+        let incoming = tokio::time::timeout_at(setup_deadline, socket.recv()).await;
+        let frame_kind = match &incoming {
+            Ok(Some(Ok(Message::Text(_)))) => "text",
+            Ok(Some(Ok(Message::Ping(_)))) => "ping",
+            Ok(Some(Ok(Message::Pong(_)))) => "pong",
+            Ok(Some(Ok(Message::Close(_)))) => "close",
+            Ok(Some(Ok(Message::Binary(_)))) => "binary",
+            Ok(Some(Err(_))) => "socket_error",
+            Ok(None) => "eof",
+            Err(_) => "timeout",
+        };
+        if control_frames == 0 {
+            tracing::info!(frame_kind, "Relay initial authenticated frame kind");
+        }
+        match incoming {
+            Ok(Some(Ok(Message::Text(raw)))) => break raw,
+            Ok(Some(Ok(Message::Ping(bytes)))) => {
+                control_frames = control_frames.saturating_add(1);
+                if !matches!(
+                    tokio::time::timeout_at(setup_deadline, socket.send(Message::Pong(bytes)))
+                        .await,
+                    Ok(Ok(()))
+                ) {
+                    tracing::warn!(control_frames, "Relay initial pong could not be sent");
+                    return;
+                }
+            }
+            Ok(Some(Ok(Message::Pong(_)))) => {
+                control_frames = control_frames.saturating_add(1);
+            }
+            other => {
+                let close_code = match other {
+                    Ok(Some(Ok(Message::Close(Some(frame))))) => Some(frame.code),
+                    _ => None,
+                };
+                tracing::warn!(
+                    frame_kind,
+                    close_code,
+                    control_frames,
+                    "Relay authenticated socket ended before initial text frame"
+                );
+                return;
+            }
+        }
     };
+    // Only field shapes and binding booleans enter diagnostics. Never log the
+    // raw authenticated frame, phone identities or the session-token value.
+    let shape: serde_json::Value = serde_json::from_str(&raw).unwrap_or_default();
+    let message_type = match shape["type"].as_str() {
+        Some("setup") => "setup",
+        Some("info") => "info",
+        Some("error") => "error",
+        _ => "other",
+    };
+    tracing::info!(
+        message_type,
+        bytes = raw.len(),
+        account_present = shape.get("accountSid").is_some(),
+        call_present = shape.get("callSid").is_some(),
+        session_present = shape.get("sessionId").is_some(),
+        custom_parameters_present = shape.get("customParameters").is_some(),
+        session_token_present = shape["customParameters"].get("session_token").is_some(),
+        error_code = shape["code"].as_u64(),
+        "Relay initial authenticated frame shape"
+    );
     let Ok(RelayInput::Setup {
         call_sid,
         account_sid,
@@ -546,12 +645,21 @@ async fn relay_socket(app: App, mut socket: WebSocket) {
         ..
     }) = relay::parse(&raw)
     else {
+        tracing::warn!(
+            reason = relay::parse(&raw)
+                .err()
+                .map(|e| e.to_string())
+                .unwrap_or_else(|| "initial frame was not setup".into()),
+            "Relay setup rejected"
+        );
         return;
     };
     if account_sid != app.config.account_sid {
+        tracing::warn!("Relay setup account binding rejected");
         return;
     }
     let Ok(h) = app.by_sid(&call_sid).await else {
+        tracing::warn!("Relay setup call binding rejected");
         return;
     };
     if h.send(Input::ConnectRelay {
@@ -561,23 +669,30 @@ async fn relay_socket(app: App, mut socket: WebSocket) {
     .await
     .is_err()
     {
+        tracing::warn!("Relay setup session-token or active-leg binding rejected");
         return;
     }
     let mut audio = h.audio.subscribe();
+    relay_observation(&h, started, "setup", None).await;
     loop {
         tokio::select! {biased;
          incoming=socket.recv()=>{
           match incoming {
            Some(Ok(Message::Text(raw)))=>{
-            let command=match relay::parse(&raw){
-             Ok(RelayInput::Prompt{voice_prompt,last:true,..})=>Some(Input::FinalPrompt{text:voice_prompt}),
-             Ok(RelayInput::Prompt{voice_prompt,last:false,..})=>Some(Input::Speech{partial:Some(voice_prompt)}),
-             Ok(RelayInput::Interrupt{..})=>Some(Input::Speech{partial:None}),
-             Ok(RelayInput::Dtmf{digit})=>Some(Input::Keypad{sid:call_sid.clone(),digits:digit}),
-             Ok(RelayInput::Error{..})|Err(_)=>{let _=h.send(Input::RelayDisconnected).await;break;},
-             _=>None,
+            let (command,event,characters)=match relay::parse(&raw){
+             Ok(RelayInput::Prompt{voice_prompt,last,..})=>{
+               let characters=Some(voice_prompt.chars().count());
+               (Some(if last {Input::FinalPrompt{text:voice_prompt}}else{Input::Speech{partial:Some(voice_prompt)}}),if last{"prompt.final"}else{"prompt.partial"},characters)
+             },
+             Ok(RelayInput::Interrupt{..})=>(Some(Input::Speech{partial:None}),"interrupt",None),
+             Ok(RelayInput::Dtmf{digit})=>(Some(Input::Keypad{sid:call_sid.clone(),digits:digit}),"dtmf",None),
+             Ok(RelayInput::Error{..})|Err(_)=>{let _=h.send(Input::RelayDisconnected).await;relay_observation(&h,started,"error",None).await;break;},
+             _=>(None,"other",None),
             };
+            // Caller policy input must enter the actor before observability can
+            // wait on SQLite and allow a concurrent private acceptance to pass.
             if let Some(command)=command{let _=h.send(command).await;}
+            relay_observation(&h,started,event,characters).await;
            }
            Some(Ok(Message::Ping(bytes)))=>{if socket.send(Message::Pong(bytes)).await.is_err(){break;}},
            Some(Ok(Message::Close(_)))|None|Some(Err(_))=>break,
@@ -587,11 +702,38 @@ async fn relay_socket(app: App, mut socket: WebSocket) {
          outgoing=audio.recv()=>{
           let Ok(frame)=outgoing else{break;};
           let Ok(s)=h.send(Input::Snapshot).await else{break;};
-          if s["generation_id"].as_u64()==Some(frame.generation) && s["policy_epoch"].as_u64()==Some(frame.epoch) && s["speech_pending"]==false && s["bridge_committed"]==false && socket.send(Message::Text(frame.payload.to_string().into())).await.is_err(){break;}
+          let Ok(session)=serde_json::from_value::<Session>(s) else {break;};
+          if frame.permitted_for(&session) {
+            if socket.send(Message::Text(frame.payload.to_string().into())).await.is_err(){break;}
+            let event=match frame.purpose {
+              crate::calls::actor::AudioPurpose::MessageClosing=>"output.end",
+              crate::calls::actor::AudioPurpose::PendingSpeechRecovery=>"output.recovery",
+              crate::calls::actor::AudioPurpose::Response=>"output.text",
+            };
+            relay_observation(&h,started,event,frame.payload["token"].as_str().map(|t|t.chars().count())).await;
+          } else {
+            relay_observation(&h,started,"output.discarded",None).await;
+          }
          }
         }
     }
     let _ = h.send(Input::RelayDisconnected).await;
+    relay_observation(&h, started, "closed", None).await;
+}
+
+async fn relay_observation(
+    handle: &crate::calls::actor::Handle,
+    started: std::time::Instant,
+    event: &'static str,
+    characters: Option<usize>,
+) {
+    let _ = handle
+        .send(Input::RelayTelemetry {
+            event,
+            elapsed_ms: started.elapsed().as_millis().min(u64::MAX as u128) as u64,
+            characters,
+        })
+        .await;
 }
 
 #[derive(Deserialize)]

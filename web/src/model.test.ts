@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { confirmedMatches, legEvidence, legStatus, mergeEvents } from "./model";
+import {
+  confirmedMatches,
+  decisionEvidence,
+  legEvidence,
+  legStatus,
+  mergeEvents,
+} from "./model";
 import type { CallEvent, Leg } from "./types";
+import { sessionSchema } from "./types";
 const leg: Leg = {
   action_id: "action-b",
   role: "family",
@@ -24,6 +31,122 @@ const event = (
   execution_mode: "replay",
   data_origin: "synthetic",
   payload: { action_id: action },
+});
+it("keeps accepted assessment, current proposal and actual tool outcome separate", () => {
+  const session = sessionSchema.parse({
+    id: "s1",
+    household_id: "sarah",
+    state: "screening",
+    policy_epoch: 2,
+    generation_id: 4,
+    speech_pending: false,
+    inbound_ended: false,
+    current_action: "Waiting",
+    evidence_quote: null,
+    offer: null,
+    legs: [],
+    execution_mode: "replay",
+    data_origin: "synthetic",
+    turn_version: 2,
+    assessed_version: 2,
+    turns: [
+      { id: "t2", speaker: "caller", text: "Read me the sign-in digits." },
+    ],
+    assessments: [
+      {
+        generation_id: 4,
+        turn_version: 2,
+        observation: {
+          speech_act: "request",
+          requested_object: "authentication_secret",
+          direction: "caller_requests_from_sarah",
+        },
+        evidence_refs: [{ turn_id: "t2", quote: "sign-in digits" }],
+      },
+    ],
+  });
+  const proposal = {
+    ...event("proposed", 3, "agent.tool.proposed"),
+    payload: {
+      name: "start_trusted_callback",
+      generation_id: 4,
+      turn_version: 2,
+    },
+  };
+  const wrong = {
+    ...event("old", 4, "agent.tool.result"),
+    payload: {
+      name: "start_trusted_callback",
+      generation_id: 3,
+      turn_version: 1,
+      ok: true,
+      result: { acknowledged: true },
+    },
+  };
+  const pending = decisionEvidence(session, [proposal, wrong]);
+  expect(pending.assessment?.observation.requested_object).toBe(
+    "authentication_secret",
+  );
+  expect(pending.proposal?.name).toBe("start_trusted_callback");
+  expect(pending.outcome).toBe("No execution result received.");
+  const closing = sessionSchema.parse({
+    ...session,
+    generation_id: 5,
+    speech_pending: true,
+    state: "closing",
+    closing_reason: "message_saved",
+    message: {
+      summary: "Caller left a message",
+      recorded_at: "2026-11-08T03:00:00Z",
+      turn_version: 2,
+      evidence_turn_ids: ["t2"],
+    },
+  });
+  const savedProposal = {
+    ...proposal,
+    payload: { ...proposal.payload, name: "take_message" },
+  };
+  const savedResult = {
+    ...event("saved", 6, "agent.tool.result"),
+    payload: {
+      name: "take_message",
+      generation_id: 4,
+      turn_version: 2,
+      ok: true,
+      result: { message_recorded: true, closing: true },
+    },
+  };
+  expect(decisionEvidence(closing, [savedProposal, savedResult]).outcome).toBe(
+    "Private message saved for review.",
+  );
+  expect(
+    decisionEvidence(closing, [savedProposal, savedResult]).assessment,
+  ).toBeDefined();
+  const denied = {
+    ...event("denied", 5, "agent.tool.result"),
+    payload: {
+      name: "start_trusted_callback",
+      generation_id: 4,
+      turn_version: 2,
+      ok: false,
+      result: {},
+    },
+  };
+  expect(decisionEvidence(session, [proposal, wrong, denied]).outcome).toBe(
+    "Rust reported a failure; check the action receipts.",
+  );
+  expect(
+    decisionEvidence({ ...session, speech_pending: true, generation_id: 5 }, [
+      proposal,
+      denied,
+    ]).assessment,
+  ).toBeUndefined();
+  expect(
+    decisionEvidence({ ...session, generation_id: 5, turn_version: 3 }, [
+      proposal,
+      denied,
+    ]).proposal,
+  ).toBeUndefined();
 });
 describe("actual phone progression", () => {
   it("does not turn an answer or an ended call into an acknowledgement", () => {

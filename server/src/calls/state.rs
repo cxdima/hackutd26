@@ -77,6 +77,8 @@ pub struct Session {
     pub offer: Option<Offer>,
     #[serde(default)]
     pub message: Option<RecordedMessage>,
+    #[serde(default)]
+    pub closing_reason: Option<String>,
     pub legs: Vec<Leg>,
     pub execution_mode: ExecutionMode,
     pub data_origin: String,
@@ -140,6 +142,7 @@ impl Session {
             evidence_quote: None,
             offer: None,
             message: None,
+            closing_reason: None,
             legs: vec![],
             execution_mode: mode,
             data_origin: "synthetic".into(),
@@ -187,7 +190,7 @@ impl Session {
 }
 impl Session {
     pub fn speech_started(&mut self) {
-        if self.bridge_committed || self.inbound_ended {
+        if self.bridge_committed || self.inbound_ended || self.closing_reason.is_some() {
             return;
         }
         self.generation_id += 1;
@@ -195,7 +198,7 @@ impl Session {
         self.current_action = "Listening; private acceptance on hold".into();
     }
     pub fn commit_turn(&mut self, text: &str) -> String {
-        if self.bridge_committed || self.inbound_ended {
+        if self.bridge_committed || self.inbound_ended || self.closing_reason.is_some() {
             return String::new();
         }
         self.generation_id += 1;

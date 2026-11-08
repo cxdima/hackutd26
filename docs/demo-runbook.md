@@ -1,8 +1,23 @@
 # FirstRing demo runbook
 
-Current live authorization: **one outbound smoke-test call to Sarah / Phone B**, resolved from local `SARAH_TEST_E164`. Caller A initiates inbound manually. Family is not enrolled or authorized; keep family calling disabled. Later handoff calls, no-answer retries and full rehearsals need their own authorized scope. Local replay/tests remain available without dialing.
+**Current priority, Nov 7 at 21:54 Central: caller A only.** Runtime is `live` / `relay`; `TEST_CALLS_AUTHORIZED`, `HANDOFF_CALLS_ENABLED` and `FAMILY_CALLS_ENABLED` are all false. Phone B is unavailable and the ledger contains 0 outbound actions/reservations. Keep outbound controls unavailable. Initial submission is due at 23:00 Central; submit honest evidence without waiting for the deferred two-phone gate.
 
-**Inbound passed Nov 7 at 20:42 Central:** A heard the greeting and pressed 1; signed caller/keypad/terminal events and Twilio's completed 15-second call agree. See [inbound evidence](evidence/inbound-probe-2026-11-07.json). The original voice was rated poor; `Polly.Joanna-Neural` / `en-US` is deployed for Say/Gather, listening comparison pending. Runtime remains `live` / `probe`, all three calling flags false, with **0 outbound actions/reservations**. `SARAH_TEST_E164` is still missing; the user's personal phone is caller A only. M1 is not complete.
+**Observed phone proof:** inbound greeting/keypad/terminal passed at 20:42. At 21:54 the replacement HTTP/2 tunnel reached signed Relay setup and the user heard the Rachel-v4 greeting, but trailing partial speech cancelled both model jobs after two final clinic transcripts. The caller heard silence afterward; no native model completion or spoken reply was observed. Earlier Relay attempts returned 64105/no setup, then twice 11200 / HTTP 502 before Rust due to the expired tunnel. Complete live conversation remains unverified. Rachel-v4 is a preset; Joanna remains the Say/Gather fallback. [Inbound evidence](evidence/inbound-probe-2026-11-07.json), [failure receipts](evidence/relay-attempts-2026-11-07.json)
+
+## Next caller-only check
+
+After the speech-finalization fix is deployed, preserve signature validation and the ledger. Verify public health and signed ingress against the configured origin; do not infer public availability from local health. For the next deliberate manual call:
+
+1. Hear the disclosed greeting, then give a clinic appointment detail. Confirm one committed transcript, a bounded model HTTP result and a relevant audible follow-up. Record silence or cancellation as a failure.
+2. Change the request to sign-in digits. Compare caller words, accepted assessment/quote, native proposed tool and actual result. An HTTP completion or queued audio is not a spoken reply.
+3. Interrupt a response and record what was heard and approximate delay. Check that obsolete work cannot authorize an action; no outbound leg is enabled.
+4. Ask to leave a benign message. Verify the private saved-message receipt, then hear the goodbye and reconcile the actual terminal callback. Locally tested closing Say/Hangup alone does not prove playback.
+
+Caller-only development passed 3/3; frozen held-out behavior failed at 7/12. The 36 generated development clips remain unlistened. See [evaluation](evaluation.md), [audio fixtures](audio-fixtures.md) and the current [90-second submission talk track](submission.md). Use explicitly labeled replay if the phone gate remains incomplete.
+
+## Current quiet-call retry
+
+The22:09 build includes a4s inactivity/8s repeated-partial recovery prompt while keeping uncertain speech uncommitted and consent held. Twilio requests Deepgram `nova-3-general` with `speechTimeout=1000`; Rachel-v4 remains the audible Relay preset. Keep all outbound flags false. Use the handset earpiece in a quiet spot: say the clinic opening, pause for the actual question, then give Tuesday2PM and request a message. Confirm the complete goodbye and automatic hangup. After that passes, use a separate manual inbound call to deliberately speak over the reply with the fictional sign-in-digit request. Record real `interrupt`, model cancellation, current-generation decision and audible response separately. No Phone B attempt is consumed.
 
 ## Start locally
 
@@ -13,9 +28,9 @@ Current live authorization: **one outbound smoke-test call to Sarah / Phone B**,
 
 These commands are the intended application entry points; use the current README/verification log for the actual build status.
 
-## First two-phone gate
+## Deferred two-phone gate
 
-Before using the one authorized attempt:
+The historical single Sarah smoke attempt is unspent. This section is deferred until a separate consenting Phone B is enrolled and the operator chooses to use that scope; it is not the current caller-only procedure. Before that attempt:
 
 - Configure Photon beta voice profile → the authenticated Twilio SIP Domain → `POST https://HOST/voice/incoming`. Use separate Photon outbound credentials and the assigned SIP endpoint. Verify TLS, compatible SRTP, digest **MD5 (legacy)** and eligible Photon caller number against `provider-preflight.md` and the actual profile.
 - Set `PUBLIC_BASE_URL` to the exact public HTTPS origin; make HTTPS/WSS reachable. Do not disable signature validation to work around a tunnel or URL mismatch.
@@ -57,7 +72,7 @@ This section is a checklist for later authorized tests, not permission for addit
 - Parent lifetime: end A while an authorized child action is pending; verify child answer/acknowledgement/terminal state still reconciles.
 - Community: after a risky call, wait for Maya's stored `community.applied` version. Select Maya before a new call from a different phone. Use a paraphrase; show matched action/context/version. Follow with a benign new-number reminder. No caller-ID match, person identification or retraining claim.
 
-## Ninety-second cut after live gates pass
+## Deferred three-phone demonstration
 
 ### Next bounded rehearsal scope — prepared, not yet authorized
 

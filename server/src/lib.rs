@@ -1,6 +1,7 @@
 pub mod calls;
 pub mod config;
 pub mod events;
+pub mod evidence;
 pub mod providers;
 
 pub mod store;

@@ -7,4 +7,4 @@ if [[ ! -x .tools/cloudflared ]]; then
 fi
 # Voice HTTP/WebSocket ingress only. Keep the SSE console on localhost.
 # Do not add --allowed-mail: Twilio cannot pass an interactive login challenge.
-exec .tools/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080
+exec .tools/cloudflared tunnel --no-autoupdate --protocol http2 --url http://127.0.0.1:8080

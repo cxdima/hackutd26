@@ -1,9 +1,15 @@
 use anyhow::{Result, anyhow, bail, ensure};
 use firstring::{
-    calls::state::{Session, Turn},
+    calls::state::{Leg, Session, Turn},
     config::ExecutionMode,
-    providers::nemotron::{ModelToolCall, Nemotron, RequestObservation, ToolPhase, system_prompt},
-    tools::{Direction, Observation, RequestedObject, SpeechAct, ToolCall},
+    providers::nemotron::{
+        ModelCapabilities, ModelToolCall, Nemotron, RequestObservation, ToolPhase,
+        append_tool_result, conversation_messages,
+    },
+    tools::{
+        CallbackReason, ContactRole, Direction, Observation, QuestionPurpose, RequestedObject,
+        SpeechAct, ToolCall,
+    },
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -15,7 +21,6 @@ use std::{
 const MODEL: &str = "nvidia/nemotron-3.5-lightning-30b-a3b";
 const ENDPOINT: &str = "https://integrate.api.nvidia.com/v1/chat/completions";
 const FIXTURES: &str = "fixtures/language-held-out.json";
-const OUTPUT: &str = ".tools/evaluation-results.json";
 const MAX_CASES: usize = 12;
 const DEFAULT_REQUEST_TIMEOUT_MS: u64 = 3500;
 
@@ -24,6 +29,9 @@ enum Mode {
     Status,
     ModelProbe,
     Evaluate,
+    EvaluateRegression,
+    EvaluateDevelopment,
+    EvaluateAOnly,
     Help,
 }
 
@@ -46,6 +54,8 @@ struct Case {
     preconditions: Preconditions,
     turns: Vec<FixtureTurn>,
     expected: Expected,
+    #[serde(default)]
+    capabilities: Option<ModelCapabilities>,
     rationale: String,
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -92,6 +102,12 @@ struct CaseResult {
     clarification: Option<bool>,
     unscored: Vec<String>,
     error: Option<String>,
+    trace: Vec<Value>,
+    capabilities: Option<ModelCapabilities>,
+    useful_action: Option<bool>,
+    simulated_local_outcome: Option<String>,
+    completed_external_action: bool,
+    turn_elapsed_ms: u128,
 }
 
 fn parse_args(args: &[String]) -> Result<Mode> {
@@ -100,6 +116,9 @@ fn parse_args(args: &[String]) -> Result<Mode> {
         [flag] => match flag.as_str() {
             "--model-probe" => Ok(Mode::ModelProbe),
             "--evaluate-held-out" => Ok(Mode::Evaluate),
+            "--evaluate-regression" => Ok(Mode::EvaluateRegression),
+            "--evaluate-development" => Ok(Mode::EvaluateDevelopment),
+            "--evaluate-a-only" => Ok(Mode::EvaluateAOnly),
             "--help" | "-h" => Ok(Mode::Help),
             _ => bail!("Unknown flag. Use --help."),
         },
@@ -107,18 +126,23 @@ fn parse_args(args: &[String]) -> Result<Mode> {
     }
 }
 
+#[cfg(test)]
 fn dataset(raw: &str) -> Result<Dataset> {
+    dataset_for(raw, "held_out")
+}
+
+fn dataset_for(raw: &str, expected_split: &str) -> Result<Dataset> {
     let data: Dataset =
         serde_json::from_str(raw).map_err(|_| anyhow!("Fixture schema is invalid"))?;
     ensure!(
         data.schema_version == 1
             && data.data_origin == "synthetic"
-            && data.split == "held_out"
+            && data.split == expected_split
             && data.authored_before_model_evaluation,
         "Only frozen synthetic held-out schema version 1 is accepted"
     );
     ensure!(
-        !data.cases.is_empty() && data.cases.len() <= MAX_CASES,
+        !data.cases.is_empty() && data.cases.len() <= MAX_CASES * 2,
         "Held-out case limit exceeded"
     );
     let mut ids = std::collections::HashSet::new();
@@ -180,11 +204,172 @@ fn dataset(raw: &str) -> Result<Dataset> {
     Ok(data)
 }
 
-fn messages(case: &Case, instruction: &str) -> Vec<Value> {
-    vec![
-        json!({"role":"system","content":system_prompt()}),
-        json!({"role":"user","content":json!({"household":case.household_id,"turns":case.turns,"preconditions":case.preconditions,"instruction":instruction}).to_string()}),
-    ]
+fn case_session(case: &Case) -> Session {
+    let mut session = Session::new(
+        case.id.clone(),
+        "evaluation-no-phone".into(),
+        case.household_id.clone(),
+        ExecutionMode::Replay,
+    );
+    session.turns = case
+        .turns
+        .iter()
+        .map(|t| Turn {
+            id: t.id.clone(),
+            speaker: t.speaker.clone(),
+            text: t.text.clone(),
+        })
+        .collect();
+    session.turn_version = case.turns.len() as u64;
+    session.generation_id = 1;
+    session
+}
+fn capabilities(case: &Case) -> ModelCapabilities {
+    case.capabilities
+        .clone()
+        .unwrap_or_else(ModelCapabilities::fictional_enrolled)
+}
+fn messages(case: &Case, extra_instruction: &str) -> Vec<Value> {
+    let mut messages = conversation_messages(&case_session(case), &capabilities(case));
+    if !extra_instruction.is_empty() {
+        let mut context: Value =
+            serde_json::from_str(messages[1]["content"].as_str().unwrap()).unwrap();
+        context["probe_instruction"] = json!(extra_instruction);
+        messages[1]["content"] = json!(context.to_string());
+    }
+    messages
+}
+
+fn execute_inert(
+    session: &mut Session,
+    caps: &ModelCapabilities,
+    tool: &ToolCall,
+) -> Result<Value> {
+    match tool {
+        ToolCall::LookupTrustedContact { role } => {
+            let (role, enrolled) = match role {
+                ContactRole::Family => ("family", caps.family_contact_enrolled),
+                ContactRole::Clinic => ("clinic", caps.clinic_contact_enrolled),
+            };
+            ensure!(enrolled, "Requested role is not enrolled");
+            Ok(
+                json!({"contact_id":format!("{}:{role}",session.household_id),"label":role,"provenance":"server_enrolled_directory"}),
+            )
+        }
+        ToolCall::LookupTactics { .. } => Ok(json!({"matches":[]})),
+        ToolCall::AskCaller {
+            question,
+            purpose,
+            evidence_refs,
+        } => {
+            ensure!(
+                session.assessed_version == session.turn_version,
+                "Assess the current turn before asking a follow-up"
+            );
+            session.evidence_valid(evidence_refs, true)?;
+            let lower = question.to_lowercase();
+            ensure!(
+                !(lower.contains("password")
+                    || lower.contains("digits")
+                    || lower.contains("verification code"))
+                    || *purpose == QuestionPurpose::ClarifyCodeType,
+                "Question could solicit a secret"
+            );
+            Ok(json!({"audio_requested":true,"stop":true}))
+        }
+        ToolCall::OfferHandoff {
+            summary,
+            observation,
+            evidence_refs,
+        } => {
+            ensure!(
+                caps.handoff_available,
+                "Private handoff calls are not authorized yet"
+            );
+            session.evidence_valid(evidence_refs, true)?;
+            ensure!(
+                session
+                    .assessments
+                    .last()
+                    .and_then(|v| v.get("observation"))
+                    == Some(&serde_json::to_value(observation)?),
+                "Offer observation must match current assessment"
+            );
+            let leg = Leg {
+                action_id: "evaluation-handoff".into(),
+                role: "sarah".into(),
+                kind: "handoff".into(),
+                status: "reserved".into(),
+                acknowledged: false,
+                call_sid: None,
+            };
+            session.legs.push(leg.clone());
+            match session.make_offer(summary, &leg.action_id, chrono::Utc::now()) {
+                Ok(offer) => Ok(json!({"offer_id":offer.id,"state":"pending","stop":true})),
+                Err(e) => {
+                    session.legs.pop();
+                    Err(e)
+                }
+            }
+        }
+        ToolCall::StartTrustedCallback {
+            contact_id,
+            reason,
+            evidence_refs,
+        } => {
+            ensure!(
+                caps.family_callback_available,
+                "Family calling is disabled; no authorized endpoint"
+            );
+            ensure!(
+                contact_id == &format!("{}:family", session.household_id),
+                "Contact is not in this household's enabled directory"
+            );
+            session.evidence_valid(evidence_refs, true)?;
+            ensure!(
+                session.assessed_version == session.turn_version && !session.speech_pending,
+                "Current turn is not assessed"
+            );
+            if *reason == CallbackReason::AuthenticationRequest {
+                ensure!(
+                    session.blocked
+                        && session
+                            .assessments
+                            .iter()
+                            .any(|a| a["observation"]["requested_object"]
+                                == "authentication_secret"
+                                && a["observation"]["speech_act"] == "request"
+                                && a["observation"]["direction"] == "caller_requests_from_sarah"),
+                    "Authentication alert needs an assessed extraction request"
+                );
+            }
+            if !session.legs.iter().any(|leg| leg.kind == "trusted") {
+                session.legs.push(Leg {
+                    action_id: "evaluation-callback".into(),
+                    role: "family".into(),
+                    kind: "trusted".into(),
+                    status: "reserved".into(),
+                    acknowledged: false,
+                    call_sid: None,
+                });
+            }
+            Ok(
+                json!({"action_id":"evaluation-callback","state":"reserved","acknowledged":false,"stop":true}),
+            )
+        }
+        ToolCall::TakeMessage {
+            summary,
+            evidence_refs,
+        } => {
+            ensure!(
+                caps.message_taking_available,
+                "Message taking is unavailable"
+            );
+            session.record_message(summary, evidence_refs, chrono::Utc::now())?;
+            Ok(json!({"message_recorded":true,"closing":true,"stop":true}))
+        }
+        _ => bail!("Tool is not available in the next-step phase"),
+    }
 }
 
 fn assess(case: &Case, call: &ModelToolCall) -> Result<(Session, Observation)> {
@@ -326,7 +511,7 @@ fn totals(results: &[CaseResult]) -> Value {
         "clarification_rate":ratio(next.iter().filter(|r|r.clarification==Some(true)).count(),next.len()),
         "required_clarification_rate":ratio(required.iter().filter(|r|r.clarification==Some(true)).count(),required.len()),
         "evidence_valid_cases":results.iter().filter(|r|r.evidence_valid).count(),"evidence_valid_rate":ratio(results.iter().filter(|r|r.evidence_valid).count(),results.len()),
-        "next_tool_allowed_cases":results.iter().filter(|r|r.next_tool_allowed==Some(true)).count(),"classification_scored_cases":results.iter().filter(|r|r.classification_correct.is_some()).count()})
+        "next_tool_allowed_cases":results.iter().filter(|r|r.next_tool_allowed==Some(true)).count(),"classification_scored_cases":results.iter().filter(|r|r.classification_correct.is_some()).count(),"classification_correct_cases":results.iter().filter(|r|r.classification_correct==Some(true)).count(),"composite_case_passes":results.iter().filter(|r|case_passes(r)).count(),"useful_action_cases":results.iter().filter(|r|r.useful_action==Some(true)).count(),"simulated_local_outcomes":results.iter().filter(|r|r.simulated_local_outcome.is_some()).count(),"completed_external_actions":results.iter().filter(|r|r.completed_external_action).count()})
 }
 
 struct Budget {
@@ -414,8 +599,11 @@ async fn followup(
     first: ModelToolCall,
     session: &Session,
 ) -> Result<ModelToolCall> {
-    messages.push(first.assistant_message);
-    messages.push(json!({"role":"tool","tool_call_id":first.id,"content":json!({"ok":true,"result":{"blocked":session.blocked,"ambiguous":session.ambiguous,"assessed_version":session.assessed_version},"execution":"evaluation_no_actions"}).to_string()}));
+    append_tool_result(
+        messages,
+        &first,
+        &json!({"ok":true,"result":{"blocked":session.blocked,"ambiguous":session.ambiguous,"assessed_version":session.assessed_version},"epoch":session.policy_epoch}),
+    );
     budget.request(model, messages, ToolPhase::NextStep).await
 }
 
@@ -490,14 +678,18 @@ async fn evaluate_case(
     case: &Case,
     result: &mut CaseResult,
 ) -> Result<()> {
-    let mut messages = messages(
-        case,
-        "Assess the latest caller turn, then choose a useful next tool. Do not execute any action.",
-    );
+    let caps = capabilities(case);
+    let mut messages = messages(case, "");
     let first = budget
         .request(model, &messages, ToolPhase::Assessment)
         .await?;
-    let (session, observation) = assess(case, &first)?;
+    let (mut session, observation) = match assess(case, &first) {
+        Ok(assessment) => assessment,
+        Err(error) => {
+            result.trace.push(json!({"step":1,"tool_call_id":first.id,"name":first.name,"arguments":first.arguments,"result":{"ok":false,"error":error.to_string()}}));
+            return Err(error);
+        }
+    };
     result.evidence_valid = true;
     let (classification, authentication) = flags(&observation);
     result.observation = Some(observation);
@@ -506,17 +698,62 @@ async fn evaluate_case(
         result.classification_correct = Some(classification == case.expected.classification);
     }
     result.predicted_classification = Some(classification);
-    let next = followup(model, budget, &mut messages, first, &session).await?;
-    let tool = validate_next(&session, &next)?;
-    result.clarification = Some(matches!(tool, ToolCall::AskCaller { .. }));
-    result.next_tool_allowed = Some(case.expected.accepted_next_tools.contains(&next.name));
-    result.next_tool = Some(next.name);
-    Ok(())
+    let outcome = json!({"ok":true,"result":{"blocked":session.blocked,"ambiguous":session.ambiguous,"assessed_version":session.assessed_version},"epoch":session.policy_epoch});
+    result.trace.push(json!({"step":1,"tool_call_id":first.id,"name":first.name,"arguments":first.arguments,"result":outcome}));
+    append_tool_result(&mut messages, &first, &outcome);
+    for step in 2..=4 {
+        let next = budget
+            .request(model, &messages, ToolPhase::NextStep)
+            .await?;
+        let tool = match validate_next(&session, &next) {
+            Ok(tool) => tool,
+            Err(error) => {
+                result.trace.push(json!({"step":step,"tool_call_id":next.id,"name":next.name,"arguments":next.arguments,"result":{"ok":false,"error":error.to_string(),"epoch":session.policy_epoch}}));
+                return Err(error);
+            }
+        };
+        let execution = execute_inert(&mut session, &caps, &tool);
+        let accepted = execution.is_ok();
+        let outcome = match execution {
+            Ok(value) => json!({"ok":true,"result":value,"epoch":session.policy_epoch}),
+            Err(e) => json!({"ok":false,"error":e.to_string(),"epoch":session.policy_epoch}),
+        };
+        let spoken_reply = if let ToolCall::AskCaller {
+            question, purpose, ..
+        } = &tool
+        {
+            Some(if *purpose == QuestionPurpose::ClarifyCodeType {
+                "Is that an appointment reference, or a code used to sign in? Please don't read the code itself.".to_string()
+            } else {
+                question.clone()
+            })
+        } else {
+            None
+        };
+        result.trace.push(json!({"step":step,"tool_call_id":next.id,"name":next.name,"arguments":next.arguments,"result":outcome,"synthetic_spoken_reply":spoken_reply}));
+        result.next_tool = Some(next.name.clone());
+        result.next_tool_allowed = Some(case.expected.accepted_next_tools.contains(&next.name));
+        result.clarification = Some(matches!(tool, ToolCall::AskCaller { .. }) && accepted);
+        if accepted && outcome["result"]["stop"] == true {
+            result.useful_action = result.next_tool_allowed;
+            result.simulated_local_outcome = Some(
+                match tool {
+                    ToolCall::AskCaller { .. } => "question_requested",
+                    ToolCall::TakeMessage { .. } => "message_recorded",
+                    ToolCall::OfferHandoff { .. } => "offer_pending",
+                    ToolCall::StartTrustedCallback { .. } => "callback_reserved",
+                    _ => unreachable!(),
+                }
+                .into(),
+            );
+            return Ok(());
+        }
+        append_tool_result(&mut messages, &next, &outcome);
+    }
+    result.useful_action = Some(false);
+    bail!("Model exhausted the runtime four-step budget before a useful terminal action")
 }
 
-fn save_report(value: &Value) -> Result<()> {
-    save_report_to(OUTPUT, value)
-}
 fn save_report_to(path: &str, value: &Value) -> Result<()> {
     std::fs::create_dir_all(".tools")
         .map_err(|_| anyhow!("Cannot create ignored evaluation directory"))?;
@@ -533,45 +770,69 @@ fn save_report_to(path: &str, value: &Value) -> Result<()> {
     Ok(())
 }
 
-async fn evaluate(data: &Dataset) -> Result<()> {
-    let (model, request_timeout_ms) = match model(Mode::Evaluate) {
-        Ok(m) => m,
-        Err(e) => {
-            save_report(
-                &json!({"status":"pending","reason":e.to_string(),"data_origin":"synthetic","request_timeout_ms":DEFAULT_REQUEST_TIMEOUT_MS,"native_tool_choice":"named_assessment_then_required_next_step","case_count":data.cases.len(),"requests_submitted":0,"metrics":null,"cases":[],"phone_tested":false}),
-            )?;
-            return Err(e);
-        }
-    };
-    let mut budget = Budget::new(MAX_CASES * 2);
+async fn evaluate(data: &Dataset, output: &str) -> Result<()> {
+    let (model, request_timeout_ms) = model(Mode::Evaluate)?;
+    let mut budget = Budget::new(MAX_CASES * 4);
     let mut results = Vec::new();
     for case in &data.cases {
-        let mut result=CaseResult {id:case.id.clone(),category:case.category.clone(),expected_classification:case.expected.classification.clone(),expected_authentication_request:case.expected.authentication_request,clarification_required:case.expected.clarification=="required",unscored:vec!["Live consent, stale acceptance and phone side effects require protocol/phone tests".into()],..CaseResult::default()};
+        let mut result = CaseResult {
+            id: case.id.clone(),
+            category: case.category.clone(),
+            expected_classification: case.expected.classification.clone(),
+            expected_authentication_request: case.expected.authentication_request,
+            clarification_required: case.expected.clarification == "required",
+            capabilities: Some(capabilities(case)),
+            unscored: vec![
+                "Phone delivery, acknowledgement, consent and stale acceptance are not simulated."
+                    .into(),
+                "Question relevance requires human review of retained synthetic replies.".into(),
+            ],
+            ..CaseResult::default()
+        };
         if case.expected.classification == "reject_instruction" {
             result.unscored.push("Observation has no instruction-rejection class; compare next-tool allowlist separately".into());
         }
-        if case.expected.tactic_match.is_some() {
-            result.unscored.push("Tactic receipt/match requires an applied capsule and is outside this model-only probe".into());
+        if case.expected.tactic_match.is_some()
+            || case.preconditions.applied_tactic_version.is_some()
+        {
+            result
+                .unscored
+                .push("No capsule store is simulated; tactic lookup returns no matches.".into());
         }
-        if let Err(e) = evaluate_case(&model, &mut budget, case, &mut result).await {
-            result.error = Some(e.to_string());
+        if case.preconditions.pending_offer {
+            result.unscored.push(
+                "Pending-offer race is covered by actor tests; no live offer is created here."
+                    .into(),
+            );
+        }
+        let started = Instant::now();
+        let outcome = tokio::time::timeout(
+            Duration::from_millis(6000),
+            evaluate_case(&model, &mut budget, case, &mut result),
+        )
+        .await;
+        result.turn_elapsed_ms = started.elapsed().as_millis();
+        match outcome {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => result.error = Some(e.to_string()),
+            Err(_) => result.error = Some("Runtime six-second turn deadline reached".into()),
         }
         println!(
             "{}",
-            json!({"case":result.id,"predicted":result.predicted_classification,"next_tool":result.next_tool,"error":result.error})
+            json!({"case":result.id,"predicted":result.predicted_classification,"next_tool":result.next_tool,"local_outcome":result.simulated_local_outcome,"error":result.error})
         );
         results.push(result);
     }
     let metrics = totals(&results);
-    let report = json!({"status":"completed_with_observations","recorded_at":chrono::Utc::now().to_rfc3339(),"model":MODEL,"data_origin":"synthetic","request_timeout_ms":request_timeout_ms,"native_tool_choice":"named_assessment_then_required_next_step","split":"held_out","case_count":data.cases.len(),"requests_submitted":budget.submitted,"request_observations":budget.observations,"metrics":metrics,"cases":results,"phone_tested":false,"tool_actions_executed":0,"interpretation":"Prewritten rubric compared with observed native tool fields; fixtures and model self-report are not phone verification. Null rates have no scored denominator."});
-    save_report(&report)?;
+    let report = json!({"status":"completed_with_observations","recorded_at":chrono::Utc::now().to_rfc3339(),"model":MODEL,"data_origin":"synthetic","request_timeout_ms":request_timeout_ms,"turn_deadline_ms":6000,"max_steps_per_case":4,"native_tool_choice":"named_assessment_then_required_next_step","split":data.split,"case_count":data.cases.len(),"requests_submitted":budget.submitted,"request_observations":budget.observations,"metrics":metrics,"cases":results,"phone_tested":false,"external_actions_executed":0,"executor":"in-memory policy-validated simulation; native tool results are returned to the same bounded model loop","interpretation":"Classification, allowed useful proposal, and simulated local outcome are separate. No provider calls, delivery, or acknowledgement are inferred. Synthetic typed arguments/replies are retained; no raw model reasoning. Null rates have no scored denominator."});
+    save_report_to(output, &report)?;
     println!(
         "{}",
-        json!({"report":OUTPUT,"metrics":metrics,"requests_submitted":budget.submitted})
+        json!({"report":output,"metrics":metrics,"requests_submitted":budget.submitted})
     );
     ensure!(
         results.iter().all(case_passes),
-        "Held-out run contains errors or rubric mismatches; inspect evaluation-results.json"
+        "Evaluation contains errors or rubric mismatches; inspect the preserved report"
     );
     Ok(())
 }
@@ -616,19 +877,52 @@ async fn main() -> Result<()> {
         }
         Mode::Help => {
             println!(
-                "FirstRing preflight\n  (no flags)           Report environment NAMES only; no external calls.\n  --model-probe        Opt in to up to 4 NVIDIA requests; native tool/result roundtrip for two synthetic contexts.\n  --evaluate-held-out  Opt in to up to 24 NVIDIA requests across <=12 frozen cases; save ignored .tools/evaluation-results.json.\n  --help              Show usage.\nModel requests require NVIDIA_API_KEY and the documented endpoint/model; named record_assessment first, then required next-step tool selection, with 3.5-second request and 120-second run limits. NEMOTRON_PROBE_TIMEOUT_MS=1..15000 overrides only --model-probe; held-out evaluation and runtime retain their normal deadlines. Reports record request_timeout_ms and native_tool_choice=named_assessment_then_required_next_step. No command dials phones or executes tools. Run from repository root."
+                "FirstRing preflight\n  (no flags)           Report environment NAMES only; no external calls.\n  --model-probe        Opt in to up to 4 NVIDIA requests; native tool/result roundtrip for two synthetic contexts.\n  --evaluate-held-out  Up to 48 NVIDIA requests on frozen v2; .tools/evaluation-v2-results.json.\n  --evaluate-regression  Original 12 cases; .tools/regression-results.json.\n  --evaluate-development  One case per development category; .tools/development-results.json.\n  --evaluate-a-only    Three development cases with no enrolled/calling contacts; .tools/a-only-development-results.json.\n  --help              Show usage.\nModel requests require NVIDIA_API_KEY and the documented endpoint/model; named record_assessment first, then required next-step tool selection, with 3.5-second request, 6-second turn, four-step turn and 120-second run limits. NEMOTRON_PROBE_TIMEOUT_MS=1..15000 overrides only --model-probe; held-out evaluation and runtime retain their normal deadlines. Reports record request_timeout_ms and native_tool_choice=named_assessment_then_required_next_step. Evaluation uses an in-memory policy executor; no command dials phones or changes application data. Run from repository root."
             );
             Ok(())
         }
-        Mode::ModelProbe | Mode::Evaluate => {
-            let raw = std::fs::read_to_string(FIXTURES).map_err(|_| {
-                anyhow!("Cannot read fixtures/language-held-out.json; run from repository root")
-            })?;
-            let data = dataset(&raw)?;
+        Mode::ModelProbe
+        | Mode::Evaluate
+        | Mode::EvaluateRegression
+        | Mode::EvaluateDevelopment
+        | Mode::EvaluateAOnly => {
+            let (path, split, output) = match mode {
+                Mode::Evaluate => (
+                    "fixtures/language-held-out-v2.json",
+                    "held_out_v2",
+                    ".tools/evaluation-v2-results.json",
+                ),
+                Mode::EvaluateRegression => {
+                    (FIXTURES, "held_out", ".tools/regression-results.json")
+                }
+                Mode::EvaluateAOnly => (
+                    "fixtures/language-a-only-development.json",
+                    "development",
+                    ".tools/a-only-development-results.json",
+                ),
+                Mode::EvaluateDevelopment => (
+                    "fixtures/language-development.json",
+                    "development",
+                    ".tools/development-results.json",
+                ),
+                _ => (FIXTURES, "held_out", ".tools/model-probe-results.json"),
+            };
+            let raw = std::fs::read_to_string(path)
+                .map_err(|_| anyhow!("Cannot read fixture file; run from repository root"))?;
+            let mut data = dataset_for(&raw, split)?;
+            if mode == Mode::EvaluateDevelopment {
+                let mut categories = std::collections::HashSet::new();
+                data.cases
+                    .retain(|case| categories.insert(case.category.clone()));
+            }
+            ensure!(
+                data.cases.len() <= MAX_CASES,
+                "Evaluation case budget exceeded"
+            );
             if mode == Mode::ModelProbe {
                 probe(&data).await
             } else {
-                evaluate(&data).await
+                evaluate(&data, output).await
             }
         }
     }
@@ -656,6 +950,63 @@ mod tests {
         }
     }
     #[test]
+    fn inert_lookup_preserves_assessment_hold_and_callback_never_completes_a_phone() {
+        let case = fixture().cases.remove(3);
+        let mut s = case_session(&case);
+        let caps = ModelCapabilities::fictional_enrolled();
+        let contact = execute_inert(
+            &mut s,
+            &caps,
+            &ToolCall::LookupTrustedContact {
+                role: firstring::tools::ContactRole::Family,
+            },
+        )
+        .unwrap();
+        assert_eq!(s.assessed_version, 0);
+        assert_eq!(contact["contact_id"], "sarah:family");
+        let tool = assessment(
+            observation(SpeechAct::Request, RequestedObject::AuthenticationSecret),
+            &case.turns[0].text,
+        );
+        let (mut s, _) = assess(&case, &tool).unwrap();
+        let call=ToolCall::parse("start_trusted_callback",json!({"contact_id":contact["contact_id"],"reason":"authentication_request","evidence_refs":tool.arguments["evidence_refs"]})).unwrap();
+        let result = execute_inert(&mut s, &caps, &call).unwrap();
+        assert_eq!(result["state"], "reserved");
+        assert_eq!(result["acknowledged"], false);
+        assert!(!s.inbound_ended);
+    }
+    #[test]
+    fn inert_executor_reports_missing_contacts_and_saves_a_benign_message() {
+        let case = fixture().cases.remove(0);
+        let caps = ModelCapabilities {
+            handoff_available: false,
+            family_contact_enrolled: false,
+            family_callback_available: false,
+            clinic_contact_enrolled: false,
+            message_taking_available: true,
+        };
+        let tool = assessment(
+            observation(SpeechAct::Statement, RequestedObject::RoutineInformation),
+            &case.turns[0].text,
+        );
+        let (mut s, _) = assess(&case, &tool).unwrap();
+        assert!(
+            execute_inert(
+                &mut s,
+                &caps,
+                &ToolCall::LookupTrustedContact {
+                    role: firstring::tools::ContactRole::Family
+                }
+            )
+            .is_err()
+        );
+        let message=ToolCall::parse("take_message",json!({"summary":"A caller reported a changed clinic visit.","evidence_refs":tool.arguments["evidence_refs"]})).unwrap();
+        let result = execute_inert(&mut s, &caps, &message).unwrap();
+        assert_eq!(result["message_recorded"], true);
+        assert!(!s.inbound_ended);
+        assert!(s.legs.is_empty());
+    }
+    #[test]
     fn only_one_explicit_known_mode_can_enable_model_requests() {
         assert_eq!(parse_args(&[]).unwrap(), Mode::Status);
         assert_eq!(
@@ -667,7 +1018,13 @@ mod tests {
     }
     #[test]
     fn diagnostic_timeout_override_is_confined_to_model_probe() {
-        for mode in [Mode::Evaluate, Mode::Status, Mode::Help] {
+        for mode in [
+            Mode::Evaluate,
+            Mode::EvaluateRegression,
+            Mode::EvaluateDevelopment,
+            Mode::Status,
+            Mode::Help,
+        ] {
             for value in [None, Some("15000"), Some("invalid"), Some("0")] {
                 assert_eq!(request_timeout_ms(mode, value).unwrap(), 3500);
             }
@@ -786,5 +1143,85 @@ mod tests {
         assert!(!case_passes(&result));
         result.clarification = Some(true);
         assert!(case_passes(&result));
+    }
+    #[tokio::test]
+    async fn evaluator_returns_lookup_result_then_reaches_inert_callback() {
+        use axum::{Json, Router, routing::post};
+        use std::sync::{Arc, Mutex};
+        let seen = Arc::new(Mutex::new(Vec::<Value>::new()));
+        let captured = seen.clone();
+        let app=Router::new().route("/chat",post(move |Json(request):Json<Value>| {
+            let captured=captured.clone();
+            async move {
+                let mut requests=captured.lock().unwrap();
+                let index=requests.len();
+                requests.push(request.clone());
+                let context:Value=serde_json::from_str(request["messages"][1]["content"].as_str().unwrap()).unwrap();
+                let turn=&context["turns"][0];
+                let evidence=json!([{"turn_id":turn["id"],"quote":turn["text"]}]);
+                let (name,args)=match index {
+                    0=>("record_assessment",json!({"observation":{"speech_act":"request","requested_object":"authentication_secret","direction":"caller_requests_from_sarah"},"evidence_refs":evidence})),
+                    1=>("lookup_trusted_contact",json!({"role":"family"})),
+                    _=>("start_trusted_callback",json!({"contact_id":"sarah:family","reason":"authentication_request","evidence_refs":evidence})),
+                };
+                Json(json!({"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":format!("native-{index}"),"type":"function","function":{"name":name,"arguments":args.to_string()}}]}}]}))
+            }
+        }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/chat", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let model = Nemotron::new("local-fixture".into(), url, "fixture-model".into());
+        let mut budget = Budget::new(4);
+        let mut result = CaseResult::default();
+        evaluate_case(&model, &mut budget, &fixture().cases[3], &mut result)
+            .await
+            .unwrap();
+        server.abort();
+        assert_eq!(result.trace.len(), 3);
+        assert_eq!(
+            result.simulated_local_outcome.as_deref(),
+            Some("callback_reserved")
+        );
+        assert!(!result.completed_external_action);
+        let requests = seen.lock().unwrap();
+        let messages = requests[2]["messages"].as_array().unwrap();
+        assert_eq!(messages.last().unwrap()["tool_call_id"], "native-1");
+        let returned: Value =
+            serde_json::from_str(messages.last().unwrap()["content"].as_str().unwrap()).unwrap();
+        assert_eq!(returned["result"]["contact_id"], "sarah:family");
+        assert!(
+            !requests[0]["messages"]
+                .to_string()
+                .contains("Do not execute any action")
+        );
+        assert!(
+            !requests[0]["messages"]
+                .to_string()
+                .contains("probe_instruction")
+        );
+    }
+    #[tokio::test]
+    async fn rejected_initial_evidence_retains_proposal_and_failure_without_a_second_request() {
+        use axum::{Json, Router, routing::post};
+        let app=Router::new().route("/chat",post(|| async {
+            Json(json!({"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"bad-evidence","type":"function","function":{"name":"record_assessment","arguments":json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":[{"turn_id":"turn-1","quote":"This quote was invented."}]}).to_string()}}]}}]}))
+        }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/chat", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let model = Nemotron::new("local-fixture".into(), url, "fixture-model".into());
+        let mut budget = Budget::new(4);
+        let mut result = CaseResult::default();
+        assert!(
+            evaluate_case(&model, &mut budget, &fixture().cases[0], &mut result)
+                .await
+                .is_err()
+        );
+        server.abort();
+        assert_eq!(budget.submitted, 1);
+        assert_eq!(result.trace.len(), 1);
+        assert_eq!(result.trace[0]["tool_call_id"], "bad-evidence");
+        assert_eq!(result.trace[0]["result"]["ok"], false);
+        assert!(!result.evidence_valid);
     }
 }

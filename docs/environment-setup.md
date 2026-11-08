@@ -1,14 +1,15 @@
 # Configure FirstRing locally
 
-The first real inbound test **passed Nov 7 at 20:42 Central**: the user heard the assistant and pressed 1; signed caller/keypad/terminal events and Twilio's completed 15-second inbound call agree. See [inbound evidence](evidence/inbound-probe-2026-11-07.json). Twilio is Full/active, Photon default profile has the user's purchased line, and `PHOTON_NUMBER` is configured. The application runs in `live` / `probe` mode through the existing tunnel.
+Current at **Nov 7, 21:54 Central:** the application uses `live` / `relay` for caller-only testing. Twilio is Full/active, Photon has the purchased line, and `PHOTON_NUMBER` is configured. Inbound greeting/keypad passed at 20:42. The latest call reached signed Relay setup and its Rachel-v4 greeting was heard, but trailing partial speech cancelled both model jobs after two final clinic transcripts. The user heard silence afterward; complete live Relay conversation remains unverified. [Inbound proof](evidence/inbound-probe-2026-11-07.json)
 
-All three calling flags remain false. The local ledger contains **0 outbound action reservations**; Sarah's single authorized attempt is unspent. The user's personal phone is caller A only, not Sarah / Phone B. Family remains unenrolled and disabled. The initial voice was rated poor; `Polly.Joanna-Neural` / `en-US` is now deployed for Say/Gather, with a listening comparison pending.
+All three outbound flags remain false and the ledger has **0 outbound reservations**. Phone B is unavailable; the user's personal phone is caller A only. The supported Rachel-v4 preset is selected for Relay in current code; Joanna remains the Say/Gather fallback. Listening quality, interruption and goodbye playback are unverified. Preset TTS is not a clone.
 
 ## Remaining account actions
 
-1. **Sarah / Phone B:** designate the separate consenting second phone and set `SARAH_TEST_E164` locally. This is the only missing core phone variable. Keep `TEST_CALLS_AUTHORIZED=false` until B is designated and ready; then enable it for the one authorized smoke attempt. Keep handoff and family flags false. A-only testing does not require outbound authorization.
+1. **Current speech-finalization repair:** the first Relay call returned 64105 without setup; two manual retries at 21:43 failed before Rust with Twilio 11200 / HTTP 502 at an expired tunnel. Replacement HTTP/2 ingress reached signed setup at 21:54, including an initial WebSocket Ping. A documented 1000ms speech timeout and bounded orphan-partial repeat prompt are being implemented; neither is a completed phone fix yet. Preserve `/voice/incoming` and `/voice/status`, credentials and the ledger. Recheck public reachability before the next deliberate manual call. [Earlier failure receipts](evidence/relay-attempts-2026-11-07.json)
+2. **Deferred Phone B:** no second phone is currently available. Leave `SARAH_TEST_E164` unset and every outbound flag false. Enrollment and outbound scope are only needed if that later gate becomes feasible; they do not block the caller-only trial or initial submission.
 
-The added card resolved Photon outbound entitlement. MD5 outbound credentials are saved locally and read back with the assigned TLS endpoint; inbound TLS and required SRTP remain configured. The user purchased the Photon number on the default profile, which now has one line. Outbound delivery to B is still untested. Hosted model protocol passed, while held-out behavior failed (3/12 composite passes); see [verification](verification.md). Relay/model conversation has not been verified by phone. Brev remains deferred.
+The added card resolved Photon outbound entitlement; MD5/TLS credentials and inbound TLS/SRTP remain configured. This does not authorize or prove outbound delivery. Hosted model protocol passed. A-only model development passed 3/3; fresh frozen held-out behavior failed at 7/12. See [evaluation](evaluation.md); the original 3/12 run remains history. Brev remains deferred.
 
 The configured Twilio SIP domain is `hackutd26-firstring-d232a271.sip.twilio.com`. It requires TLS/SRTP and an attached credential list, routes Voice via POST to the current `PUBLIC_BASE_URL` plus `/voice/incoming`, and status to `/voice/status`. Locally generated inbound SIP credentials are stored in `.env` as `TWILIO_SIP_USERNAME` / `TWILIO_SIP_PASSWORD`, separate from Photon outbound credentials. No credentials were rotated. The project-local setup records retain resource IDs and prevent blind re-creation after ambiguous results.
 
@@ -25,7 +26,7 @@ git check-ignore .env
 
 `DEMO_ADMIN_TOKEN` is already generated in `.env` with mode 600 file permissions; an authenticated local API read succeeded without displaying it. Enter its value locally in the console; do not send it in chat. Preserve it on subsequent setup edits. This token is not a Twilio or Photon credential. The separate replay helper uses `.tools/replay-admin-token`; the currently running normal service uses `.env`.
 
-## Values needed for the first two-phone test
+## Existing runtime values and deferred Phone B
 
 | Variable | Where its value comes from |
 |---|---|
@@ -41,7 +42,7 @@ git check-ignore .env
 | `PHOTON_SIP_HOST` / `PHOTON_SIP_PORT` | In that Photon Voice SIP profile, open **Outbound calls** and copy the assigned **SIP connection** host/port. The guide example is `sip.photon.codes:5061`; use the actual assignment, not the authentication realm. |
 | `PHOTON_SIP_USERNAME` / `PHOTON_SIP_PASSWORD` | Generate/copy the **outbound** credentials in the same Photon Voice profile. Configure digest **MD5 (legacy)** for Twilio compatibility and retain TLS/compatible SRTP. |
 | `SARAH_TEST_E164` | Your designated consenting Phone B's actual E.164 number, `+` followed by country code and subscriber digits. It is entered by you, never selected by the model or caller. |
-| `VOICE_TRANSPORT` | Keep `probe` for Milestone 1; no model key is required for that checkpoint. |
+| `VOICE_TRANSPORT` | Current caller-only path is `relay`; `gather` is the explicitly labeled fallback. `probe` is the earlier keypad transport checkpoint. |
 | `MAX_CALL_SECONDS` | Local duration cap; keep `180` (range 15–600). |
 
 Twilio documents the dashboard credentials in its [Auth Token reference](https://www.twilio.com/docs/iam/api/authtoken). Use a funded/enabled account; [trial restrictions](https://www.twilio.com/docs/usage/trials/try-out-voice) prevent the final Relay/SIP architecture. The user completed the account upgrade, purchased the Photon line, and initiated the verified inbound call. No outbound call has been placed.
@@ -62,16 +63,16 @@ bash scripts/voice-tunnel.sh
 # update the Twilio SIP Domain Voice webhook. Keep this process running.
 ```
 
-Reuse the running ingress process; its current URL is already in `.env`. Do not add `--allowed-mail` or an access-login policy: provider webhooks cannot use browser authentication. [Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) have no uptime guarantee and change hostname on restart. Their lack of SSE is handled by using the operator console at `http://127.0.0.1:8080`, while the public URL carries voice HTTP/WSS and later generated audio. Real signed inbound HTTP is now verified. [WebSocket support](https://developers.cloudflare.com/network/websockets/) is documented, but the actual signed Relay session remains pending. Public/local health returned 200 and unsigned POST returned 403 after the preset-voice deployment.
+The helper now selects HTTP/2. The old origin expired despite Rust remaining healthy: do not assume a local 200 proves the tunnel is usable. After the coordinated replacement, update the current origin locally and the existing SIP Domain URLs, then recheck public health and unsigned rejection. Do not add browser-access authentication. [Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) have no uptime guarantee and change hostname on restart. Use the console at `http://127.0.0.1:8080`; the public URL carries voice HTTP/WSS. Earlier public 200/unsigned 403 checks are historical. Signed Relay setup and greeting listening were observed at 21:54; a complete spoken model reply remains pending.
 
 ## Later conversation values
 
 | Variable | Where its value comes from / current setting |
 |---|---|
-| `NVIDIA_API_KEY` | Already authenticated for the [requested model](https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b). Native protocol passed; held-out behavior failed. No new key collection is needed. |
+| `NVIDIA_API_KEY` | Already authenticated for the [requested model](https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b). Protocol passed, A-only development 3/3, fresh held-out 7/12. No new key collection is needed. |
 | `NEMOTRON_CHAT_URL` | Keep the provided NVIDIA chat-completions URL. This is an application constant, not a value to invent. |
 | `NEMOTRON_MODEL` | Keep `nvidia/nemotron-3.5-lightning-30b-a3b`; do not silently substitute a model. |
-| `VOICE_TRANSPORT` | After the first phone checkpoint, use `relay` after Twilio ConversationRelay onboarding/addendum. Use `gather` for the explicit setup-blocked fallback. |
+| `VOICE_TRANSPORT` | Current value is `relay`. Use `gather` only as the explicitly labeled setup-blocked fallback; this loses streaming interruption/concurrent revocation. |
 | `VOICE_OUTPUT` | Keep `relay_native`. Current output is a preset assistant voice, not a clone. |
 | `HANDOFF_CALLS_ENABLED` | Keep `false`: additional Sarah handoff calls are not yet authorized. |
 | `FAMILY_CALLS_ENABLED` | Keep `false`: family is not enrolled or authorized. |
@@ -87,4 +88,4 @@ bash scripts/cargo.sh run --bin preflight
 
 The default reports variable **names** that are present/missing, not their values, and performs zero external requests. Presence does not prove correct flags, provider access or authorization. With the NVIDIA key ready, the explicit `--model-probe` flag makes bounded model-only requests; it never dials.
 
-Preserve the current live/probe service, tunnel and ledger. Follow the [two-phone checklist](demo-runbook.md) once B is designated. A calls manually; the console's authenticated Phone B action uses only `contact_id="sarah"`. Unknown create outcomes remain reserved and must not be retried blindly.
+Preserve the current live/relay service, credentials and ledger through the coordinated tunnel repair. Follow the [caller-only checklist](demo-runbook.md) next. The console shows HTTP/model proposal/result traces separately from actual phone outcomes. Phone B stays unavailable; any future unknown create outcome remains reserved and must not be retried blindly.

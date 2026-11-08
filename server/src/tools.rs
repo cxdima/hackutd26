@@ -200,6 +200,85 @@ impl ToolCall {
     }
 }
 
+/// A public proposal summary retains validated categories and omits private text.
+pub fn public_arguments(tool: &ToolCall) -> Value {
+    match tool {
+        ToolCall::RecordAssessment { observation, .. }
+        | ToolCall::OfferHandoff { observation, .. } => json!({"observation":observation}),
+        ToolCall::AskCaller {
+            question, purpose, ..
+        } => json!({"purpose":purpose,"question_characters":question.chars().count()}),
+        ToolCall::LookupTrustedContact { role } => json!({"role":role}),
+        ToolCall::LookupTactics {
+            requested_action,
+            pretext_category,
+        } => json!({"requested_action":requested_action,"pretext_category":pretext_category}),
+        ToolCall::StartTrustedCallback { reason, .. } => json!({"reason":reason}),
+        ToolCall::TakeMessage { summary, .. } => {
+            json!({"summary_characters":summary.chars().count()})
+        }
+        ToolCall::PublishTactic {
+            tactic,
+            requested_action,
+            pretext_category,
+            pressure_category,
+        } => {
+            json!({"tactic":tactic,"requested_action":requested_action,"pretext_category":pretext_category,"pressure_category":pressure_category})
+        }
+    }
+}
+
+/// Bound the public outcome to policy-owned booleans/counts. A requested action
+/// never becomes a completed or acknowledged call in this projection.
+pub fn public_result(value: &Value) -> Value {
+    let mut fields = serde_json::Map::new();
+    for key in [
+        "blocked",
+        "ambiguous",
+        "assessed_version",
+        "audio_requested",
+        "message_recorded",
+        "closing",
+        "stop",
+        "acknowledged",
+        "summary_characters",
+    ] {
+        if value[key].is_boolean() || value[key].is_u64() {
+            fields.insert(key.into(), value[key].clone());
+        }
+    }
+    for (key, source) in [
+        ("contact_available", "contact_id"),
+        ("offer_created", "offer_id"),
+        ("action_requested", "action_id"),
+    ] {
+        if value.get(source).is_some() {
+            fields.insert(key.into(), json!(true));
+        }
+    }
+    if let Some(matches) = value["matches"].as_array() {
+        fields.insert("tactic_matches".into(), json!(matches.len()));
+    }
+    if value["state"].as_str().is_some_and(|s| {
+        matches!(
+            s,
+            "reserved"
+                | "requested"
+                | "unknown"
+                | "ringing"
+                | "in-progress"
+                | "completed"
+                | "failed"
+                | "no-answer"
+                | "busy"
+                | "canceled"
+        )
+    }) {
+        fields.insert("state".into(), value["state"].clone());
+    }
+    Value::Object(fields)
+}
+
 /// A closed categorical vocabulary prevents names, numbers and quotes entering shared memory.
 pub const REQUESTED_ACTIONS: &[&str] = &[
     "relay_sign_in_text_digits",

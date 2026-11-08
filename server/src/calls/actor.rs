@@ -21,11 +21,49 @@ pub struct Handle {
     tx: mpsc::Sender<Envelope>,
     pub audio: tokio::sync::broadcast::Sender<AudioFrame>,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AudioPurpose {
+    Response,
+    MessageClosing,
+    PendingSpeechRecovery,
+}
 #[derive(Clone, Debug)]
 pub struct AudioFrame {
     pub generation: u64,
     pub epoch: u64,
     pub payload: Value,
+    pub purpose: AudioPurpose,
+}
+impl AudioFrame {
+    pub fn permitted_for(&self, session: &Session) -> bool {
+        if self.generation != session.generation_id
+            || self.epoch != session.policy_epoch
+            || session.inbound_ended
+            || session.end_requested
+            || session.bridge_committed
+        {
+            return false;
+        }
+        match self.purpose {
+            AudioPurpose::Response => !session.speech_pending && session.closing_reason.is_none(),
+            AudioPurpose::MessageClosing => {
+                session.closing_reason.as_deref() == Some("message_saved")
+                    && self.payload["type"] == "end"
+            }
+            AudioPurpose::PendingSpeechRecovery => {
+                session.speech_pending
+                    && session.closing_reason.is_none()
+                    && self.payload["type"] == "text"
+            }
+        }
+    }
+}
+pub(crate) struct PendingSpeechEpisode {
+    pub(crate) first_started: std::time::Instant,
+    pub(crate) deadline: std::time::Instant,
+    pub(crate) generation: u64,
+    pub(crate) epoch: u64,
+    pub(crate) prompted: bool,
 }
 struct Envelope {
     input: Input,
@@ -73,6 +111,10 @@ pub enum Input {
     Speech {
         partial: Option<String>,
     },
+    SpeechRecovery {
+        generation: u64,
+        epoch: u64,
+    },
     FinalPrompt {
         text: String,
     },
@@ -112,6 +154,12 @@ pub enum Input {
         tool: crate::providers::nemotron::ModelToolCall,
     },
     RelayDisconnected,
+    ClosingResponse,
+    RelayTelemetry {
+        event: &'static str,
+        elapsed_ms: u64,
+        characters: Option<usize>,
+    },
 
     End,
 }
@@ -181,6 +229,8 @@ impl App {
             handle: handle.clone(),
             model_task: None,
             relay_attached: false,
+            pending_speech: None,
+            speech_recovery_task: None,
         };
         tokio::spawn(actor.run(rx));
         handle
@@ -231,6 +281,8 @@ impl App {
             handle: h.clone(),
             model_task: None,
             relay_attached: false,
+            pending_speech: None,
+            speech_recovery_task: None,
         };
         tokio::spawn(actor.run(rx));
         let cleanup = h.clone();
@@ -290,6 +342,8 @@ pub(crate) struct Actor {
     pub(crate) handle: Handle,
     pub(crate) model_task: Option<tokio::task::JoinHandle<()>>,
     pub(crate) relay_attached: bool,
+    pub(crate) pending_speech: Option<PendingSpeechEpisode>,
+    pub(crate) speech_recovery_task: Option<tokio::task::JoinHandle<()>>,
 }
 impl Actor {
     async fn run(mut self, mut rx: mpsc::Receiver<Envelope>) {
@@ -338,7 +392,8 @@ impl Actor {
                 anyhow::ensure!(
                     &nonce == expected
                         && !self.session.inbound_ended
-                        && !self.session.bridge_committed,
+                        && !self.session.bridge_committed
+                        && self.session.closing_reason.is_none(),
                     "Invalid or obsolete Gather token"
                 );
                 let next = uuid::Uuid::new_v4().to_string();
@@ -487,6 +542,7 @@ impl Actor {
                 );
             }
             Input::InboundEnded => {
+                self.clear_speech_recovery();
                 if let Some(task) = self.model_task.take() {
                     task.abort();
                 }
@@ -512,6 +568,9 @@ impl Actor {
                     }
                     self.session.state = "ended".into();
                 }
+                if self.session.closing_reason.is_some() {
+                    self.session.state = "ended".into();
+                }
                 self.session.current_action = if self
                     .session
                     .legs
@@ -533,6 +592,12 @@ impl Actor {
                 self.start_postcall();
             }
             Input::End => {
+                self.clear_speech_recovery();
+                if self.session.inbound_ended
+                    && self.session.legs.iter().all(|leg| terminal(&leg.status))
+                {
+                    return Ok(json!({"ignored":"already_terminal"}));
+                }
                 self.session.end_requested = true;
                 self.session.inbound_ended = true;
                 self.session.speech_pending = true;

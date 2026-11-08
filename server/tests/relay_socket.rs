@@ -159,6 +159,32 @@ async fn send_json(socket: &mut Socket, value: Value) {
         .unwrap();
 }
 
+#[tokio::test]
+async fn websocket_ping_before_setup_preserves_authenticated_session_binding() {
+    let server = server().await;
+    let (_, snapshot) = server.app.incoming(CALLER).await.unwrap();
+    let mut socket = connect(
+        &server,
+        "/voice/relay",
+        Some("https://relay.fixture.example/voice/relay"),
+    )
+    .await
+    .unwrap();
+    socket
+        .send(Message::Ping(b"before-setup".to_vec().into()))
+        .await
+        .unwrap();
+    let reply = tokio::time::timeout(Duration::from_secs(2), socket.next())
+        .await
+        .expect("Server must answer a ping while awaiting setup")
+        .expect("Server must keep the socket open")
+        .expect("Server must not reset the socket on a control frame");
+    assert!(matches!(reply, Message::Pong(bytes) if bytes.as_ref() == b"before-setup"));
+    socket.send(Message::Pong(Vec::new().into())).await.unwrap();
+    send_json(&mut socket, setup(&snapshot)).await;
+    wait_event(&server.app, "voice.connected").await;
+}
+
 // A pong is a processing barrier: the server awaits each preceding actor input.
 async fn socket_barrier(socket: &mut Socket) {
     let marker = b"activity-barrier";
@@ -206,6 +232,178 @@ async fn assessed_socket(server: &Server) -> (Handle, Socket, Value, Value) {
     )
     .await;
     (handle, socket, evidence, observation)
+}
+
+async fn post_voice(server: &Server, path: &str, form: &[(&str, &str)]) -> String {
+    let mut pairs = form.to_vec();
+    pairs.push(("AccountSid", ACCOUNT));
+    pairs.sort_unstable_by_key(|(key, _)| *key);
+    let mut signed = format!("{ORIGIN}{path}");
+    for (key, value) in &pairs {
+        signed.push_str(key);
+        signed.push_str(value);
+    }
+    let response = reqwest::Client::new()
+        .post(format!("http://{}{path}", server.address))
+        .header("x-twilio-signature", signature(&signed))
+        .form(&pairs)
+        .send()
+        .await
+        .unwrap();
+    assert!(response.status().is_success());
+    response.text().await.unwrap()
+}
+
+#[tokio::test]
+async fn saved_message_ends_relay_then_speaks_goodbye_in_order_before_hangup() {
+    let server = server().await;
+    let (handle, mut socket, evidence, _) = assessed_socket(&server).await;
+    propose(
+        &handle,
+        "take_message",
+        json!({"summary":"Clinic visit Wednesday at ten.","evidence_refs":evidence}),
+    )
+    .await;
+    let output = tokio::time::timeout(Duration::from_secs(2), socket.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let Message::Text(output) = output else {
+        panic!("Expected Relay end command")
+    };
+    let output: Value = serde_json::from_str(&output).unwrap();
+    assert_eq!(
+        output["type"], "end",
+        "Do not enqueue goodbye TTS then interrupt it with end"
+    );
+    let response = post_voice(&server, "/voice/after-relay", &[("CallSid", CALLER)]).await;
+    assert!(response.contains("Your message has been noted."));
+    assert!(response.find("</Say>").unwrap() < response.find("<Hangup/>").unwrap());
+    assert!(!response.contains("<Gather"));
+    assert!(!response.contains("connection ended"));
+    let retry = post_voice(&server, "/voice/after-relay", &[("CallSid", CALLER)]).await;
+    assert_eq!(response, retry);
+    let state = handle.send(Input::Snapshot).await.unwrap();
+    assert_eq!(
+        state["inbound_ended"], false,
+        "TwiML dispatch is not provider completion"
+    );
+    assert_eq!(state["closing_reason"], "message_saved");
+    assert!(
+        server
+            .app
+            .store
+            .actions(&handle.id)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn committed_message_closing_rejects_new_turn_and_stale_failure() {
+    let server = server().await;
+    let (handle, _socket, evidence, _) = assessed_socket(&server).await;
+    let before = handle.send(Input::Snapshot).await.unwrap();
+    propose(
+        &handle,
+        "take_message",
+        json!({"summary":"Clinic visit Wednesday at ten.","evidence_refs":evidence}),
+    )
+    .await;
+    let closing = handle.send(Input::Snapshot).await.unwrap();
+    assert!(
+        handle
+            .send(Input::FinalPrompt {
+                text: "Wait, another request.".into()
+            })
+            .await
+            .is_err()
+    );
+    handle.send(Input::Speech { partial: None }).await.unwrap();
+    handle
+        .send(Input::ModelFailed {
+            generation: before["generation_id"].as_u64().unwrap(),
+            detail: "stale model timeout".into(),
+        })
+        .await
+        .unwrap();
+    let after = handle.send(Input::Snapshot).await.unwrap();
+    assert_eq!(after["generation_id"], closing["generation_id"]);
+    assert_eq!(after["turn_version"], before["turn_version"]);
+    assert_eq!(after["state"], "closing");
+    assert!(
+        !server
+            .app
+            .store
+            .events_after(0)
+            .await
+            .unwrap()
+            .iter()
+            .any(|e| e.kind == "dependency.failed")
+    );
+}
+
+#[tokio::test]
+async fn terminal_status_before_closing_callback_never_restarts_goodbye_audio() {
+    let server = server().await;
+    let (handle, _socket, evidence, _) = assessed_socket(&server).await;
+    propose(
+        &handle,
+        "take_message",
+        json!({"summary":"Clinic visit Wednesday at ten.","evidence_refs":evidence}),
+    )
+    .await;
+    handle.send(Input::InboundEnded).await.unwrap();
+    let response = post_voice(&server, "/voice/after-relay", &[("CallSid", CALLER)]).await;
+    assert_eq!(response, "<Response><Hangup/></Response>");
+    assert_eq!(
+        handle.send(Input::Snapshot).await.unwrap()["state"],
+        "ended"
+    );
+}
+
+#[tokio::test]
+async fn saved_message_gather_response_hangs_up_and_retry_cannot_restart_screening() {
+    let server = server().await;
+    let (handle, initial) = server.app.incoming(CALLER).await.unwrap();
+    let path = format!(
+        "/voice/turn?turn_id={}",
+        initial["relay_token"].as_str().unwrap()
+    );
+    let text = "The clinic visit is Wednesday at ten.";
+    let form = [("CallSid", CALLER), ("SpeechResult", text)];
+    let work = post_voice(&server, &path, &form);
+    let model = async {
+        let state = wait_snapshot(&handle, |s| s["turn_version"] == 1).await;
+        let evidence = json!([{"turn_id":state["turns"][0]["id"],"quote":text}]);
+        propose(&handle,"record_assessment",json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":evidence})).await;
+        propose(
+            &handle,
+            "take_message",
+            json!({"summary":"Clinic visit Wednesday at ten.","evidence_refs":evidence}),
+        )
+        .await;
+    };
+    let (response, _) = tokio::join!(work, model);
+    assert!(response.contains("Your message has been noted."));
+    assert!(
+        !response.contains("<Gather"),
+        "Completed message must not ask for another turn"
+    );
+    assert!(response.find("</Say>").unwrap() < response.find("<Hangup/>").unwrap());
+    let retry = post_voice(
+        &server,
+        &path,
+        &[("CallSid", CALLER), ("SpeechResult", text)],
+    )
+    .await;
+    assert_eq!(response, retry);
+    assert_eq!(
+        handle.send(Input::Snapshot).await.unwrap()["turn_version"],
+        1
+    );
 }
 
 async fn assistant_activity(socket: &mut Socket) {
@@ -566,4 +764,126 @@ async fn duplicate_setup_cannot_displace_the_attached_socket() {
         .count();
     assert_eq!(connected, 1);
     first.close(None).await.unwrap();
+}
+
+#[tokio::test]
+async fn caller_policy_input_precedes_telemetry_and_blocks_current_private_acceptance() {
+    for (input, metric, policy_event) in [
+        (
+            json!({"type":"prompt","voicePrompt":"Wait, before you connect","lang":"en-US","last":false}),
+            "prompt.partial",
+            "transcript.partial",
+        ),
+        (
+            json!({"type":"interrupt","utteranceUntilInterrupt":"Please hold","durationUntilInterruptMs":100}),
+            "interrupt",
+            "session.updated",
+        ),
+        (
+            json!({"type":"prompt","voicePrompt":"Before connecting, ask Sarah for her account login digits.","lang":"en-US","last":true}),
+            "prompt.final",
+            "transcript.final",
+        ),
+    ] {
+        let server = server().await;
+        let (handle, mut socket, evidence, observation) = assessed_socket(&server).await;
+        propose(&handle,"offer_handoff",json!({"summary":"Caller reports a changed visit.","observation":observation,"evidence_refs":evidence})).await;
+        let before = handle.send(Input::Snapshot).await.unwrap();
+        handle
+            .send(Input::Status {
+                action_id: before["offer"]["leg_id"].as_str().unwrap().into(),
+                sid: SARAH.into(),
+                status: "in-progress".into(),
+            })
+            .await
+            .unwrap();
+        socket_barrier(&mut socket).await;
+        let baseline = server
+            .app
+            .store
+            .events_after(0)
+            .await
+            .unwrap()
+            .last()
+            .unwrap()
+            .sequence;
+        send_json(&mut socket, input).await;
+        socket_barrier(&mut socket).await;
+        let events = server.app.store.events_after(baseline).await.unwrap();
+        let telemetry = events
+            .iter()
+            .find(|e| e.kind == "relay.telemetry" && e.payload["event"] == metric)
+            .expect("transport observation is retained");
+        let changed = events
+            .iter()
+            .find(|e| e.kind == policy_event)
+            .expect("caller policy input is applied");
+        assert!(
+            changed.sequence < telemetry.sequence,
+            "{metric}: observability must not insert an awaited actor/SQLite operation before caller policy input"
+        );
+        let choice = handle
+            .send(Input::Choice {
+                offer_id: before["offer"]["id"].as_str().unwrap().into(),
+                sid: SARAH.into(),
+                digits: "1".into(),
+            })
+            .await
+            .unwrap();
+        assert!(
+            !choice["twiml"].as_str().unwrap().contains("<Conference"),
+            "{metric}: previous consent must remain held/revoked"
+        );
+        let after = handle.send(Input::Snapshot).await.unwrap();
+        assert_eq!(after["bridge_committed"], false);
+        assert!(
+            after["generation_id"].as_u64().unwrap() > before["generation_id"].as_u64().unwrap()
+        );
+    }
+}
+
+#[tokio::test]
+async fn orphan_speech_recovery_reaches_socket_but_late_recovery_after_final_is_discarded() {
+    let server = server().await;
+    let (handle, mut socket, _, _) = assessed_socket(&server).await;
+    let mut frames = handle.audio.subscribe();
+    send_json(
+        &mut socket,
+        json!({"type":"prompt","voicePrompt":"Actually, wait","lang":"en-US","last":false}),
+    )
+    .await;
+    let message = tokio::time::timeout(Duration::from_secs(6), socket.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let Message::Text(message) = message else {
+        panic!("Expected recovery text")
+    };
+    let message: Value = serde_json::from_str(&message).unwrap();
+    assert_eq!(message["type"], "text");
+    assert!(
+        message["token"]
+            .as_str()
+            .unwrap()
+            .contains("Please repeat your request")
+    );
+    assert!(message.get("purpose").is_none());
+    let recovery = frames.recv().await.unwrap();
+    let held = handle.send(Input::Snapshot).await.unwrap();
+    assert_eq!(held["speech_pending"], true);
+    assert_eq!(held["turn_version"], 1);
+    send_json(&mut socket,json!({"type":"prompt","voicePrompt":"The visit is Friday at noon.","lang":"en-US","last":true})).await;
+    socket_barrier(&mut socket).await;
+    handle.audio.send(recovery).unwrap();
+    assert!(
+        tokio::time::timeout(Duration::from_millis(200), socket.next())
+            .await
+            .is_err(),
+        "Old recovery must not speak after a new final"
+    );
+    assert_eq!(
+        handle.send(Input::Snapshot).await.unwrap()["turn_version"],
+        2
+    );
 }

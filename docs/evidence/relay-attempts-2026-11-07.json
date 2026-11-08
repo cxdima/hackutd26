@@ -1,0 +1,193 @@
+{
+  "attempts": [
+    {
+      "attempt": 1,
+      "recorded_at": "2026-11-08T03:19:19.120676+00:00",
+      "execution_mode": "live",
+      "transport": "relay",
+      "result": "FAIL",
+      "call_id_sha256_prefix": "08b282814ab3",
+      "provider_error_code": 64105,
+      "provider_error": "Websocket ended",
+      "relay_duration_seconds": 0,
+      "call_duration_seconds": 6,
+      "signed_setup_observed": false,
+      "model_requests_observed": 0,
+      "caller_report": "Only heard the assistant connection ended; no conversational greeting or reply.",
+      "application_events": [
+        {
+          "sequence": 15,
+          "type": "call.inbound.received",
+          "occurred_at": "2026-11-08T03:19:12.266558+00:00",
+          "execution_mode": "live"
+        },
+        {
+          "sequence": 16,
+          "type": "dependency.failed",
+          "occurred_at": "2026-11-08T03:19:13.036165+00:00",
+          "execution_mode": "live"
+        },
+        {
+          "sequence": 17,
+          "type": "session.updated",
+          "occurred_at": "2026-11-08T03:19:13.038274+00:00",
+          "execution_mode": "live"
+        },
+        {
+          "sequence": 18,
+          "type": "call.ended",
+          "occurred_at": "2026-11-08T03:19:19.118322+00:00",
+          "execution_mode": "live"
+        },
+        {
+          "sequence": 19,
+          "type": "session.updated",
+          "occurred_at": "2026-11-08T03:19:19.120676+00:00",
+          "execution_mode": "live"
+        },
+        {
+          "sequence": 20,
+          "type": "session.updated",
+          "occurred_at": "2026-11-08T03:22:42.275335+00:00",
+          "execution_mode": "live"
+        },
+        {
+          "sequence": 21,
+          "type": "session.updated",
+          "occurred_at": "2026-11-08T03:22:42.277563+00:00",
+          "execution_mode": "live"
+        }
+      ],
+      "outbound_actions": 0,
+      "cause": "Not yet established; setup diagnostics added.",
+      "voice": "Amazon Joanna-Neural"
+    },
+    {
+      "attempt": 2,
+      "recorded_at": "2026-11-08T03:53:00Z",
+      "execution_mode": "live",
+      "transport": "relay",
+      "result": "FAIL",
+      "call_id_sha256_prefix": "a6ffe70da0bb",
+      "provider_start_time": "Sun, 08 Nov 2026 03:43:49 +0000",
+      "provider_status": "busy",
+      "call_duration_seconds": 0,
+      "provider_error_code": 11200,
+      "provider_http_status": 502,
+      "signed_setup_observed": false,
+      "model_requests_observed": 0,
+      "application_inbound_observed": false,
+      "caller_report": "We are sorry an application error has occurred goodbye.",
+      "cause": "Expired Cloudflare Quick Tunnel. Cloudflared reported Unauthorized: Tunnel not found; Rust remained locally healthy.",
+      "outbound_actions": 0
+    },
+    {
+      "attempt": 3,
+      "recorded_at": "2026-11-08T03:53:00Z",
+      "execution_mode": "live",
+      "transport": "relay",
+      "result": "FAIL",
+      "call_id_sha256_prefix": "f605fb15e734",
+      "provider_start_time": "Sun, 08 Nov 2026 03:43:55 +0000",
+      "provider_status": "busy",
+      "call_duration_seconds": 0,
+      "provider_error_code": 11200,
+      "provider_http_status": 502,
+      "signed_setup_observed": false,
+      "model_requests_observed": 0,
+      "application_inbound_observed": false,
+      "caller_report": "We are sorry an application error has occurred goodbye.",
+      "cause": "Expired Cloudflare Quick Tunnel. Cloudflared reported Unauthorized: Tunnel not found; Rust remained locally healthy.",
+      "outbound_actions": 0
+    },
+    {
+      "attempt": 4,
+      "recorded_at": "2026-11-08T03:57:24.579411+00:00",
+      "execution_mode": "live",
+      "transport": "relay",
+      "result": "PARTIAL: greeting and transcription passed; conversation failed",
+      "call_id_sha256_prefix": "c43b84068a9a",
+      "signed_setup_observed": true,
+      "audible_greeting_confirmed": true,
+      "voice": "ElevenLabs Rachel v4",
+      "partial_prompt_count": 23,
+      "final_prompt_count": 2,
+      "cancelled_model_jobs": 2,
+      "completed_model_requests": 0,
+      "audible_model_reply_confirmed": false,
+      "caller_report": "Greeting heard, then radio silence. Caller confirmed nearby speech or speakerphone audio.",
+      "cause": "Both model jobs canceled by subsequent documented partial prompts; trailing partial was not finalized during the wait, leaving speech_pending true.",
+      "first_authenticated_frame": "ping followed by setup",
+      "setup_shape": {
+        "accountSid": true,
+        "callSid": true,
+        "sessionId": true,
+        "customParameters.session_token": true
+      },
+      "application_events": [
+        {
+          "sequence": 23,
+          "type": "voice.connected",
+          "occurred_at": "2026-11-08T03:54:33.172618+00:00"
+        },
+        {
+          "sequence": 25,
+          "type": "relay.telemetry",
+          "occurred_at": "2026-11-08T03:54:33.177896+00:00",
+          "event": "setup"
+        },
+        {
+          "sequence": 91,
+          "type": "relay.telemetry",
+          "occurred_at": "2026-11-08T03:54:44.078070+00:00",
+          "event": "prompt.final"
+        },
+        {
+          "sequence": 93,
+          "type": "transcript.final",
+          "occurred_at": "2026-11-08T03:54:44.081095+00:00"
+        },
+        {
+          "sequence": 97,
+          "type": "model.cancelled",
+          "occurred_at": "2026-11-08T03:54:44.452479+00:00"
+        },
+        {
+          "sequence": 116,
+          "type": "relay.telemetry",
+          "occurred_at": "2026-11-08T03:54:47.475959+00:00",
+          "event": "prompt.final"
+        },
+        {
+          "sequence": 118,
+          "type": "transcript.final",
+          "occurred_at": "2026-11-08T03:54:47.481362+00:00"
+        },
+        {
+          "sequence": 122,
+          "type": "model.cancelled",
+          "occurred_at": "2026-11-08T03:54:47.737200+00:00"
+        },
+        {
+          "sequence": 129,
+          "type": "relay.telemetry",
+          "occurred_at": "2026-11-08T03:55:53.157386+00:00",
+          "event": "closed"
+        },
+        {
+          "sequence": 136,
+          "type": "call.ended",
+          "occurred_at": "2026-11-08T03:55:53.412596+00:00"
+        }
+      ],
+      "outbound_actions": 0,
+      "audible_reply_latency_ms": null,
+      "remediation": "Set provider speechTimeout=1000; keep finality/consent checks and partial/interrupt cancellation. Pending next call.",
+      "call_duration_seconds": 80,
+      "provider_terminal_status": "completed",
+      "provider_relay_session_status": "completed",
+      "caller_ended_call": true,
+      "automated_clean_closing_verified": false
+    }
+  ]
+}

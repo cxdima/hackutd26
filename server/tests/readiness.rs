@@ -11,6 +11,57 @@ use http_body_util::BodyExt;
 use serde_json::Value;
 use tower::ServiceExt;
 
+#[tokio::test]
+async fn partial_relay_proof_explains_observations_without_passing_the_gate() {
+    let app = App::new(inbound_config()).await.unwrap();
+    app.store
+        .set_metadata(
+            "verification.relay_phone",
+            &serde_json::json!({
+                "status":"partial", "source":"manual_relay_rehearsal",
+                "recorded_at":"2026-11-08T03:54:33Z",
+                "checks":{"signed_setup":true,"caller_transcript":true,"audible_greeting":true}
+            })
+            .to_string(),
+        )
+        .await
+        .unwrap();
+    let (_, body) = get(app, "/health/ready").await;
+    assert_eq!(body["evidence"]["relay_phone"]["status"], "pending");
+    assert!(
+        body["evidence"]["relay_phone"]["detail"]
+            .as_str()
+            .unwrap()
+            .contains("greeting confirmed")
+    );
+    assert_eq!(body["capabilities"]["relay"]["live_verified"], false);
+}
+
+#[tokio::test]
+async fn recorded_ingress_failure_is_visible_without_claiming_relay_worked() {
+    let app = App::new(inbound_config()).await.unwrap();
+    app.store
+        .set_metadata(
+            "verification.relay_phone",
+            &serde_json::json!({
+                "status":"failed", "source":"manual_relay_rehearsal",
+                "recorded_at":"2026-11-08T03:44:01Z", "error_code":11200
+            })
+            .to_string(),
+        )
+        .await
+        .unwrap();
+    let (_, body) = get(app, "/health/ready").await;
+    assert_eq!(body["evidence"]["relay_phone"]["status"], "failed");
+    assert!(
+        body["evidence"]["relay_phone"]["detail"]
+            .as_str()
+            .unwrap()
+            .contains("voice webhook")
+    );
+    assert_eq!(body["capabilities"]["relay"]["live_verified"], false);
+}
+
 fn inbound_config() -> Config {
     let mut c = Config::from_env().unwrap();
     c.database_url = "sqlite::memory:".into();
@@ -114,4 +165,82 @@ async fn model_configuration_does_not_claim_inbound_setup_or_verification() {
     assert_eq!(body["capabilities"]["inbound"]["configured"], false);
     assert_eq!(body["capabilities"]["model"]["configured"], true);
     assert_eq!(body["capabilities"]["model"]["live_verified"], false);
+}
+
+#[tokio::test]
+async fn recorded_phone_evidence_is_separate_from_configuration_and_relay_proof() {
+    let app = App::new(inbound_config()).await.unwrap();
+    app.store.set_metadata("verification.inbound_phone", &serde_json::json!({
+        "status":"passed", "recorded_at":"2026-11-08T02:42:49Z",
+        "source":"manual_inbound_probe", "checks":{
+            "signed_inbound":true,"caller_keypad":true,"audible_greeting":true,"terminal_reconciled":true
+        }
+    }).to_string()).await.unwrap();
+    let (_, body) = get(app.clone(), "/health/ready").await;
+    assert_eq!(body["capabilities"]["inbound"]["live_verified"], true);
+    assert_eq!(body["capabilities"]["relay"]["live_verified"], false);
+    assert_eq!(body["live_verified"], true);
+    let (_, state) = get(app, "/api/state").await;
+    assert_eq!(state["evidence"]["inbound_phone"]["status"], "passed");
+    assert_eq!(state["evidence"]["model_protocol"]["status"], "pending");
+}
+
+#[tokio::test]
+async fn partial_or_malformed_evidence_cannot_claim_a_verified_phone_call() {
+    let app = App::new(inbound_config()).await.unwrap();
+    app.store.set_metadata("verification.inbound_phone", r#"{"status":"passed","recorded_at":"2026-11-08T02:42:49Z","source":"manual_inbound_probe","checks":{"signed_inbound":true}}"#).await.unwrap();
+    let (_, body) = get(app.clone(), "/api/state").await;
+    assert_eq!(body["evidence"]["inbound_phone"]["status"], "pending");
+    app.store
+        .set_metadata("verification.relay_phone", "invalid")
+        .await
+        .unwrap();
+    let (_, body) = get(app, "/health/ready").await;
+    assert_eq!(body["capabilities"]["relay"]["live_verified"], false);
+}
+
+#[tokio::test]
+async fn phone_b_controls_follow_enrollment_authorization_and_durable_global_budget() {
+    let mut c = inbound_config();
+    c.photon_number = "+12025550100".into();
+    c.sip_username = "test".into();
+    c.sip_password = "test".into();
+    c.smoke_authorized = true;
+    let app = App::new(c.clone()).await.unwrap();
+    let (_, body) = get(app, "/api/state").await;
+    assert_eq!(body["phone_b"]["enrolled"], false);
+    assert_eq!(body["phone_b"]["can_request"], false);
+    c.contacts.insert("sarah".into(), "+12025550123".into());
+    let app = App::new(c).await.unwrap();
+    let (_, body) = get(app.clone(), "/api/state").await;
+    assert_eq!(body["phone_b"]["can_request"], true);
+    let leg = firstring::calls::state::Leg {
+        action_id: "reserved-smoke".into(),
+        role: "sarah".into(),
+        kind: "probe".into(),
+        status: "unknown".into(),
+        acknowledged: false,
+        call_sid: None,
+    };
+    app.store
+        .reserve("session", "smoke", &leg, ExecutionMode::Live)
+        .await
+        .unwrap();
+    let (_, body) = get(app, "/api/state").await;
+    assert_eq!(body["phone_b"]["remaining_attempts"], 0);
+    assert_eq!(body["phone_b"]["can_request"], false);
+}
+
+#[tokio::test]
+async fn recorded_relay_failure_is_visible_without_erasing_inbound_proof() {
+    let app = App::new(inbound_config()).await.unwrap();
+    app.store.set_metadata("verification.relay_phone", r#"{"status":"failed","source":"manual_relay_rehearsal","recorded_at":"2026-11-08T03:19:13Z","error_code":64105}"#).await.unwrap();
+    let (_, body) = get(app, "/api/state").await;
+    assert_eq!(body["evidence"]["relay_phone"]["status"], "failed");
+    assert!(
+        body["evidence"]["relay_phone"]["detail"]
+            .as_str()
+            .unwrap()
+            .contains("64105")
+    );
 }

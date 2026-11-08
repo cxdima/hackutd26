@@ -2,9 +2,9 @@
 
 A Rust call-screening prototype for HackUTD 2026. A disclosed assistant screens unfamiliar callers, offers a private keypad choice, and withdraws that offer when the request changes. Rust owns permission and provider effects. The console shows actual actor events and separates real execution from authored replay.
 
-**Current checkpoint:** the first real inbound call passed **Nov 7 at 20:42 Central**: the user heard the disclosed assistant, pressed 1, and the signed events reconcile with Twilio's completed 15-second call. See [inbound evidence](docs/evidence/inbound-probe-2026-11-07.json). The user rated the initial voice poor; Say/Gather now uses `Polly.Joanna-Neural` / `en-US`, with a listening comparison pending. Phone B and Relay/model conversation remain unverified; M1 is not complete.
+**Current checkpoint, Nov 7 at 21:54 Central:** the latest manual call reached signed Relay setup and the user heard the ElevenLabs Rachel-v4 preset greeting. Two final clinic transcripts reached Rust, but trailing partial speech cancelled both model jobs and left the caller in silence. No native model completion or spoken reply was observed. This is partial transport/audio proof, **not a passed live conversation**. Earlier inbound greeting/keypad/terminal proof passed at 20:42; see [inbound evidence](docs/evidence/inbound-probe-2026-11-07.json).
 
-Local consent/revocation, model adapter, console and community logic are implemented. Hosted Nemotron native protocol passed, but held-out behavior passed only 3/12 composite cases; see [actual results](docs/verification.md). The purchased Photon line is configured. Runtime is `live` / `probe`, all three calling flags are false, and there are 0 outbound actions/reservations. Sarah's one authorized smoke attempt is unspent; `SARAH_TEST_E164` is the only missing core phone variable. The user's personal phone is caller A only. Family remains disabled and Brev is deferred.
+Hosted Nemotron native protocol passed separately. Caller-only model development passed 3/3; fresh frozen held-out behavior finished 7/12, a failed behavioral gate, not an accuracy claim. See [evaluation](docs/evaluation.md). Runtime is `live` / `relay`, caller A only, all three outbound flags false and 0 outbound actions/reservations. Phone B is unavailable. Local consent/revocation, private message persistence, model proposal/result traces and closing Say/Hangup are implemented and tested; audible reply, interruption, goodbye, handoff and family calls remain unverified. The 36 generated development audio clips are still unlistened. Initial submission is due **23:00 Central**.
 
 ## Run the verified local replay
 
@@ -23,9 +23,9 @@ Run benign consent, revoked consent, and the benign new-number control from the 
 
 A 58-second labeled replay video and sanitized screenshot are saved in `.tools/artifacts/`. See the [recording instructions](web/README.md) to reproduce them and the [verification record](docs/verification.md) for actual test outcomes.
 
-## Configure the real two-phone gate
+## Continue the caller-only voice gate
 
-See [where to obtain every environment value](docs/environment-setup.md). Preserve the existing `.env`, service, tunnel and ledger. Keep `VOICE_TRANSPORT=probe`, `DEMO_EXECUTION_MODE=live`, and all calling flags false for A-only testing. Designate Sarah / Phone B and configure `SARAH_TEST_E164` locally. Only when B is ready for the single authorized smoke attempt, enable `TEST_CALLS_AUTHORIZED` and restart; keep `HANDOFF_CALLS_ENABLED=false` and `FAMILY_CALLS_ENABLED=false`.
+See [environment setup](docs/environment-setup.md). Preserve the existing `.env`, service and ledger. Keep `VOICE_TRANSPORT=relay`, `DEMO_EXECUTION_MODE=live`, `TEST_CALLS_AUTHORIZED=false`, `HANDOFF_CALLS_ENABLED=false` and `FAMILY_CALLS_ENABLED=false`. The first Relay attempt failed with 64105; two later attempts failed at an expired Quick Tunnel before Rust. The replacement HTTP/2 tunnel now reached signed setup; speech finalization remains the active blocker. Rachel-v4 is a preset, not a clone; Joanna is the Say/Gather fallback.
 
 ```sh
 bash scripts/cargo.sh run --bin preflight
@@ -34,7 +34,7 @@ bash scripts/cargo.sh run --bin firstring
 
 The purchased Photon line, authenticated Twilio SIP Domain and public HTTPS origin are configured. The inbound Voice URL is `/voice/incoming`, with status notifications to `/voice/status`. All voice endpoints validate the Twilio signature using the configured URL; there is no validation bypass. An authenticated operator requests Phone B with its contact ID after A calls manually. The durable global smoke budget allows one attempt, including uncertain outcomes. Reset does not clear that reservation.
 
-Follow [provider preflight](docs/provider-preflight.md) and the remaining [phone checklist](docs/demo-runbook.md). Phone B delivery, Relay conversation, private handoff/revocation and family enrollment remain live gates. Do not enable a later calling mode until its external test scope is authorized.
+Follow [provider preflight](docs/provider-preflight.md) and the [caller-only checklist](docs/demo-runbook.md) for contextual follow-up, changed request, interruption and message goodbye. Phone B delivery, private handoff/revocation and family calling remain deferred. Do not enable a later calling mode until its endpoint and external test scope exist.
 
 The primary conversation transport is `VOICE_TRANSPORT=relay`; `gather` is the explicit turn-based fallback after a 30–45 minute Relay onboarding blocker. Gather pauses A while the private offer is pending, so it **does not demonstrate concurrent revocation**. Relay's optional undocumented speaker-event envelope still requires signed live capture; that subscription is disabled. Documented partial prompts and interruptions hold consent, while assistant diagnostics cannot cancel their own reply. No raw audio/SIP server is used.
 

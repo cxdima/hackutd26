@@ -16,6 +16,7 @@ Current primary provider documentation determines API syntax and account capabil
 - Neighborhood Firebreak shares expiring categorical tactic capsules among fictional households. Match tactics, not people; show the subscriber's actual applied version.
 - Rust owns policy, state, provider adapters, authorization and events. Default to Axum/Tokio, typed errors, tracing, `reqwest` and SQLite. Preserve an existing suitable stack.
 - The primary voice route is Photon SMS-number SIP → Twilio Programmable Voice/ConversationRelay → Rust. Prove transport first with Say/Gather and independent outbound DTMF. Then use Relay for the live Nemotron conversation; Gather is the fallback if Relay setup blocks.
+- Current authorized continuation: inbound Say/Gather transport is proven and Phone B is unavailable. Proceed with A-only Relay/Nemotron testing while all outbound flags remain false. Do not wait for a second handset, spend the unused Sarah attempt, or claim the private handoff/family phone gates passed.
 - Use the master guide's current Nemotron model/tool contract, subject to a real access probe. The NVIDIA speech skill does not configure LLM tool calling.
 - Do not build a SIP/RTP server, raw-audio pipeline, distributed workflow system, vector database or second model for the core. No post-bridge AI monitoring claim.
 - Use React/TypeScript/Vite if starting a new frontend. Readable live actions and real evidence matter more than decorative animation.

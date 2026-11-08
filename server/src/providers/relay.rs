@@ -5,6 +5,11 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use url::Url;
 
+// Twilio-managed preset TTS, not a voice clone or a separate reasoning agent.
+// https://www.twilio.com/docs/voice/conversationrelay/voice-configuration
+const TTS_PROVIDER: &str = "ElevenLabs";
+const TTS_VOICE: &str = "21m00Tcm4TlvDq8ikWAM-v4";
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RelayInput {
     Setup {
@@ -163,7 +168,7 @@ fn valid_sid(value: &str, prefix: &str) -> bool {
 
 pub fn connect_twiml(base_url: &str, session_token: &str, display_name: &str) -> String {
     let Ok(base) = public_origin(base_url) else {
-        return "<Response><Say>The assistant is temporarily unavailable.</Say><Hangup/></Response>".into();
+        return super::twilio::say_end("The assistant is temporarily unavailable.");
     };
     let mut ws = base.clone();
     // HTTPS and WSS share this configured public authority, independent of Host headers.
@@ -175,7 +180,7 @@ pub fn connect_twiml(base_url: &str, session_token: &str, display_name: &str) ->
     after.set_path("/voice/after-relay");
     let greeting = format!("I'm {display_name}'s automated assistant. What is the call about?");
     format!(
-        "<Response><Connect action=\"{}\" method=\"POST\"><ConversationRelay url=\"{}\" welcomeGreeting=\"{}\" interruptible=\"any\" reportInputDuringAgentSpeech=\"any\" dtmfDetection=\"true\" partialPrompts=\"true\" language=\"en-US\"><Parameter name=\"session_token\" value=\"{}\"/></ConversationRelay></Connect></Response>",
+        "<Response><Connect action=\"{}\" method=\"POST\"><ConversationRelay url=\"{}\" welcomeGreeting=\"{}\" interruptible=\"any\" reportInputDuringAgentSpeech=\"any\" dtmfDetection=\"true\" partialPrompts=\"true\" speechTimeout=\"1000\" language=\"en-US\" transcriptionProvider=\"Deepgram\" speechModel=\"nova-3-general\" ttsProvider=\"{TTS_PROVIDER}\" voice=\"{TTS_VOICE}\"><Parameter name=\"session_token\" value=\"{}\"/></ConversationRelay></Connect></Response>",
         escape(after.as_str()),
         escape(ws.as_str()),
         escape(&greeting),
@@ -350,6 +355,11 @@ mod tests {
         assert!(xml.contains("url=\"wss://firstring.example/voice/relay\""));
         assert!(xml.contains("reportInputDuringAgentSpeech=\"any\""));
         assert!(xml.contains("partialPrompts=\"true\""));
+        assert!(xml.contains("speechTimeout=\"1000\""));
+        assert!(xml.contains("transcriptionProvider=\"Deepgram\""));
+        assert!(xml.contains("speechModel=\"nova-3-general\""));
+        assert!(xml.contains("ttsProvider=\"ElevenLabs\""));
+        assert!(xml.contains("voice=\"21m00Tcm4TlvDq8ikWAM-v4\""));
         assert!(!xml.contains("speaker-events"));
         assert!(xml.contains("name=\"session_token\" value=\"opaque&lt;&amp;&quot;token\""));
         assert!(xml.contains("Sarah &amp; Maya"));

@@ -197,6 +197,18 @@ async fn native_assessment_result_is_returned_with_matching_id_before_validated_
     assert_eq!(snapshot["turns"][1]["text"], QUESTION);
     assert!(snapshot["legs"].as_array().unwrap().is_empty());
     let events = app.store.events_after(0).await.unwrap();
+    let measurements: Vec<_> = events
+        .iter()
+        .filter(|e| e.kind == "model.request.completed")
+        .collect();
+    assert_eq!(measurements.len(), 2);
+    assert!(
+        measurements
+            .iter()
+            .all(|e| e.payload["boundary"] == "model_http"
+                && e.payload["heard"] == false
+                && e.payload["observation"]["elapsed_ms"].is_number())
+    );
     let spoken: Vec<_> = events
         .iter()
         .filter(|e| e.kind == "audio.requested")
@@ -252,6 +264,13 @@ async fn cancellation(end: bool) {
     assert_eq!(snapshot["speech_pending"], true);
     assert_eq!(snapshot["inbound_ended"], end);
     let events = app.store.events_after(0).await.unwrap();
+    if !end {
+        let cancelled = events.iter().find(|e| e.kind == "model.cancelled")
+            .expect("An in-flight model task aborted by caller speech needs an observed cancellation receipt");
+        assert_eq!(cancelled.payload["reason"], "caller_speech");
+        assert_eq!(cancelled.payload["generation_id"], 1);
+        assert!(!cancelled.payload.to_string().contains("Wait, I changed"));
+    }
     assert!(
         !events
             .iter()

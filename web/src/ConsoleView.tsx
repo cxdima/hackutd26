@@ -22,9 +22,11 @@ import {
 } from "lucide-react";
 import {
   confirmedMatches,
+  decisionEvidence,
   displayName,
   legEvidence,
   legStatus,
+  modelHttpEvidence,
   shortId,
   timeLabel,
 } from "./model";
@@ -41,6 +43,10 @@ export interface ViewProps {
 const readable = (value: string) => value.replaceAll("_", " ");
 const terminal = ["completed", "busy", "failed", "no-answer", "canceled"];
 const eventNames: Record<string, string> = {
+  "agent.tool.proposed": "Model proposed a tool",
+  "agent.tool.result": "Rust execution result",
+  "model.request.completed": "Model HTTP request completed",
+  "model.cancelled": "Model job cancelled",
   "message.recorded": "Private message saved",
   "call.inbound.received": "Incoming call received",
   "voice.connected": "Conversation connected",
@@ -158,9 +164,35 @@ export function ConsoleView({
   const sessionReplay = active?.execution_mode === "replay";
   const withdrawn = active?.offer?.status === "revoked";
   const name = displayName(active?.household_id ?? state.selected_household);
-  const liveCaps = state.capabilities.filter(
-    (cap) => cap.status === "verified",
+  const configured = state.capabilities.filter(
+    (cap) =>
+      ["inbound", "outbound", "nemotron", "relay"].includes(cap.id) &&
+      cap.status === "configured",
   ).length;
+  const phoneBReady =
+    !!state.phone_b &&
+    state.phone_b.enrolled &&
+    state.phone_b.enabled &&
+    state.phone_b.authorized &&
+    state.phone_b.remaining_attempts > 0 &&
+    state.phone_b.can_request &&
+    !!active &&
+    active.execution_mode === "live" &&
+    active.household_id === "sarah" &&
+    !active.inbound_ended &&
+    !active.legs.some((leg) => leg.kind === "probe");
+  const phoneBReason = !state.phone_b
+    ? "Enrollment and attempt budget have not been received."
+    : !state.phone_b.can_request
+      ? state.phone_b.reason
+      : !active ||
+          sessionReplay ||
+          active.household_id !== "sarah" ||
+          active.inbound_ended
+        ? "An active live Sarah session is required."
+        : active.legs.some((leg) => leg.kind === "probe")
+          ? "This session already has a reserved probe."
+          : state.phone_b.reason;
   const allEnded =
     active?.inbound_ended &&
     active.legs.every((leg) => terminal.includes(leg.status));
@@ -169,6 +201,21 @@ export function ConsoleView({
     void onAction(path, body);
   };
   const lastReceipt = sessionEvents.at(-1);
+  const decision = active ? decisionEvidence(active, sessionEvents) : undefined;
+  const modelHttp = active
+    ? modelHttpEvidence(active, sessionEvents)
+    : undefined;
+  const toolNames: Record<string, string> = {
+    record_assessment: "Assess the caller’s request",
+    ask_caller: "Ask a follow-up",
+    offer_handoff: "Offer a private handoff",
+    take_message: "Save a private message",
+    lookup_tactics: "Look up similar tactics",
+    lookup_trusted_contact: "Look up an enrolled contact",
+    start_trusted_callback: "Request an independent contact",
+  };
+  const supportingQuote =
+    decision?.assessment?.evidence_refs[0]?.quote ?? active?.evidence_quote;
   const applied =
     state.community.find((h) => h.household_id === active?.household_id)
       ?.last_applied_version ?? 0;
@@ -208,14 +255,12 @@ export function ConsoleView({
         <div className="line-state">
           <span className={`mode-pill ${replay ? "replay" : "live"}`}>
             {replay ? <Play size={13} /> : <Radio size={13} />}
-            {replay ? "Replay" : "Live execution"}
+            {replay ? "Replay" : "Execution mode: live"}
           </span>
           <span>
             {replay
               ? "Authored scenarios · no phone calls"
-              : liveCaps
-                ? "Provider receipts available"
-                : "Provider verification pending"}
+              : "Verification is shown separately below"}
           </span>
         </div>
         <div className="household-select">
@@ -232,6 +277,43 @@ export function ConsoleView({
             <option value="maya">Maya</option>
           </select>
         </div>
+      </section>
+      <section
+        className="verification-strip"
+        aria-label="Configuration and verification"
+      >
+        <div role="group" aria-label="Local configuration">
+          <strong>Local configuration</strong>
+          <span className="proof-status">{configured}/4 inputs configured</span>
+          <p>Credentials and routes only. See Evidence &amp; setup.</p>
+        </div>
+        {(
+          [
+            ["model_protocol", "Model protocol"],
+            ["inbound_phone", "Real inbound phone"],
+            ["relay_phone", "Live Relay conversation"],
+          ] as const
+        ).map(([key, label]) => {
+          const proof = state.evidence?.[key];
+          return (
+            <div role="group" aria-label={label} key={key}>
+              <strong>{label}</strong>
+              <span className={`proof-status ${proof?.status ?? "pending"}`}>
+                {proof?.status === "passed"
+                  ? "Recorded pass"
+                  : proof?.status === "failed"
+                    ? "Recorded failure"
+                    : "Pending"}
+              </span>
+              <p>{proof?.detail ?? "No verified receipt received."}</p>
+              {proof?.recorded_at && (
+                <time dateTime={proof.recorded_at}>
+                  Recorded {new Date(proof.recorded_at).toLocaleString()}
+                </time>
+              )}
+            </div>
+          );
+        })}
       </section>
       {stale && (
         <div className="notice warning" role="status">
@@ -323,22 +405,29 @@ export function ConsoleView({
                 </p>
               </div>
             )}
-            {active?.speech_pending && partialText && (
-              <article className="turn partial">
-                <p className="speaker">
-                  Caller <span>Still speaking</span>
-                </p>
-                <p className="turn-text">{partialText}</p>
-              </article>
-            )}
+            {active?.speech_pending &&
+              !active.inbound_ended &&
+              !active.closing_reason &&
+              partialText && (
+                <article className="turn partial">
+                  <p className="speaker">
+                    Caller <span>Still speaking</span>
+                  </p>
+                  <p className="turn-text">{partialText}</p>
+                </article>
+              )}
           </div>
           <div className="panel-foot">
             <span className="tiny-dot" />
-            {active?.speech_pending
-              ? "New speech · choice on hold"
-              : active
-                ? `${active.turns.length} committed ${active.turns.length === 1 ? "turn" : "turns"}`
-                : "Transcript appears from received events"}
+            {active?.inbound_ended
+              ? "Caller ended"
+              : active?.closing_reason === "message_saved"
+                ? "Message saved; goodbye pending"
+                : active?.speech_pending
+                  ? "New speech · choice on hold"
+                  : active
+                    ? `${active.turns.length} committed ${active.turns.length === 1 ? "turn" : "turns"}`
+                    : "Transcript appears from received events"}
           </div>
         </section>
         <section
@@ -360,33 +449,131 @@ export function ConsoleView({
           </div>
           <div className="decision-body">
             <h2 id="decision-heading">
-              {active?.current_action ??
-                (replay
-                  ? "See how a choice can change."
-                  : "Waiting for the first ring.")}
+              {allEnded
+                ? "Call ended"
+                : (active?.current_action ??
+                  (replay
+                    ? "See how a choice can change."
+                    : "Waiting for the first ring."))}
             </h2>
             <p className="decision-context">
               {active
-                ? active.speech_pending
-                  ? "New caller speech is being assessed. A pending choice cannot connect yet."
-                  : withdrawn
-                    ? "The request changed while the choice was pending."
-                    : active.message
-                      ? "A minimized message is saved for this household’s review."
-                      : active.state === "bridged" ||
-                          active.state === "connected"
-                        ? "The approved human conversation has begun. Screening has ended."
-                        : "A private handoff requires a current choice from the intended recipient."
+                ? active.closing_reason === "message_saved"
+                  ? active.inbound_ended
+                    ? "A private message is saved and the call has ended. Goodbye playback remains unverified."
+                    : "A private message is saved. Goodbye delivery and call completion still need their own receipts."
+                  : active.inbound_ended
+                    ? "The caller has ended. Any independent contact outcome is shown separately."
+                    : active.speech_pending
+                      ? "Waiting for the caller to finish. A pending choice cannot connect yet."
+                      : withdrawn
+                        ? "The request changed while the choice was pending."
+                        : active.message
+                          ? "A minimized message is saved for this household’s review."
+                          : active.state === "bridged" ||
+                              active.state === "connected"
+                            ? "The approved human conversation has begun. Screening has ended."
+                            : "A private handoff requires a current choice from the intended recipient."
                 : replay
                   ? "Explore the private handoff, then the moment a new request withdraws it."
                   : `FirstRing will ask what the caller needs before offering ${name} a private choice.`}
             </p>
-            {active?.evidence_quote && (
+            {active && (
+              <dl className="decision-trace">
+                <div>
+                  <dt>Accepted assessment</dt>
+                  <dd>
+                    {decision?.assessment
+                      ? `${readable(decision.assessment.observation.speech_act)} · ${readable(decision.assessment.observation.requested_object)} · ${readable(decision.assessment.observation.direction).replace("sarah", name)}`
+                      : active.turns.some((turn) => turn.speaker === "caller")
+                        ? "No accepted assessment for the current turn."
+                        : "No committed caller words yet."}
+                  </dd>
+                </div>
+                <div>
+                  <dt>
+                    {decision?.proposal?.legacy
+                      ? "Earlier proposal (turn not recorded)"
+                      : "Proposed action"}
+                  </dt>
+                  <dd>
+                    {decision?.proposal
+                      ? (toolNames[decision.proposal.name] ??
+                        readable(decision.proposal.name))
+                      : "No model proposal received for this turn."}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Actual execution outcome</dt>
+                  <dd>{decision?.outcome}</dd>
+                </div>
+              </dl>
+            )}
+            {supportingQuote && (
               <div className="evidence-quote">
-                <span>What changed the action</span>
-                <blockquote>“{active.evidence_quote}”</blockquote>
+                <span>
+                  {decision?.assessment
+                    ? "Supporting caller words"
+                    : "Last recorded caller evidence"}
+                </span>
+                <blockquote>“{supportingQuote}”</blockquote>
                 <p>
                   <ArrowDownLeft size={13} /> From the caller’s committed words
+                </p>
+              </div>
+            )}
+            {modelHttp && (
+              <div
+                role="group"
+                aria-label="Model HTTP observation"
+                className="model-observation"
+              >
+                <dl className="decision-trace">
+                  <div>
+                    <dt>Model HTTP observation</dt>
+                    <dd>
+                      {modelHttp.completed ? (
+                        <>
+                          <span style={{ overflowWrap: "anywhere" }}>
+                            {modelHttp.completed.observation.response_model ??
+                              "Response model not reported"}
+                          </span>
+                          <br />
+                          {readable(
+                            modelHttp.completed.observation.outcome,
+                          )} · {modelHttp.completed.observation.elapsed_ms} ms
+                          <br />
+                          Turn {modelHttp.completed.turn_version} · generation{" "}
+                          {modelHttp.completed.generation_id}
+                          <br />
+                          {modelHttp.current
+                            ? "Current turn and generation"
+                            : "Earlier turn or generation"}
+                          {modelHttp.cancelledGeneration !== undefined && (
+                            <>
+                              <br />
+                              Model job later cancelled
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          No completed HTTP observation received.
+                          {modelHttp.cancelledGeneration !== undefined && (
+                            <>
+                              <br />
+                              Model job cancelled · generation{" "}
+                              {modelHttp.cancelledGeneration}
+                            </>
+                          )}
+                        </>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="offer-note">
+                  HTTP timing; audible response unverified. This is not an
+                  accepted assessment or execution receipt.
                 </p>
               </div>
             )}
@@ -596,7 +783,11 @@ export function ConsoleView({
               <PhoneCall size={16} />
               <div>
                 <strong>Designated test phones</strong>
-                <span>Actions use the server’s enrolled contacts.</span>
+                <span id="phone-b-reason">
+                  {phoneBReason}
+                  {state.phone_b &&
+                    ` Attempt budget remaining: ${state.phone_b.remaining_attempts}.`}
+                </span>
               </div>
             </>
           )}
@@ -630,8 +821,10 @@ export function ConsoleView({
             </>
           ) : (
             <button
-              disabled={disabled || !active || sessionReplay}
+              disabled={disabled || !phoneBReady}
+              aria-describedby="phone-b-reason"
               onClick={() =>
+                phoneBReady &&
                 active &&
                 send("/api/demo/probe", {
                   session_id: active.id,

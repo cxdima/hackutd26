@@ -1,0 +1,9 @@
+{
+  "frozen_at_utc": "2026-11-08T03:03:24.498031+00:00",
+  "fixture": "fixtures/language-held-out-v2.json",
+  "sha256": "e46307acd45870616e6b964fe158117fac234820cdc22f7ee5aa316de4452c79",
+  "before_prompt_tuning": true,
+  "before_model_execution": true,
+  "source": "authored synthetic cases, independent expected outcomes",
+  "original_held_out_status": "preserved unchanged; now regression data"
+}

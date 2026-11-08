@@ -1,0 +1,13 @@
+{
+  "frozen_at_utc": "2026-11-08T03:17:21.049080+00:00",
+  "before_held_out_execution": true,
+  "prompt_tuned_only_on_development": true,
+  "files": {
+    "server/src/providers/nemotron.rs": "267bc140192079c0cc12dd2981365e6472adc6f8f760c22e5c6474bae9939bc5",
+    "server/src/bin/preflight.rs": "094087f71205cc12a4053845d932e1ed305dba4df1b33e3fab07bc1c53c9e913",
+    "fixtures/language-held-out-v2.json": "e46307acd45870616e6b964fe158117fac234820cdc22f7ee5aa316de4452c79"
+  },
+  "request_timeout_ms": 3500,
+  "turn_deadline_ms": 6000,
+  "max_steps": 4
+}

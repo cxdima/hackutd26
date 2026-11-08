@@ -24,6 +24,36 @@ export const eventSchema = z.object({
   payload: z.record(z.string(), z.unknown()),
 });
 export type CallEvent = z.infer<typeof eventSchema>;
+const observationSchema = z.object({
+  speech_act: z.enum([
+    "request",
+    "statement",
+    "negation",
+    "quotation",
+    "unclear",
+  ]),
+  requested_object: z.enum([
+    "authentication_secret",
+    "appointment_reference",
+    "payment",
+    "payment_diversion",
+    "remote_access",
+    "routine_information",
+    "unknown",
+  ]),
+  direction: z.enum([
+    "caller_requests_from_sarah",
+    "caller_supplies",
+    "none",
+    "unclear",
+  ]),
+});
+export const assessmentSchema = z.object({
+  turn_version: z.number().int().nonnegative(),
+  generation_id: z.number().int().nonnegative(),
+  observation: observationSchema,
+  evidence_refs: z.array(z.object({ turn_id: z.string(), quote: z.string() })),
+});
 export const sessionSchema = z.object({
   id: z.string(),
   household_id: z.string(),
@@ -32,8 +62,12 @@ export const sessionSchema = z.object({
   generation_id: z.number(),
   speech_pending: z.boolean(),
   inbound_ended: z.boolean(),
+  closing_reason: z.string().nullable().optional(),
   current_action: z.string(),
   evidence_quote: z.string().nullable(),
+  turn_version: z.number().int().nonnegative().optional(),
+  assessed_version: z.number().int().nonnegative().optional(),
+  assessments: z.array(assessmentSchema).optional(),
   message: z
     .object({
       summary: z.string(),
@@ -60,12 +94,35 @@ export const sessionSchema = z.object({
   data_origin: z.string(),
 });
 export type Session = z.infer<typeof sessionSchema>;
+const proofSchema = z.object({
+  status: z.enum(["pending", "passed", "failed"]),
+  detail: z.string(),
+  recorded_at: z.string().nullable().optional(),
+  source: z.string().optional(),
+});
 export const stateSchema = z.object({
   execution_mode: mode,
   data_origin: z.string(),
   transport: z.string(),
   phone_display: z.string(),
   selected_household: z.string(),
+  evidence: z
+    .object({
+      model_protocol: proofSchema,
+      inbound_phone: proofSchema,
+      relay_phone: proofSchema,
+    })
+    .optional(),
+  phone_b: z
+    .object({
+      enrolled: z.boolean(),
+      enabled: z.boolean(),
+      authorized: z.boolean(),
+      remaining_attempts: z.number().int().nonnegative(),
+      can_request: z.boolean(),
+      reason: z.string(),
+    })
+    .optional(),
   capabilities: z.array(
     z.object({
       id: z.string(),

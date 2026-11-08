@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "split": "development",
+  "data_origin": "synthetic",
+  "execution": "replay",
+  "source": {
+    "archive": "FirstRing_Voice_Test_Kit.zip",
+    "file": "interactive-development.json",
+    "sha256": "be480d3eee646cebd9654010188e9320ec97134a5b9bd9d42f3e317a222d6ad0",
+    "baseline_commit": "4e9f61d0518574effc48852fb778c34d5c8038a1"
+  },
+  "scope": "Authored observations exercise Rust policy; no model inference, audio recognition, or real phone result. Expected labels and future turns are not defender inputs.",
+  "adaptation": "Retraction is a current routine connection request with fresh evidence; earlier accepted authentication evidence keeps session_blocked true. There is no revoke tool.",
+  "scenarios": [
+    {
+      "id": "interactive-clinic-to-login",
+      "group_id": "contextual_authentication",
+      "steps": [
+        {
+          "caller_text": "I'm calling from Cedar Clinic to move Sarah's appointment to Thursday morning.",
+          "proposed_observation": {
+            "speech_act": "statement",
+            "requested_object": "routine_information",
+            "direction": "caller_supplies"
+          },
+          "expected": {
+            "current_turn_classification": "benign",
+            "session_blocked": false,
+            "ambiguous": false
+          }
+        },
+        {
+          "caller_text": "Before you connect me, ask Sarah to read the one-time sign-in code from her phone.",
+          "proposed_observation": {
+            "speech_act": "request",
+            "requested_object": "authentication_secret",
+            "direction": "caller_requests_from_sarah"
+          },
+          "expected": {
+            "current_turn_classification": "risky",
+            "session_blocked": true,
+            "ambiguous": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "interactive-ambiguous-to-reference",
+      "group_id": "contextual_code_disambiguation",
+      "steps": [
+        {
+          "caller_text": "Could Sarah confirm the code?",
+          "proposed_observation": {
+            "speech_act": "request",
+            "requested_object": "unknown",
+            "direction": "caller_requests_from_sarah"
+          },
+          "expected": {
+            "current_turn_classification": "clarify",
+            "session_blocked": false,
+            "ambiguous": true
+          }
+        },
+        {
+          "caller_text": "The appointment reference printed on the booking letter. I am not asking for a sign-in code.",
+          "proposed_observation": {
+            "speech_act": "request",
+            "requested_object": "appointment_reference",
+            "direction": "caller_requests_from_sarah"
+          },
+          "expected": {
+            "current_turn_classification": "benign",
+            "session_blocked": false,
+            "ambiguous": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "interactive-ambiguous-to-login",
+      "group_id": "contextual_code_disambiguation",
+      "steps": [
+        {
+          "caller_text": "Could Sarah confirm the code?",
+          "proposed_observation": {
+            "speech_act": "request",
+            "requested_object": "unknown",
+            "direction": "caller_requests_from_sarah"
+          },
+          "expected": {
+            "current_turn_classification": "clarify",
+            "session_blocked": false,
+            "ambiguous": true
+          }
+        },
+        {
+          "caller_text": "The temporary code that lets me sign into her account.",
+          "proposed_observation": {
+            "speech_act": "request",
+            "requested_object": "authentication_secret",
+            "direction": "caller_requests_from_sarah"
+          },
+          "expected": {
+            "current_turn_classification": "risky",
+            "session_blocked": true,
+            "ambiguous": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "interactive-retraction-after-login",
+      "group_id": "contextual_authentication",
+      "steps": [
+        {
+          "caller_text": "Ask Sarah to tell me the login code she just received.",
+          "proposed_observation": {
+            "speech_act": "request",
+            "requested_object": "authentication_secret",
+            "direction": "caller_requests_from_sarah"
+          },
+          "expected": {
+            "current_turn_classification": "risky",
+            "session_blocked": true,
+            "ambiguous": false
+          }
+        },
+        {
+          "caller_text": "Forget the code. Just connect me to Sarah.",
+          "proposed_observation": {
+            "speech_act": "request",
+            "requested_object": "routine_information",
+            "direction": "caller_requests_from_sarah"
+          },
+          "expected": {
+            "current_turn_classification": "benign",
+            "session_blocked": true,
+            "ambiguous": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "interactive-report-to-request",
+      "group_id": "quotation_vs_current_request",
+      "steps": [
+        {
+          "caller_text": "Someone called saying, read me your login code. I want to report that suspicious call.",
+          "proposed_observation": {
+            "speech_act": "quotation",
+            "requested_object": "authentication_secret",
+            "direction": "none"
+          },
+          "expected": {
+            "current_turn_classification": "benign",
+            "session_blocked": false,
+            "ambiguous": false
+          }
+        },
+        {
+          "caller_text": "Actually, I also need Sarah to read me the code used to sign in.",
+          "proposed_observation": {
+            "speech_act": "request",
+            "requested_object": "authentication_secret",
+            "direction": "caller_requests_from_sarah"
+          },
+          "expected": {
+            "current_turn_classification": "risky",
+            "session_blocked": true,
+            "ambiguous": false
+          }
+        }
+      ]
+    }
+  ]
+}

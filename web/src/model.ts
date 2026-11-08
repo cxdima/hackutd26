@@ -1,5 +1,171 @@
 import { matchSchema } from "./types";
-import type { CallEvent, Leg, TacticMatch } from "./types";
+import type { CallEvent, Leg, Session, TacticMatch } from "./types";
+import { z } from "zod";
+
+const httpObservation = z.object({
+  generation_id: z.number().int().nonnegative(),
+  turn_version: z.number().int().nonnegative(),
+  boundary: z.literal("model_http"),
+  heard: z.literal(false),
+  observation: z.object({
+    response_model: z.string().max(200).nullable(),
+    elapsed_ms: z.number().int().nonnegative(),
+    outcome: z.enum([
+      "success",
+      "timeout",
+      "authentication",
+      "authorization",
+      "rate_limit_or_quota",
+      "request_schema",
+      "model_or_endpoint",
+      "provider",
+      "transport",
+      "configuration",
+      "schema",
+    ]),
+  }),
+});
+
+export function modelHttpEvidence(session: Session, events: CallEvent[]) {
+  const relevant = events
+    .filter(
+      (event) =>
+        event.session_id === session.id &&
+        event.execution_mode === session.execution_mode,
+    )
+    .sort((a, b) => a.sequence - b.sequence);
+  const completed = relevant
+    .flatMap((event) => {
+      if (event.type !== "model.request.completed") return [];
+      const parsed = httpObservation.safeParse(event.payload);
+      return parsed.success
+        ? [{ ...parsed.data, sequence: event.sequence }]
+        : [];
+    })
+    .at(-1);
+  const cancelled = relevant.findLast(
+    (event) =>
+      event.type === "model.cancelled" &&
+      Number.isInteger(event.payload.generation_id) &&
+      Number(event.payload.generation_id) >= 0 &&
+      (!completed ||
+        (event.sequence > completed.sequence &&
+          event.payload.generation_id === completed.generation_id)),
+  );
+  return {
+    completed,
+    cancelledGeneration: cancelled
+      ? Number(cancelled.payload.generation_id)
+      : undefined,
+    current:
+      !!completed &&
+      completed.generation_id === session.generation_id &&
+      completed.turn_version === session.turn_version,
+  };
+}
+
+export function decisionEvidence(session: Session, events: CallEvent[]) {
+  const messageClosing =
+    session.closing_reason === "message_saved" &&
+    session.message != null &&
+    session.turn_version !== undefined &&
+    session.message?.turn_version === session.turn_version;
+  const matchesGeneration = (generation: unknown) =>
+    generation === session.generation_id ||
+    (messageClosing &&
+      typeof generation === "number" &&
+      generation + 1 === session.generation_id);
+  const assessment =
+    (!session.speech_pending || messageClosing) &&
+    session.turn_version !== undefined &&
+    session.assessed_version === session.turn_version
+      ? session.assessments?.findLast(
+          (item) =>
+            item.turn_version === session.turn_version &&
+            matchesGeneration(item.generation_id) &&
+            item.evidence_refs.some((reference) =>
+              session.turns.some(
+                (turn) =>
+                  turn.speaker === "caller" &&
+                  turn.id === reference.turn_id &&
+                  reference.quote.length > 0 &&
+                  turn.text.includes(reference.quote),
+              ),
+            ),
+        )
+      : undefined;
+  const sameSession = events
+    .filter(
+      (event) =>
+        event.session_id === session.id &&
+        event.execution_mode === session.execution_mode,
+    )
+    .sort((a, b) => a.sequence - b.sequence);
+  const current = sameSession.filter(
+    (event) =>
+      matchesGeneration(event.payload.generation_id) &&
+      event.payload.turn_version === session.turn_version &&
+      session.turn_version !== undefined,
+  );
+  const proposed = current.findLast(
+    (event) =>
+      event.type === "agent.tool.proposed" &&
+      typeof event.payload.name === "string",
+  );
+  const legacy = proposed
+    ? undefined
+    : sameSession.findLast(
+        (event) =>
+          event.type === "agent.tool.proposed" &&
+          typeof event.payload.name === "string" &&
+          event.payload.generation_id === undefined &&
+          event.payload.turn_version === undefined,
+      );
+  const proposal = proposed
+    ? { name: String(proposed.payload.name), legacy: false }
+    : legacy
+      ? { name: String(legacy.payload.name), legacy: true }
+      : undefined;
+  const receipt =
+    proposed &&
+    current.findLast(
+      (event) =>
+        event.type === "agent.tool.result" &&
+        event.sequence > proposed.sequence &&
+        event.payload.generation_id === proposed.payload.generation_id &&
+        event.payload.name === proposed.payload.name &&
+        typeof event.payload.ok === "boolean",
+    );
+  let outcome = "No execution result received.";
+  if (receipt?.payload.ok === false)
+    outcome = "Rust reported a failure; check the action receipts.";
+  if (receipt?.payload.ok === true) {
+    const result = receipt.payload.result;
+    const value =
+      result && typeof result === "object" && !Array.isArray(result)
+        ? (result as Record<string, unknown>)
+        : {};
+    if (value.message_recorded === true)
+      outcome = "Private message saved for review.";
+    else if (value.audio_requested === true)
+      outcome = "Reply queued; caller playback is unverified.";
+    else if (value.acknowledged === true)
+      outcome = "Contact acknowledgement recorded.";
+    else if (proposal?.name === "offer_handoff")
+      outcome = "Private offer created; phone receipts are shown separately.";
+    else if (proposal?.name === "start_trusted_callback")
+      outcome =
+        "Independent contact request accepted; no acknowledgement implied.";
+    else if (proposal?.name === "record_assessment")
+      outcome = "Assessment accepted by Rust.";
+    else if (proposal?.name === "lookup_trusted_contact")
+      outcome = "Enrolled directory lookup completed; no call requested.";
+    else if (proposal?.name === "lookup_tactics")
+      outcome = "Tactic lookup completed; matches require their own receipt.";
+    else outcome = "Tool completed; no phone outcome implied.";
+  }
+  return { assessment, proposal, outcome };
+}
 
 export function legStatus(leg: Leg): string {
   if (leg.acknowledged) return "Acknowledged by keypad";
