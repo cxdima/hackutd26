@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/readme/hero.webp" width="100%" alt="FirstRing: Ringo the sea lion balances a lime ring on its nose; a noisy waveform from the left becomes a calm line as it reaches the ring. Stack: Rust, Axum, Tokio, SQLite; Photon SIP to Twilio ConversationRelay; NVIDIA Nemotron 3.5 Lightning 30B-A3B; Brev H100 with vLLM and NVFP4; Angular console.">
+<img src="docs/readme/hero-v2.webp" width="100%" alt="FirstRing: Ringo the sea lion balances a lime ring on its nose; a noisy waveform from the left becomes a calm line as it reaches the ring. Stack: Rust, Axum, Tokio, SQLite; Photon SIP to Twilio ConversationRelay; NVIDIA Nemotron 3.5 Lightning 30B-A3B; Brev H100 with vLLM and NVFP4; Angular console.">
 
 <br>
 
@@ -179,7 +179,7 @@ sequenceDiagram
 
 <br>
 
-<img src="docs/readme/banner-voice.webp" width="100%" alt="02 Voice pipeline: Ringo wearing a headset balances the lime ring on its nose while sound waves flow into it.">
+<img src="docs/readme/banner-voice-v2.webp" width="100%" alt="02 Voice pipeline: Ringo wearing a headset balances the lime ring on its nose while sound waves flow into it.">
 
 ## 02 · Voice pipeline
 
@@ -304,7 +304,7 @@ Robot calls run under a durable allowance (**26 total, 19 used**, one at a time,
 
 <br>
 
-<img src="docs/readme/banner-nvidia.webp" width="100%" alt="03 NVIDIA inference: Ringo balances the lime ring on its nose while light from a GPU accelerator card arcs into it.">
+<img src="docs/readme/banner-nvidia-v2.webp" width="100%" alt="03 NVIDIA inference: Ringo balances the lime ring on its nose while light from a GPU accelerator card arcs into it.">
 
 ## 03 · NVIDIA Nemotron on Brev
 
@@ -452,7 +452,7 @@ A phone conversation feels broken after roughly two seconds of silence, and ever
 
 <br>
 
-<img src="docs/readme/banner-safety.webp" width="100%" alt="05 Policy and safety: a jagged magenta waveform stops at the ring Ringo balances on its nose; a calm lime line continues on the other side.">
+<img src="docs/readme/banner-safety-v2.webp" width="100%" alt="05 Policy and safety: a jagged magenta waveform stops at the ring Ringo balances on its nose; a calm lime line continues on the other side.">
 
 ## 05 · Policy and safety
 
