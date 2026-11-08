@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { ConsoleView } from "./ConsoleView";
-import type { ConsoleState } from "./types";
+import { stateSchema, type ConsoleState } from "./types";
 const state: ConsoleState = {
   execution_mode: "replay",
   data_origin: "synthetic",
@@ -128,4 +128,47 @@ it("cannot request a live probe for a historical replay session", () => {
     />,
   );
   expect(screen.getByRole("button", { name: "Call Phone B" })).toBeDisabled();
+});
+
+it("shows a persisted message only in the private view without claiming it was delivered", () => {
+  const messageState = stateSchema.parse({
+    ...state,
+    sessions: [
+      {
+        ...state.sessions[0],
+        offer: null,
+        legs: [],
+        message: {
+          summary: "Caller asks to reschedule the clinic visit.",
+          recorded_at: "2026-11-08T00:00:00Z",
+          turn_version: 1,
+          evidence_turn_ids: ["t1"],
+        },
+      },
+    ],
+  });
+  render(
+    <ConsoleView
+      state={messageState}
+      events={[]}
+      stale={false}
+      busy={null}
+      onAction={vi.fn()}
+    />,
+  );
+  const heading = screen.getByRole("heading", {
+    name: "Saved message for Sarah",
+  });
+  expect(heading.closest(".private-panel")).toHaveTextContent(
+    "Caller asks to reschedule the clinic visit.",
+  );
+  expect(
+    screen.getByText(
+      "Caller identity unverified. Saved for review; not a delivery receipt.",
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("Acknowledged by keypad")).not.toBeInTheDocument();
+  expect(document.querySelector(".community-strip")).not.toHaveTextContent(
+    "reschedule",
+  );
 });

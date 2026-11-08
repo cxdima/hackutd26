@@ -41,6 +41,7 @@ export interface ViewProps {
 const readable = (value: string) => value.replaceAll("_", " ");
 const terminal = ["completed", "busy", "failed", "no-answer", "canceled"];
 const eventNames: Record<string, string> = {
+  "message.recorded": "Private message saved",
   "call.inbound.received": "Incoming call received",
   "voice.connected": "Conversation connected",
   "handoff.offered": "Private choice offered",
@@ -370,9 +371,12 @@ export function ConsoleView({
                   ? "New caller speech is being assessed. A pending choice cannot connect yet."
                   : withdrawn
                     ? "The request changed while the choice was pending."
-                    : active.state === "bridged" || active.state === "connected"
-                      ? "The approved human conversation has begun. Screening has ended."
-                      : "A private handoff requires a current choice from the intended recipient."
+                    : active.message
+                      ? "A minimized message is saved for this household’s review."
+                      : active.state === "bridged" ||
+                          active.state === "connected"
+                        ? "The approved human conversation has begun. Screening has ended."
+                        : "A private handoff requires a current choice from the intended recipient."
                 : replay
                   ? "Explore the private handoff, then the moment a new request withdraws it."
                   : `FirstRing will ask what the caller needs before offering ${name} a private choice.`}
@@ -402,6 +406,16 @@ export function ConsoleView({
               <LockKeyhole size={17} /> The private side
             </h2>
           </div>
+          {active?.message && (
+            <article className="offer" aria-label="Private saved message">
+              <h3>Saved message for {name}</h3>
+              <blockquote>{active.message.summary}</blockquote>
+              <p className="offer-note">
+                Caller identity unverified. Saved for review; not a delivery
+                receipt.
+              </p>
+            </article>
+          )}
           {active?.offer ? (
             <article className={`offer ${withdrawn ? "withdrawn" : ""}`}>
               <div className="offer-label">
@@ -431,7 +445,7 @@ export function ConsoleView({
                     : "This offer is no longer awaiting a choice."}
               </p>
             </article>
-          ) : (
+          ) : !active?.message ? (
             <div className="empty-private">
               <span className="private-illustration">
                 <Phone size={27} strokeWidth={1.3} />
@@ -445,7 +459,7 @@ export function ConsoleView({
                 caller stays on their own line.
               </p>
             </div>
-          )}
+          ) : null}
           <div className="phone-legs">
             {active?.legs.map((leg) => (
               <PhoneLeg

@@ -56,6 +56,13 @@ pub struct Offer {
     pub leg_id: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RecordedMessage {
+    pub summary: String,
+    pub recorded_at: String,
+    pub turn_version: u64,
+    pub evidence_turn_ids: Vec<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Session {
     pub id: String,
     pub household_id: String,
@@ -68,6 +75,8 @@ pub struct Session {
     pub current_action: String,
     pub evidence_quote: Option<String>,
     pub offer: Option<Offer>,
+    #[serde(default)]
+    pub message: Option<RecordedMessage>,
     pub legs: Vec<Leg>,
     pub execution_mode: ExecutionMode,
     pub data_origin: String,
@@ -130,6 +139,7 @@ impl Session {
             current_action: "Listening to the caller".into(),
             evidence_quote: None,
             offer: None,
+            message: None,
             legs: vec![],
             execution_mode: mode,
             data_origin: "synthetic".into(),
@@ -230,6 +240,77 @@ impl Session {
             !require_current || evidence.iter().any(|e| e.turn_id == current.id),
             "Assessment needs evidence from the current turn"
         );
+        Ok(())
+    }
+    pub fn record_message(
+        &mut self,
+        summary: &str,
+        evidence: &[crate::tools::EvidenceRef],
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            !self.speech_pending
+                && !self.inbound_ended
+                && !self.bridge_committed
+                && self.turn_version > 0
+                && self.assessed_version == self.turn_version,
+            "Assess the current turn before completing a message"
+        );
+        self.evidence_valid(evidence, true)?;
+        let lower = summary.to_lowercase();
+        // This deliberately rejects sensitive wording instead of attempting to
+        // identify every possible credential value. It is not a semantic scrubber.
+        let credential_word = lower.split(|c: char| !c.is_alphabetic()).any(|word| {
+            matches!(
+                word.strip_suffix('s').unwrap_or(word),
+                "password" | "passcode" | "otp" | "secret" | "pin"
+            )
+        });
+        anyhow::ensure!(
+            !credential_word
+                && ![
+                    "one-time",
+                    "one time",
+                    "sign-in",
+                    "sign in",
+                    "verification code",
+                    "authentication code",
+                    "access token",
+                    "recovery code",
+                ]
+                .iter()
+                .any(|term| lower.contains(term)),
+            "Remove authentication details from the message summary"
+        );
+        // Contact/number literals are unnecessary in the private incident receipt;
+        // outbound contact resolution always uses the enrolled directory.
+        let summary: String = summary
+            .split_whitespace()
+            .map(|word| {
+                if word.contains('@') || word.chars().any(char::is_numeric) {
+                    "[redacted]"
+                } else {
+                    word
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+            .chars()
+            .take(360)
+            .collect();
+        anyhow::ensure!(!summary.is_empty(), "Message summary is empty");
+        self.message = Some(RecordedMessage {
+            summary,
+            recorded_at: now.to_rfc3339(),
+            turn_version: self.turn_version,
+            evidence_turn_ids: evidence
+                .iter()
+                .map(|reference| reference.turn_id.clone())
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .collect(),
+        });
+        self.current_action = "Message received; caller identity unverified".into();
         Ok(())
     }
     pub fn assess(
@@ -399,5 +480,25 @@ impl Session {
             return true;
         }
         false
+    }
+}
+
+#[cfg(test)]
+mod message_snapshot_tests {
+    use super::*;
+
+    #[test]
+    fn old_session_snapshots_default_to_no_saved_message() {
+        let session = Session::new(
+            "s".into(),
+            "ca".into(),
+            "sarah".into(),
+            ExecutionMode::Replay,
+        );
+        let mut old = serde_json::to_value(session).unwrap();
+        old.as_object_mut().unwrap().remove("message");
+        let recovered: Session = serde_json::from_value(old).unwrap();
+        assert!(recovered.message.is_none());
+        assert!(recovered.public_value()["message"].is_null());
     }
 }

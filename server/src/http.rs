@@ -323,12 +323,12 @@ async fn state(State(app): State<App>) -> ApiResult {
         .map(Session::public_value)
         .collect::<Vec<_>>();
     let c = &app.config;
-    let configured = c.telephony_configured();
     let (community, tactics) = crate::patterns::view(&app.store, c.mode).await?;
     let capabilities = json!([
-    {"id":"telephony","status":if configured{"configured"}else{"pending"},"detail":if configured{"Credentials present; real phone gate not yet verified"}else{"Configure Photon/Twilio credentials and public HTTPS"}},
-    {"id":"nemotron","status":if c.nvidia_key.is_empty(){"pending"}else{"configured"},"detail":"Native tool-call access requires a real probe"},
-    {"id":"relay","status":"pending","detail":"Onboarding and real WebSocket phone test pending"},
+    {"id":"inbound","status":if c.inbound_configured(){"configured"}else{"pending"},"detail":"Twilio signing credentials and HTTPS origin only; Photon line/profile and actual inbound audio still need verification"},
+    {"id":"outbound","status":if c.outbound_configured(){"configured"}else{"pending"},"detail":"Separate Photon SIP credentials and caller number; endpoint enrollment, authorization and real outbound test remain separate gates"},
+    {"id":"nemotron","status":if c.model_configured(){"configured"}else{"pending"},"detail":"Native tool-call access requires a real probe"},
+    {"id":"relay","status":if c.relay_configured(){"configured"}else{"pending"},"detail":"Local signed-WebSocket inputs only; onboarding and real phone protocol test pending"},
     {"id":"smoke_test","status":if c.smoke_authorized{"configured"}else{"pending"},"detail":"Exactly one authorized outbound attempt to Sarah/Phone B"},
     {"id":"family","status":if c.family_enabled{"configured"}else{"disabled"},"detail":"Family calls require separate enrollment and authorization"},
     {"id":"voice_clone","status":"disabled","detail":"Preset assistant voice; no clone endpoint verified"}
@@ -336,14 +336,21 @@ async fn state(State(app): State<App>) -> ApiResult {
     Ok(Json(json!({"execution_mode":c.mode,"data_origin":"synthetic","transport":c.transport,"phone_display":if c.photon_number.is_empty(){"Not configured"}else{&c.photon_number},"selected_household":app.store.metadata("selected_household").await?.unwrap_or_else(||"sarah".into()),"capabilities":capabilities,"sessions":snapshots,"community":community,"tactics":tactics})).into_response())
 }
 async fn ready(State(app): State<App>) -> Response {
-    let ready = app.config.telephony_configured() && !app.config.admin_token.is_empty();
+    let c = &app.config;
+    let ready = c.selected_transport_configured() && !c.admin_token.is_empty();
     (
         if ready {
             StatusCode::OK
         } else {
             StatusCode::SERVICE_UNAVAILABLE
         },
-        Json(json!({"configured":ready,"live_verified":false,"execution_mode":app.config.mode})),
+        Json(json!({"configured":ready,"live_verified":false,"execution_mode":c.mode,"transport":c.transport,
+            "capabilities":{
+                "inbound":{"configured":c.inbound_configured(),"live_verified":false},
+                "outbound":{"configured":c.outbound_configured(),"live_verified":false},
+                "relay":{"configured":c.relay_configured(),"live_verified":false},
+                "model":{"configured":c.model_configured(),"live_verified":false}
+            },"meaning":"Local configuration only; provider account capabilities and live outcomes are not verified"})),
     )
         .into_response()
 }
@@ -567,8 +574,6 @@ async fn relay_socket(app: App, mut socket: WebSocket) {
              Ok(RelayInput::Prompt{voice_prompt,last:false,..})=>Some(Input::Speech{partial:Some(voice_prompt)}),
              Ok(RelayInput::Interrupt{..})=>Some(Input::Speech{partial:None}),
              Ok(RelayInput::Dtmf{digit})=>Some(Input::Keypad{sid:call_sid.clone(),digits:digit}),
-             Ok(RelayInput::Speaker{speaker,started:true}) if speaker=="client"=>Some(Input::Speech{partial:None}),
-             Ok(RelayInput::Other{hold:true})=>Some(Input::Speech{partial:None}),
              Ok(RelayInput::Error{..})|Err(_)=>{let _=h.send(Input::RelayDisconnected).await;break;},
              _=>None,
             };

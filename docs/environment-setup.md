@@ -1,6 +1,15 @@
 # Configure FirstRing locally
 
-Real phone tests remain **DEPENDENT ON SETUP**. No credentials or alternative env file have been supplied. The current authorization permits exactly one outbound smoke-test attempt to Sarah / Phone B. Family calling stays disabled.
+Real phone tests remain **DEPENDENT ON SETUP**. `.env` was created from the example on Nov 7; its public origin points to the running temporary voice tunnel and `DEMO_ADMIN_TOKEN` was generated locally without being displayed. The rebuilt service reads this file, currently in replay mode. Provider credential fields are still empty at the latest check. The current authorization permits exactly one outbound smoke-test attempt to Sarah / Phone B. Family calling stays disabled.
+
+## Remaining account actions
+
+1. **Inbound Photon/Twilio:** Photon **Beta → project → Voice → Lines**: use the assigned voice-capable line as `PHOTON_NUMBER` and open its SIP profile. A shared iMessage assignment cannot carry voice; do not buy another messaging plan to solve this. Twilio **Console → Account dashboard** supplies `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`. Twilio **Communications → Voice → SIP domains → Credential Lists**: attach the inbound login to the SIP Domain, then enter that same pair in Photon profile **Inbound calls**, destination `sips:YOURDOMAIN.sip.twilio.com`, TLS, and save. These are provider-to-provider settings, not the Photon outbound env variables. Set the SIP Domain Voice URL to `POST ${PUBLIC_BASE_URL}/voice/incoming`. The local operator token is already generated.
+2. **Outbound Photon/Sarah:** the assigned Photon profile's **Outbound calls** supplies `PHOTON_SIP_USERNAME`, `PHOTON_SIP_PASSWORD`, and **SIP connection** `PHOTON_SIP_HOST`/`PHOTON_SIP_PORT`. Verify **MD5 (legacy)**, TLS and compatible secure media; use the connection host, not the authentication realm. Set designated `SARAH_TEST_E164`. Keep `HANDOFF_CALLS_ENABLED=false`, `FAMILY_CALLS_ENABLED=false`; the one existing smoke authorization uses `TEST_CALLS_AUTHORIZED=true` only when ready. Use the app probe once, not an additional terminal call.
+3. **Hosted inference:** NVIDIA **API Catalog → Nemotron 3.5 Lightning → Get API Key** supplies `NVIDIA_API_KEY`. Keep the supplied model/URL constants. The existing `--model-probe` runs independently of phones; the held-out evaluator runs only after that protocol gate passes.
+4. **Optional Brev/NGC: deferred by the user; no action needed for the first call.** When resumed, Brev **organization → launch/create instance → GPU selection** supplies the actual GPU/region and compute/storage quote. NVIDIA **NGC → account menu → Setup → Generate Personal Key**, with **NGC Catalog** scope, supplies `NGC_API_KEY` for the dedicated GPU host. Entitlement, Zeroshot approval and supported tag must then be confirmed. `MAGPIE_ZERO_SHOT_URL` stays blank. See [Brev preparation](brev-speech-preflight.md); no GPU has been allocated.
+
+Only these external setup facts remain. No additional messaging purchase, model migration or GPU is needed for the initial transport test. Configure values locally; never paste credentials in chat.
 
 Create `.env` from `.env.example` without overwriting any existing file, then edit locally. The server reads `.env` automatically on startup; restart after changes. Git ignores `.env`, `.env.*`, databases and `.tools/`; only `.env.example` is intentionally tracked.
 
@@ -11,7 +20,7 @@ chmod 600 .env
 git check-ignore .env
 ```
 
-For `DEMO_ADMIN_TOKEN`, generate a unique value locally with a password manager or `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'`, then paste it into `.env` in your editor. Do not send it in chat. This token unlocks the FirstRing console and authenticated operator API; it is not a Twilio or Photon credential.
+`DEMO_ADMIN_TOKEN` is already generated in `.env` with mode600 file permissions; an authenticated local API read succeeded without displaying it. Enter its value locally in the console; do not send it in chat. Preserve it on subsequent setup edits. This token is not a Twilio or Photon credential. The separate replay helper uses `.tools/replay-admin-token`; the currently running normal service uses `.env`.
 
 ## Values needed for the first two-phone test
 
@@ -42,7 +51,15 @@ In Twilio Console, open **Communications → Voice → SIP domains → Credentia
 
 Set the SIP Domain's Voice webhook to `POST PUBLIC_BASE_URL/voice/incoming`. Configure inbound status notifications to `/voice/status` where offered. The Rust Calls API sets outbound status URLs itself, including the reserved action ID. Complete the [provider preflight](provider-preflight.md) before spending the one smoke attempt.
 
-For public ingress, an existing HTTPS deployment or a webhook-capable tunnel works. [ngrok's localhost guide](https://ngrok.com/docs/start) explains obtaining a public URL from its CLI. Keep both HTTP callbacks and WebSocket upgrades reachable without an interactive login challenge. Cloudflare [Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) can expose local HTTP for testing, but their documented lack of SSE support makes them unsuitable for hosting this complete live console; a changing URL also requires updating `PUBLIC_BASE_URL` and callbacks. No tunnel runtime/account has been installed or provisioned here.
+No existing ingress or tunnel account was configured. A project-local **cloudflared 2026.10.7** was downloaded from the [official release](https://github.com/cloudflare/cloudflared/releases/tag/2026.10.7), its Darwin arm64 archive checked against SHA-256 `3586ccf397e98e5f437e60e7c307ca6ac463e110580503af8bb8e6f9ebf831bd`, and a free accountless voice tunnel started. No global installation or account change was made.
+
+```sh
+bash scripts/voice-tunnel.sh
+# Copy the printed HTTPS origin into PUBLIC_BASE_URL, restart Rust, and
+# update the Twilio SIP Domain Voice webhook. Keep this process running.
+```
+
+This is the one prepared ingress option. Reuse the running process while it is available; its current URL is already in `.env`. Do not add `--allowed-mail` or an access-login policy: provider webhooks cannot use browser authentication. [Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) have no uptime guarantee and change hostname on restart. Their lack of SSE is handled by using the operator console at `http://127.0.0.1:8080`, while the public URL carries only voice HTTP/WSS and later generated audio. [WebSocket support](https://developers.cloudflare.com/network/websockets/) is documented; a real signed Relay session still needs verification. Public health succeeded and unsigned POST/upgrade requests returned 403; those checks do not count as a phone or valid-signature gate.
 
 ## Later conversation values
 

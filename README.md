@@ -34,7 +34,7 @@ Configure the Photon beta voice profile and authenticated Twilio SIP Domain to t
 
 Follow [provider preflight](docs/provider-preflight.md) and the concrete [phone checklist](docs/demo-runbook.md). Provider account provisioning, tunnel/deployment, additional phone tests and family enrollment are not completed by this repository. Do not enable a later calling mode until its external test scope is authorized.
 
-The primary conversation transport is `VOICE_TRANSPORT=relay`; `gather` is the explicit turn-based fallback after a 30–45 minute Relay onboarding blocker. Gather pauses A while the private offer is pending, so it **does not demonstrate concurrent revocation**. Relay's undocumented speaker-event envelope still requires signed live capture; unknown messages conservatively hold consent. No raw audio/SIP server is used.
+The primary conversation transport is `VOICE_TRANSPORT=relay`; `gather` is the explicit turn-based fallback after a 30–45 minute Relay onboarding blocker. Gather pauses A while the private offer is pending, so it **does not demonstrate concurrent revocation**. Relay's optional undocumented speaker-event envelope still requires signed live capture; that subscription is disabled. Documented partial prompts and interruptions hold consent, while assistant diagnostics cannot cancel their own reply. No raw audio/SIP server is used.
 
 ## Checks
 

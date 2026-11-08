@@ -1,7 +1,7 @@
 use crate::tools::{self, ToolCall};
 use anyhow::{Result, anyhow, ensure};
 use serde_json::{Value, json};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[derive(Clone)]
 pub struct Nemotron {
@@ -11,7 +11,49 @@ pub struct Nemotron {
     client: reqwest::Client,
 }
 
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct RequestObservation {
+    pub requested_model: String,
+    pub response_model: Option<String>,
+    pub elapsed_ms: u128,
+    pub outcome: String,
+    pub error: Option<String>,
+}
+pub struct ObservedToolResponse {
+    pub result: Result<ModelToolCall>,
+    pub observation: RequestObservation,
+}
+
 impl Nemotron {
+    pub async fn next_tool_observed(&self, messages: &[Value]) -> ObservedToolResponse {
+        let start = Instant::now();
+        let mut response_model = None;
+        let result = self.request(messages, &mut response_model).await;
+        let error = result.as_ref().err().map(ToString::to_string);
+        let outcome = match error.as_deref() {
+            None => "success",
+            Some("Nemotron request timed out" | "Nemotron response body timed out") => "timeout",
+            Some("Nemotron returned HTTP 401") => "authentication",
+            Some("Nemotron returned HTTP 403") => "authorization",
+            Some("Nemotron returned HTTP 429") => "rate_limit_or_quota",
+            Some("Nemotron returned HTTP 400" | "Nemotron returned HTTP 422") => "request_schema",
+            Some("Nemotron returned HTTP 404") => "model_or_endpoint",
+            Some(e) if e.starts_with("Nemotron returned HTTP 5") => "provider",
+            Some("Nemotron transport failed" | "Nemotron response body failed") => "transport",
+            Some(e) if e.contains("pending") || e.contains("configuration") => "configuration",
+            Some(_) => "schema",
+        };
+        ObservedToolResponse {
+            observation: RequestObservation {
+                requested_model: self.model.clone(),
+                response_model,
+                elapsed_ms: start.elapsed().as_millis(),
+                outcome: outcome.into(),
+                error,
+            },
+            result,
+        }
+    }
     pub fn new(api_key: String, url: String, model: String) -> Self {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_millis(3500))
@@ -28,6 +70,14 @@ impl Nemotron {
     }
 
     pub async fn next_tool(&self, messages: &[Value]) -> Result<ModelToolCall> {
+        self.next_tool_observed(messages).await.result
+    }
+
+    async fn request(
+        &self,
+        messages: &[Value],
+        response_model: &mut Option<String>,
+    ) -> Result<ModelToolCall> {
         ensure!(
             !self.api_key.trim().is_empty(),
             "Nemotron API access pending: NVIDIA_API_KEY is missing"
@@ -78,19 +128,32 @@ impl Nemotron {
             "Nemotron response exceeds size limit"
         );
         let mut bytes = Vec::new();
-        while let Some(chunk) = response
-            .chunk()
-            .await
-            .map_err(|_| anyhow!("Nemotron response body failed"))?
-        {
+        while let Some(chunk) = response.chunk().await.map_err(|e| {
+            if e.is_timeout() {
+                anyhow!("Nemotron response body timed out")
+            } else {
+                anyhow!("Nemotron response body failed")
+            }
+        })? {
             ensure!(
                 bytes.len() + chunk.len() <= 65_536,
                 "Nemotron response exceeds size limit"
             );
             bytes.extend_from_slice(&chunk);
         }
-        let body = serde_json::from_slice(&bytes)
+        let body: Value = serde_json::from_slice(&bytes)
             .map_err(|_| anyhow!("Nemotron returned invalid JSON"))?;
+        // Retain only a bounded identifier, never arbitrary response/error bodies.
+        *response_model = body["model"]
+            .as_str()
+            .filter(|id| {
+                !id.is_empty()
+                    && id.len() <= 200
+                    && id
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"/._:-".contains(&b))
+            })
+            .map(str::to_owned);
         parse_response(body)
     }
 }
@@ -174,6 +237,13 @@ mod tests {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     async fn local_server(status: u16, body: String) -> (String, tokio::task::JoinHandle<String>) {
+        local_server_delayed(status, body, Duration::ZERO).await
+    }
+    async fn local_server_delayed(
+        status: u16,
+        body: String,
+        delay: Duration,
+    ) -> (String, tokio::task::JoinHandle<String>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let task = tokio::spawn(async move {
@@ -199,6 +269,7 @@ mod tests {
                     }
                 }
             }
+            tokio::time::sleep(delay).await;
             let response = format!(
                 "HTTP/1.1 {status} Fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                 body.len(),
@@ -212,6 +283,45 @@ mod tests {
 
     fn response() -> Value {
         json!({"id":"chatcmpl-fixture","model":"nvidia/nemotron-3.5-lightning-30b-a3b","choices":[{"index":0,"finish_reason":"tool_calls","message":{"role":"assistant","content":"Internal planning must never be spoken.","tool_calls":[{"id":"call_fixture_1","type":"function","function":{"name":"lookup_trusted_contact","arguments":"{\"role\":\"family\"}"}}]}}]})
+    }
+
+    #[tokio::test]
+    async fn observations_retain_provider_model_and_measure_the_request() {
+        let (url, server) =
+            local_server_delayed(200, response().to_string(), Duration::from_millis(50)).await;
+        let model = Nemotron::new("local-test-key".into(), url, "requested-model".into());
+        let observed = model.next_tool_observed(&[]).await;
+        assert!(observed.result.is_ok());
+        assert_eq!(observed.observation.requested_model, "requested-model");
+        assert_eq!(
+            observed.observation.response_model.as_deref(),
+            Some("nvidia/nemotron-3.5-lightning-30b-a3b")
+        );
+        assert_eq!(observed.observation.outcome, "success");
+        assert!((50..3500).contains(&observed.observation.elapsed_ms));
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn observations_distinguish_authentication_quota_and_schema_without_error_bodies() {
+        for (status, body, class) in [
+            (401, "sensitive-provider-error", "authentication"),
+            (403, "sensitive-provider-error", "authorization"),
+            (429, "sensitive-provider-error", "rate_limit_or_quota"),
+            (200, "{}", "schema"),
+        ] {
+            let (url, server) = local_server(status, body.into()).await;
+            let model = Nemotron::new("local-test-key".into(), url, "requested-model".into());
+            let observed = model.next_tool_observed(&[]).await;
+            assert!(observed.result.is_err());
+            assert_eq!(observed.observation.outcome, class);
+            assert!(
+                !serde_json::to_string(&observed.observation)
+                    .unwrap()
+                    .contains("sensitive-provider-error")
+            );
+            server.await.unwrap();
+        }
     }
 
     #[test]

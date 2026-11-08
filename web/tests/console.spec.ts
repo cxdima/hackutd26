@@ -88,6 +88,77 @@ const revoked: ConsoleState = {
   tactics: [],
 };
 
+test("stored message appears privately without a delivery or community claim", async ({
+  page,
+}, info) => {
+  const message = {
+    summary: "Caller asks to reschedule the clinic visit on Tuesday.",
+    recorded_at: "2026-11-08T00:00:00Z",
+    turn_version: 1,
+    evidence_turn_ids: ["message-turn"],
+  };
+  const snapshot: ConsoleState = {
+    ...empty,
+    sessions: [
+      {
+        ...revoked.sessions[0],
+        state: "screening",
+        policy_epoch: 0,
+        current_action: "Message received; caller identity unverified",
+        turns: [
+          {
+            id: "message-turn",
+            speaker: "caller",
+            text: "Please reschedule the clinic visit on Tuesday.",
+          },
+        ],
+        evidence_quote: "Please reschedule the clinic visit on Tuesday.",
+        offer: null,
+        legs: [],
+        message,
+      },
+    ],
+  };
+  await page.route("**/api/events", () => new Promise(() => {}));
+  await page.route("**/api/state", (route) =>
+    route.fulfill({ json: snapshot }),
+  );
+  await page.goto("/");
+  await page.getByLabel("Operator token").fill("fixture-operator-token");
+  await page.getByRole("button", { name: "Connect console" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Saved message for Sarah" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("article", { name: "Private saved message" }),
+  ).toContainText(message.summary);
+  await expect(
+    page.getByText(
+      "Caller identity unverified. Saved for review; not a delivery receipt.",
+    ),
+  ).toBeVisible();
+  await expect(page.locator(".community-strip")).not.toContainText(
+    "reschedule",
+  );
+  await page.screenshot({
+    path: info.outputPath("private-message-desktop.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole("heading", { name: "Saved message for Sarah" })
+    .scrollIntoViewIfNeeded();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: info.outputPath("private-message-mobile.png"),
+    fullPage: true,
+  });
+});
+
 test("locked console keeps credentials out of storage and unlocks an honest empty replay", async ({
   page,
 }, info) => {

@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow, bail, ensure};
 use firstring::{
     calls::state::{Session, Turn},
     config::ExecutionMode,
-    providers::nemotron::{ModelToolCall, Nemotron, system_prompt},
+    providers::nemotron::{ModelToolCall, Nemotron, RequestObservation, system_prompt},
     tools::{Direction, Observation, RequestedObject, SpeechAct, ToolCall},
 };
 use serde::{Deserialize, Serialize};
@@ -318,6 +318,7 @@ struct Budget {
     remaining: usize,
     submitted: usize,
     deadline: Instant,
+    observations: Vec<RequestObservation>,
 }
 impl Budget {
     fn new(max: usize) -> Self {
@@ -325,6 +326,7 @@ impl Budget {
             remaining: max,
             submitted: 0,
             deadline: Instant::now() + Duration::from_secs(120),
+            observations: Vec::new(),
         }
     }
     async fn request(&mut self, model: &Nemotron, messages: &[Value]) -> Result<ModelToolCall> {
@@ -334,12 +336,18 @@ impl Budget {
         );
         self.remaining -= 1;
         self.submitted += 1;
-        tokio::time::timeout_at(
+        let observed = tokio::time::timeout_at(
             tokio::time::Instant::from_std(self.deadline),
-            model.next_tool(messages),
+            model.next_tool_observed(messages),
         )
         .await
-        .map_err(|_| anyhow!("Evaluation total deadline reached"))?
+        .map_err(|_| anyhow!("Evaluation total deadline reached"))?;
+        eprintln!(
+            "{}",
+            json!({"request_index":self.submitted,"observation":observed.observation})
+        );
+        self.observations.push(observed.observation);
+        observed.result
     }
 }
 
@@ -389,6 +397,7 @@ async fn probe(data: &Dataset) -> Result<()> {
     let model = model()?;
     let mut budget = Budget::new(4);
     let mut questions = Vec::new();
+    let outcome = async {
     for (index, text) in [
         "The clinic appointment time has changed, and I need to give her the new time.",
         "I have a grocery delivery and need to know which entrance she wants the bags left at.",
@@ -423,11 +432,18 @@ async fn probe(data: &Dataset) -> Result<()> {
         questions[0].to_lowercase() != questions[1].to_lowercase(),
         "Probe produced identical follow-ups for different details"
     );
-    println!(
-        "{}",
-        json!({"status":"model_probe_passed","data_origin":"synthetic","requests_submitted":budget.submitted,"native_result_roundtrips":2,"distinct_contextual_followups":questions,"relevance_check":"prewritten lexical anchors; human review still required","phone_tested":false})
-    );
-    Ok(())
+    Ok::<(), anyhow::Error>(())
+    }.await;
+    let report = json!({"status":if outcome.is_ok(){"model_probe_passed"}else{"model_probe_failed"},
+        "recorded_at":chrono::Utc::now().to_rfc3339(),"requested_model":MODEL,"data_origin":"synthetic",
+        "requests_submitted":budget.submitted,"request_observations":budget.observations,
+        "native_result_roundtrips":budget.observations.iter().enumerate().filter(|(i,o)|i%2==1 && o.outcome=="success").count(),
+        "distinct_contextual_followups":questions,"error":outcome.as_ref().err().map(ToString::to_string),
+        "relevance_check":"prewritten lexical anchors; human review still required","phone_tested":false,
+        "latency_boundary":"HTTP request through complete response and tool parsing; not audible latency"});
+    save_report_to(".tools/model-probe-results.json", &report)?;
+    println!("{report}");
+    outcome
 }
 
 async fn evaluate_case(
@@ -459,10 +475,21 @@ async fn evaluate_case(
 }
 
 fn save_report(value: &Value) -> Result<()> {
+    save_report_to(OUTPUT, value)
+}
+fn save_report_to(path: &str, value: &Value) -> Result<()> {
     std::fs::create_dir_all(".tools")
         .map_err(|_| anyhow!("Cannot create ignored evaluation directory"))?;
     let text = serde_json::to_string_pretty(value)?;
-    std::fs::write(OUTPUT, text).map_err(|_| anyhow!("Cannot write evaluation report"))?;
+    if std::path::Path::new(path).exists() {
+        let backup = format!(
+            "{path}.{}.previous",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        );
+        std::fs::copy(path, backup)
+            .map_err(|_| anyhow!("Cannot preserve prior evaluation report"))?;
+    }
+    std::fs::write(path, text).map_err(|_| anyhow!("Cannot write evaluation report"))?;
     Ok(())
 }
 
@@ -496,7 +523,7 @@ async fn evaluate(data: &Dataset) -> Result<()> {
         results.push(result);
     }
     let metrics = totals(&results);
-    let report = json!({"status":"completed_with_observations","recorded_at":chrono::Utc::now().to_rfc3339(),"model":MODEL,"data_origin":"synthetic","split":"held_out","case_count":data.cases.len(),"requests_submitted":budget.submitted,"metrics":metrics,"cases":results,"phone_tested":false,"tool_actions_executed":0,"interpretation":"Prewritten rubric compared with observed native tool fields; fixtures and model self-report are not phone verification. Null rates have no scored denominator."});
+    let report = json!({"status":"completed_with_observations","recorded_at":chrono::Utc::now().to_rfc3339(),"model":MODEL,"data_origin":"synthetic","split":"held_out","case_count":data.cases.len(),"requests_submitted":budget.submitted,"request_observations":budget.observations,"metrics":metrics,"cases":results,"phone_tested":false,"tool_actions_executed":0,"interpretation":"Prewritten rubric compared with observed native tool fields; fixtures and model self-report are not phone verification. Null rates have no scored denominator."});
     save_report(&report)?;
     println!(
         "{}",

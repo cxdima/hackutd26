@@ -61,7 +61,7 @@ impl Twilio {
     }
     pub async fn create(&self, leg: &Leg, twiml_path: &str) -> CreateOutcome {
         let c = &self.config;
-        if c.mode != ExecutionMode::Live || !c.telephony_configured() {
+        if c.mode != ExecutionMode::Live || !c.outbound_configured() {
             return CreateOutcome::Rejected { status: 503 };
         }
         let allowed = match leg.kind.as_str() {

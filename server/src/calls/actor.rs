@@ -368,8 +368,8 @@ impl Actor {
                     "Smoke test not authorized in local configuration"
                 );
                 anyhow::ensure!(
-                    self.app.config.telephony_configured(),
-                    "Telephony setup pending"
+                    self.app.config.outbound_configured(),
+                    "Outbound Photon SIP setup pending"
                 );
                 let leg = Leg {
                     action_id: uuid::Uuid::new_v4().to_string(),

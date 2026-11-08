@@ -750,15 +750,28 @@ impl Actor {
                 )
             }
             ToolCall::TakeMessage {
-                summary: _,
+                summary,
                 evidence_refs,
             } => {
-                anyhow::ensure!(
-                    self.session.assessed_version == self.session.turn_version,
-                    "Assess the current turn before completing a message"
-                );
-                self.session.evidence_valid(&evidence_refs, true)?;
-                self.session.current_action = "Message received; caller identity unverified".into();
+                let mut candidate = self.session.clone();
+                candidate.record_message(&summary, &evidence_refs, Utc::now())?;
+                // Failed storage must not leave a message in actor memory that a
+                // later snapshot could accidentally persist or display as saved.
+                self.app.store.save(&candidate).await?;
+                self.session = candidate;
+                let message = self.session.message.as_ref().expect("Message was recorded");
+                // Neither the event nor caller
+                // speech repeats the private summary; only authenticated snapshots expose it.
+                self.emit(
+                    "system",
+                    "message.recorded",
+                    json!({
+                        "recorded_at":message.recorded_at,
+                        "turn_version":message.turn_version,
+                        "evidence_turn_ids":message.evidence_turn_ids,
+                    }),
+                )
+                .await?;
                 self.speak("Your message has been noted. No connection has been made. Goodbye.")
                     .await?;
                 Ok(json!({"message_recorded":true,"stop":true}))
@@ -767,5 +780,207 @@ impl Actor {
                 anyhow::bail!("Publication runs only in a post-call job")
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod message_tests {
+    use super::*;
+    use crate::{
+        calls::actor::{App, Handle},
+        config::Config,
+        providers::nemotron::ModelToolCall,
+    };
+
+    async fn prepared_message() -> (App, Handle, Value) {
+        let mut config = Config::from_env().unwrap();
+        config.mode = ExecutionMode::Replay;
+        config.database_url = "sqlite::memory:".into();
+        let app = App::new(config).await.unwrap();
+        let (handle, _) = app
+            .incoming("CA00000000000000000000000000000001")
+            .await
+            .unwrap();
+        let turn = handle
+            .send(Input::FinalPrompt {
+                text: "Please reschedule the clinic visit on Tuesday.".into(),
+            })
+            .await
+            .unwrap();
+        let evidence = json!([{"turn_id":turn["turn_id"],"quote":"Please reschedule the clinic visit on Tuesday."}]);
+        let assessment = send_tool(&handle, "record_assessment", json!({"observation":{"speech_act":"request","requested_object":"routine_information","direction":"caller_requests_from_sarah"},"evidence_refs":evidence})).await.unwrap();
+        assert_eq!(assessment["ok"], true);
+        (app, handle, evidence)
+    }
+
+    async fn send_tool(handle: &Handle, name: &str, arguments: Value) -> anyhow::Result<Value> {
+        let snapshot = handle.send(Input::Snapshot).await?;
+        handle
+            .send(Input::ModelTool {
+                generation: snapshot["generation_id"].as_u64().unwrap(),
+                epoch: snapshot["policy_epoch"].as_u64().unwrap(),
+                version: snapshot["turn_version"].as_u64().unwrap(),
+                deadline: Instant::now() + Duration::from_secs(5),
+                tool: ModelToolCall {
+                    id: "message-tool".into(),
+                    name: name.into(),
+                    arguments,
+                    assistant_message: json!({}),
+                },
+            })
+            .await
+    }
+
+    #[tokio::test]
+    async fn take_message_persists_private_summary_before_claiming_success() {
+        let (app, handle, evidence) = prepared_message().await;
+        let result = send_tool(&handle, "take_message", json!({"summary":"  Caller asks to reschedule the clinic visit on Tuesday.  ","evidence_refs":evidence})).await.unwrap();
+        assert_eq!(result["result"]["message_recorded"], true);
+        // Read SQLite directly, before another actor request could save memory.
+        let stored = app.store.sessions().await.unwrap().pop().unwrap();
+        let message = &stored.public_value()["message"];
+        assert_eq!(
+            message["summary"],
+            "Caller asks to reschedule the clinic visit on Tuesday."
+        );
+        assert_eq!(message["turn_version"], 1);
+        assert_eq!(
+            message["evidence_turn_ids"],
+            json!([evidence[0]["turn_id"]])
+        );
+        assert!(
+            chrono::DateTime::parse_from_rfc3339(message["recorded_at"].as_str().unwrap()).is_ok()
+        );
+        let events = app.store.events_after(0).await.unwrap();
+        let receipt = events
+            .iter()
+            .find(|event| event.kind == "message.recorded")
+            .expect("A durable message has a receipt");
+        let audio = events
+            .iter()
+            .find(|event| event.kind == "audio.requested")
+            .unwrap();
+        assert!(receipt.sequence < audio.sequence);
+        assert!(!receipt.payload.to_string().contains("clinic visit"));
+        assert!(!audio.payload.to_string().contains("clinic visit"));
+        assert!(app.store.actions(&handle.id).await.unwrap().is_empty());
+        let (households, capsules) = crate::patterns::view(&app.store, ExecutionMode::Replay)
+            .await
+            .unwrap();
+        assert!(capsules.is_empty());
+        assert!(
+            households
+                .iter()
+                .all(|household| household["last_applied_version"] == 0)
+        );
+    }
+
+    #[tokio::test]
+    async fn take_message_minimizes_contact_literals_and_rejects_authentication_details() {
+        let (app, handle, evidence) = prepared_message().await;
+        let result = send_tool(&handle, "take_message", json!({"summary":"Caller asks for a reply at person@example.test or +15550123456.","evidence_refs":evidence})).await.unwrap();
+        assert_eq!(result["ok"], true);
+        let stored = app.store.sessions().await.unwrap().pop().unwrap();
+        assert_eq!(
+            stored.public_value()["message"]["summary"],
+            "Caller asks for a reply at [redacted] or [redacted]"
+        );
+        for summary in [
+            "Caller supplied password correcthorsebatterystaple.",
+            "Caller supplied passwords correcthorsebatterystaple.",
+            "Caller supplied a recovery code correcthorsebatterystaple.",
+        ] {
+            let result = send_tool(
+                &handle,
+                "take_message",
+                json!({"summary":summary,"evidence_refs":evidence}),
+            )
+            .await
+            .unwrap();
+            assert_eq!(result["ok"], false);
+        }
+        let after = app.store.sessions().await.unwrap().pop().unwrap();
+        assert_eq!(
+            after.public_value()["message"],
+            stored.public_value()["message"]
+        );
+        assert!(
+            !serde_json::to_string(&after)
+                .unwrap()
+                .contains("correcthorsebatterystaple")
+        );
+    }
+
+    #[tokio::test]
+    async fn take_message_never_announces_success_when_durable_write_fails() {
+        let (app, handle, evidence) = prepared_message().await;
+        let before = handle.send(Input::Snapshot).await.unwrap();
+        sqlx::raw_sql("CREATE TRIGGER reject_message BEFORE UPDATE OF data ON sessions WHEN json_extract(NEW.data, '$.message.summary') IS NOT NULL BEGIN SELECT RAISE(FAIL, 'message write rejected'); END;").execute(&app.store.pool).await.unwrap();
+        let result = send_tool(
+            &handle,
+            "take_message",
+            json!({"summary":"Caller asks to reschedule.","evidence_refs":evidence}),
+        )
+        .await;
+        assert!(
+            result.is_err() || result.as_ref().is_ok_and(|value| value["ok"] == false),
+            "A failed persistence must not return message_recorded"
+        );
+        assert!(
+            app.store
+                .events_after(0)
+                .await
+                .unwrap()
+                .iter()
+                .all(|event| !matches!(
+                    event.kind.as_str(),
+                    "message.recorded" | "audio.requested"
+                ))
+        );
+        sqlx::raw_sql("DROP TRIGGER reject_message")
+            .execute(&app.store.pool)
+            .await
+            .unwrap();
+        let after = handle.send(Input::Snapshot).await.unwrap();
+        assert!(
+            after["message"].is_null(),
+            "A rejected candidate must not survive in actor memory"
+        );
+        assert_eq!(after["current_action"], before["current_action"]);
+        let stored = app.store.sessions().await.unwrap().pop().unwrap();
+        assert!(stored.public_value()["message"].is_null());
+        assert_eq!(
+            stored.current_action,
+            before["current_action"].as_str().unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn take_message_cannot_finalize_while_new_speech_is_unresolved() {
+        let (app, handle, evidence) = prepared_message().await;
+        handle
+            .send(Input::Speech {
+                partial: Some("Actually wait".into()),
+            })
+            .await
+            .unwrap();
+        let result = send_tool(
+            &handle,
+            "take_message",
+            json!({"summary":"Caller asks to reschedule.","evidence_refs":evidence}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(result["ok"], false);
+        assert!(
+            app.store
+                .sessions()
+                .await
+                .unwrap()
+                .pop()
+                .unwrap()
+                .public_value()["message"]
+                .is_null()
+        );
     }
 }

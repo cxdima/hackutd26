@@ -1,6 +1,33 @@
-# Local verification — 2026-11-07 18:40 Central
+# Verification — 2026-11-07 19:24 Central
 
-Real phone tests: **DEPENDENT ON SETUP**. No real outbound call or live NVIDIA inference request has been made. User configuration is still in progress; `.env` is absent. One Sarah / Phone B smoke attempt is authorized, not yet spent. Family and additional handoff calls remain disabled.
+## Continuation from e9cdfd3
+
+Fresh checks after the three focused fixes: Cargo fmt, Clippy (`--workspace --all-targets -- -D warnings`), build and **106 workspace tests pass**. Frontend lint/typecheck/build/format, **11 unit tests and 5 Chromium tests pass**. Existing actual Rust API/SSE regression integration also passes after rebuilding/restarting; old replay state/artifacts were preserved.
+
+Observed failing regressions before fixes:
+
+- Relay assistant diagnostics invalidated a current model result, held private consent, and subscribed to an unverified speaker envelope. Fixed by removing that optional subscription and keeping diagnostics inert. Documented partial prompts/interruptions still hold consent; valid signatures/setup binding remain mandatory. Tested shapes are defensive fixtures, not live captures.
+- Inbound-only probe configuration returned 503 because outbound SIP was absent. Health and console now split inbound, outbound, Relay and model configuration. Selected probe readiness is independent of outbound/NVIDIA; outbound action still rejects before reservation when SIP setup is incomplete. No configuration produces a verified badge.
+- `take_message` dropped its summary and claimed success even on storage failure. It now minimizes/bounds the validated summary, saves a candidate aggregate before adopting it, emits a metadata receipt before caller audio, and displays it privately. Database failure/recovery leaves no phantom saved message; old snapshots remain readable. Numeric/contact literals are redacted and sensitive wording rejected conservatively; this is not a complete semantic PII scrubber. Desktop/mobile screenshots inspected.
+
+The existing native model probe gained per-request elapsed time, requested/returned model identifiers and sanitized failure classes; request and conversation deadlines are unchanged. Local fake-provider tests prove these measurements retain returned identity and distinguish authentication, authorization, rate-limit/quota and schema errors without logging response bodies. They do not measure hosted inference.
+
+| Live integration gate | Actual outcome |
+|---|---|
+| Local `.env` / non-network preflight | Created from example, mode600, ignored by Git; local operator token generated without displaying it, authenticated API200. No provider secrets invented. Default preflight exits0 with zero requests. |
+| Public ingress | Project-local checksum-verified cloudflared2026.10.7; HTTPS health200, unsigned voice POST403 and WS upgrade403. No browser authentication. This is reachability/rejection evidence only. |
+| Hosted Nemotron protocol probe | Exact command executed; exit1: `Pending: NVIDIA_API_KEY is missing; no model requests submitted`. Identity, native round trips, follow-ups and hosted latency: unobserved. |
+| Held-out evaluation | Not run: protocol gate has not passed. No scores or accuracy claims. |
+| Inbound A | **DEPENDENT ON SETUP**: no signed real provider webhook, audible greeting or physical keypad evidence. |
+| Outbound Sarah/B | **DEPENDENT ON SETUP**: one authorized attempt unspent; no request/ring/answer/audio/ack/terminal live evidence. |
+| Live Relay | **DEPENDENT ON SETUP**: signed upgrade/setup and real prompt/interrupt ordering unobserved. Optional speaker events disabled. |
+| Brev speech | User explicitly deferred provisioning. Actual GPU inventory/rate, NGC entitlement/gated access and supported tag unverified; no GPU allocated, no synthesis/playback measurement. |
+
+Current temporary ingress is recorded in ignored `.env`; operator SSE stays on localhost because Quick Tunnels lack SSE. At19:27 the normal Rust process was restarted from `.env` in replay mode; its configured database has zero sessions/actions, and the old isolated replay database/artifacts are preserved. Additional handoff/family flags stay false. The next exact live test is manual A greeting/key, then the single existing app-controlled Sarah/B attempt, with no separate terminal dial. Later rehearsal scope is in [the runbook](demo-runbook.md).
+
+## Preserved e9cdfd3 baseline — 18:40 Central
+
+At that checkpoint, `.env` was absent and real phone tests were **DEPENDENT ON SETUP**. No real outbound call or live NVIDIA inference request had been made. The one Sarah / Phone B smoke attempt was unspent. These historical results are preserved separately from the continuation above.
 
 | Executed command | Observed outcome |
 |---|---|
@@ -30,7 +57,7 @@ The saved `.tools/artifacts/firstring-replay.webm` is 57.68 seconds at 1440×104
 ## Outstanding evidence
 
 - **M1 DEPENDENT ON SETUP:** exact Photon outbound SIP assignment/credentials, Twilio account and signed public ingress, manual A greeting/key, one authorized B ringing/answer/private audio/key, terminal callbacks.
-- **M2 DEPENDENT ON SETUP:** real Nemotron access/native tools/contextual follow-ups, Relay onboarding and signed speaker-event envelope capture. Unknown envelopes conservatively hold consent; this may prevent live handoff until resolved.
+- **M2 DEPENDENT ON SETUP:** real Nemotron access/native tools/contextual follow-ups, Relay onboarding and signed prompt/interrupt capture. The continuation disables optional unverified speaker events and fixes assistant diagnostics holding consent.
 - **M3–M4 DEPENDENT ON SETUP AND SCOPE:** additional private handoff tests, enrolled/authorized family endpoint, two-way bridge audio/privacy, physical stale key during the bounded old Gather, child completion after A hangs up.
 - **M5–M6 DEPENDENT ON SETUP:** fresh model paraphrase/categorical retrieval on phones, held-out language evaluation, live rehearsal recording and submission receipt.
 

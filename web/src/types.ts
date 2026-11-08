@@ -34,6 +34,15 @@ export const sessionSchema = z.object({
   inbound_ended: z.boolean(),
   current_action: z.string(),
   evidence_quote: z.string().nullable(),
+  message: z
+    .object({
+      summary: z.string(),
+      recorded_at: z.string(),
+      turn_version: z.number().int().positive(),
+      evidence_turn_ids: z.array(z.string()),
+    })
+    .nullable()
+    .optional(),
   turns: z.array(
     z.object({ id: z.string(), text: z.string(), speaker: z.string() }),
   ),

@@ -134,14 +134,37 @@ impl Config {
             model: get("NEMOTRON_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b"),
         })
     }
-    pub fn telephony_configured(&self) -> bool {
+    pub fn inbound_configured(&self) -> bool {
         !self.account_sid.is_empty()
             && !self.auth_token.is_empty()
+            && self.public_base_url.starts_with("https://")
+            && !self.public_base_url.contains("YOUR_HOST")
+    }
+    pub fn outbound_configured(&self) -> bool {
+        self.inbound_configured()
             && !self.photon_number.is_empty()
             && !self.sip_username.is_empty()
             && !self.sip_password.is_empty()
-            && self.public_base_url.starts_with("https://")
-            && !self.public_base_url.contains("YOUR_HOST")
+            && !self.sip_host.is_empty()
+            && self.sip_port != 0
+    }
+    pub fn relay_configured(&self) -> bool {
+        // Local handshake/setup inputs only. Onboarding and live protocol proof
+        // cannot be inferred from credential presence.
+        self.inbound_configured()
+    }
+    pub fn model_configured(&self) -> bool {
+        !self.nvidia_key.trim().is_empty()
+            && !self.model_url.trim().is_empty()
+            && !self.model.trim().is_empty()
+    }
+    pub fn selected_transport_configured(&self) -> bool {
+        match self.transport.as_str() {
+            "probe" => self.inbound_configured(),
+            "relay" => self.relay_configured() && self.model_configured(),
+            "gather" => self.inbound_configured() && self.model_configured(),
+            _ => false,
+        }
     }
     pub fn external_url(&self, path: &str) -> String {
         format!("{}{path}", self.public_base_url)

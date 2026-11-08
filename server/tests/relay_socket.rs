@@ -152,6 +152,202 @@ async fn propose(handle: &Handle, name: &str, args: Value) {
     );
 }
 
+async fn send_json(socket: &mut Socket, value: Value) {
+    socket
+        .send(Message::Text(value.to_string().into()))
+        .await
+        .unwrap();
+}
+
+// A pong is a processing barrier: the server awaits each preceding actor input.
+async fn socket_barrier(socket: &mut Socket) {
+    let marker = b"activity-barrier";
+    socket
+        .send(Message::Ping(marker.to_vec().into()))
+        .await
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            match socket.next().await.unwrap().unwrap() {
+                Message::Pong(bytes) if bytes.as_ref() == marker => return,
+                Message::Text(_) | Message::Pong(_) => {}
+                other => panic!("Socket closed before processing barrier: {other:?}"),
+            }
+        }
+    })
+    .await
+    .unwrap();
+}
+
+async fn assessed_socket(server: &Server) -> (Handle, Socket, Value, Value) {
+    let (handle, snapshot) = server.app.incoming(CALLER).await.unwrap();
+    let mut socket = connect(
+        server,
+        "/voice/relay",
+        Some("https://relay.fixture.example/voice/relay"),
+    )
+    .await
+    .unwrap();
+    send_json(&mut socket, setup(&snapshot)).await;
+    wait_event(&server.app, "voice.connected").await;
+    let text = "The clinic visit is Wednesday at ten.";
+    send_json(
+        &mut socket,
+        json!({"type":"prompt","voicePrompt":text,"lang":"en-US","last":true}),
+    )
+    .await;
+    let committed = wait_snapshot(&handle, |s| s["turn_version"] == 1).await;
+    let evidence = json!([{"turn_id":committed["turns"][0]["id"],"quote":text}]);
+    let observation = json!({"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"});
+    propose(
+        &handle,
+        "record_assessment",
+        json!({"observation":observation,"evidence_refs":evidence}),
+    )
+    .await;
+    (handle, socket, evidence, observation)
+}
+
+async fn assistant_activity(socket: &mut Socket) {
+    // Defensive fixtures, not asserted provider captures: the optional speaker
+    // event envelope is unverified. None of these is a caller prompt/interrupt.
+    for message in [
+        json!({"type":"info","name":"agentSpeaking","value":"on"}),
+        json!({"type":"info","name":"agentSpeaking","value":"off"}),
+        json!({"type":"agentSpeaking","value":true}),
+        json!({"type":"info","name":"tokensPlayed","value":"The assistant reply"}),
+        json!({"type":"info","name":"configUpdated","value":{"session":{"ttsLanguage":"en-US"}}}),
+    ] {
+        send_json(socket, message).await;
+    }
+    socket_barrier(socket).await;
+}
+
+#[tokio::test]
+async fn assistant_activity_cannot_cancel_a_current_reply() {
+    let server = server().await;
+    let (handle, mut socket, evidence, _) = assessed_socket(&server).await;
+    let before = handle.send(Input::Snapshot).await.unwrap();
+    assistant_activity(&mut socket).await;
+    // The response was prepared before the assistant diagnostics arrived.
+    let outcome = handle.send(Input::ModelTool {
+        generation: before["generation_id"].as_u64().unwrap(),
+        epoch: before["policy_epoch"].as_u64().unwrap(),
+        version: before["turn_version"].as_u64().unwrap(),
+        deadline: Instant::now() + Duration::from_secs(5),
+        tool: ModelToolCall {
+            id: "reply-prepared-before-diagnostics".into(),
+            name: "ask_caller".into(),
+            arguments: json!({"question":"Does Sarah need to bring anything to the visit?","purpose":"clarify_request","evidence_refs":evidence}),
+            assistant_message: json!({}),
+        },
+    }).await;
+    assert!(
+        outcome.is_ok(),
+        "Assistant diagnostics invalidated a current model response: {outcome:?}"
+    );
+    assert_eq!(outcome.unwrap()["ok"], true);
+    let reply = tokio::time::timeout(Duration::from_secs(2), socket.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let Message::Text(reply) = reply else {
+        panic!("Expected caller text, received {reply:?}")
+    };
+    let reply: Value = serde_json::from_str(&reply).unwrap();
+    assert_eq!(
+        reply["token"],
+        "Does Sarah need to bring anything to the visit?"
+    );
+    let after = handle.send(Input::Snapshot).await.unwrap();
+    assert_eq!(after["generation_id"], before["generation_id"]);
+    assert_eq!(after["speech_pending"], false);
+}
+
+#[tokio::test]
+async fn assistant_activity_cannot_indefinitely_hold_private_consent() {
+    let server = server().await;
+    let (handle, mut socket, evidence, observation) = assessed_socket(&server).await;
+    propose(&handle, "offer_handoff", json!({"summary":"The caller reports a clinic appointment. Identity unverified.","observation":observation,"evidence_refs":evidence})).await;
+    let before = handle.send(Input::Snapshot).await.unwrap();
+    handle
+        .send(Input::Status {
+            action_id: before["offer"]["leg_id"].as_str().unwrap().into(),
+            sid: SARAH.into(),
+            status: "in-progress".into(),
+        })
+        .await
+        .unwrap();
+    assistant_activity(&mut socket).await;
+    let choice = handle
+        .send(Input::Choice {
+            offer_id: before["offer"]["id"].as_str().unwrap().into(),
+            sid: SARAH.into(),
+            digits: "1".into(),
+        })
+        .await
+        .unwrap();
+    assert!(
+        choice["twiml"].as_str().unwrap().contains("<Conference"),
+        "Assistant diagnostics held valid consent: {choice}"
+    );
+    let after = handle.send(Input::Snapshot).await.unwrap();
+    assert_eq!(after["bridge_committed"], true);
+    assert_eq!(after["speech_pending"], false);
+}
+
+#[tokio::test]
+async fn diagnostics_cannot_reopen_a_hold_from_documented_caller_speech() {
+    for speech in [
+        json!({"type":"prompt","voicePrompt":"Actually, before you connect","lang":"en-US","last":false}),
+        json!({"type":"interrupt","utteranceUntilInterrupt":"Please hold","durationUntilInterruptMs":460}),
+    ] {
+        let server = server().await;
+        let (handle, mut socket, evidence, observation) = assessed_socket(&server).await;
+        propose(&handle, "offer_handoff", json!({"summary":"The caller reports a clinic appointment. Identity unverified.","observation":observation,"evidence_refs":evidence})).await;
+        let before = handle.send(Input::Snapshot).await.unwrap();
+        handle
+            .send(Input::Status {
+                action_id: before["offer"]["leg_id"].as_str().unwrap().into(),
+                sid: SARAH.into(),
+                status: "in-progress".into(),
+            })
+            .await
+            .unwrap();
+        send_json(&mut socket, speech).await;
+        send_json(
+            &mut socket,
+            json!({"type":"info","name":"clientSpeaking","value":"off"}),
+        )
+        .await;
+        assistant_activity(&mut socket).await;
+        let choice = handle
+            .send(Input::Choice {
+                offer_id: before["offer"]["id"].as_str().unwrap().into(),
+                sid: SARAH.into(),
+                digits: "1".into(),
+            })
+            .await
+            .unwrap();
+        assert!(!choice["twiml"].as_str().unwrap().contains("<Conference"));
+        let after = handle.send(Input::Snapshot).await.unwrap();
+        assert_eq!(after["bridge_committed"], false);
+        assert_eq!(after["speech_pending"], true);
+    }
+}
+
+#[test]
+fn relay_subscribes_only_to_verified_caller_input_contracts() {
+    let twiml = firstring::providers::relay::connect_twiml(ORIGIN, "opaque-token", "Sarah");
+    assert!(twiml.contains("partialPrompts=\"true\""));
+    assert!(twiml.contains("reportInputDuringAgentSpeech=\"any\""));
+    assert!(
+        !twiml.contains("speaker-events"),
+        "Unverified speaker event envelope must remain unsubscribed"
+    );
+}
+
 #[tokio::test]
 async fn websocket_upgrade_requires_signature_for_configured_origin_and_exact_query() {
     let server = server().await;

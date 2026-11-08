@@ -25,18 +25,12 @@ pub enum RelayInput {
     Dtmf {
         digit: String,
     },
-    /// Internal normalized shape; wire parsing requires verified provider evidence.
-    Speaker {
-        speaker: String,
-        started: bool,
-    },
     Error {
         code: Option<u32>,
         description: String,
     },
-    Other {
-        hold: bool,
-    },
+    /// Optional diagnostics have no caller-speech semantics.
+    Other,
 }
 
 #[derive(Deserialize)]
@@ -70,10 +64,6 @@ enum WireInput {
     Error {
         code: Option<u32>,
         description: String,
-    },
-    Info {
-        name: String,
-        value: Value,
     },
     #[serde(other)]
     Other,
@@ -156,13 +146,11 @@ pub fn parse(message: &str) -> Result<RelayInput> {
             );
             RelayInput::Error { code, description }
         }
-        WireInput::Info { name, value } if name == "configUpdated" && value.is_object() => {
-            RelayInput::Other { hold: false }
-        }
         // The official docs name clientSpeaking/agentSpeaking but do not publish their
-        // envelope or state values. Until a signed capture verifies those, never map
-        // a guessed "off" to speech completion. Prompt.last remains the turn boundary.
-        WireInput::Info { .. } | WireInput::Other => RelayInput::Other { hold: true },
+        // envelope or state values. We do not subscribe to them. Diagnostics must
+        // neither start nor finish caller speech: doing so can cancel a valid reply
+        // or hold consent forever. Only prompt/interrupt drive the caller-speech gate.
+        WireInput::Other => RelayInput::Other,
     };
     Ok(input)
 }
@@ -187,7 +175,7 @@ pub fn connect_twiml(base_url: &str, session_token: &str, display_name: &str) ->
     after.set_path("/voice/after-relay");
     let greeting = format!("I'm {display_name}'s automated assistant. What is the call about?");
     format!(
-        "<Response><Connect action=\"{}\" method=\"POST\"><ConversationRelay url=\"{}\" welcomeGreeting=\"{}\" interruptible=\"any\" reportInputDuringAgentSpeech=\"any\" dtmfDetection=\"true\" partialPrompts=\"true\" events=\"speaker-events\" language=\"en-US\"><Parameter name=\"session_token\" value=\"{}\"/></ConversationRelay></Connect></Response>",
+        "<Response><Connect action=\"{}\" method=\"POST\"><ConversationRelay url=\"{}\" welcomeGreeting=\"{}\" interruptible=\"any\" reportInputDuringAgentSpeech=\"any\" dtmfDetection=\"true\" partialPrompts=\"true\" language=\"en-US\"><Parameter name=\"session_token\" value=\"{}\"/></ConversationRelay></Connect></Response>",
         escape(after.as_str()),
         escape(ws.as_str()),
         escape(&greeting),
@@ -326,16 +314,16 @@ mod tests {
     }
 
     #[test]
-    fn unknown_speaker_envelope_never_reopens_the_gate() {
+    fn optional_diagnostics_have_no_caller_speech_semantics() {
         assert_eq!(
             parse(r#"{"type":"info","name":"clientSpeaking","value":"off"}"#).unwrap(),
-            RelayInput::Other { hold: true }
+            RelayInput::Other
         );
         assert_eq!(
             parse(r#"{"type":"clientSpeaking","value":false}"#).unwrap(),
-            RelayInput::Other { hold: true }
+            RelayInput::Other
         );
-        assert_eq!(parse(r#"{"type":"info","name":"configUpdated","value":{"session":{"ttsLanguage":"en-US"}}}"#).unwrap(), RelayInput::Other { hold:false });
+        assert_eq!(parse(r#"{"type":"info","name":"configUpdated","value":{"session":{"ttsLanguage":"en-US"}}}"#).unwrap(), RelayInput::Other);
     }
 
     #[test]
@@ -362,7 +350,7 @@ mod tests {
         assert!(xml.contains("url=\"wss://firstring.example/voice/relay\""));
         assert!(xml.contains("reportInputDuringAgentSpeech=\"any\""));
         assert!(xml.contains("partialPrompts=\"true\""));
-        assert!(xml.contains("events=\"speaker-events\""));
+        assert!(!xml.contains("speaker-events"));
         assert!(xml.contains("name=\"session_token\" value=\"opaque&lt;&amp;&quot;token\""));
         assert!(xml.contains("Sarah &amp; Maya"));
         assert!(!xml.contains("<Stream"));

@@ -47,7 +47,7 @@ Phone proof record:
 
 This section is a checklist for later authorized tests, not permission for additional calls.
 
-- Relay: complete onboarding/addendum, validate signed WebSocket connection and session token, capture actual setup/prompt/interrupt/DTMF/speaker events. Confirm two different caller details produce different relevant follow-ups and a native Nemotron tool/result loop.
+- Relay: after transport and hosted model proof, complete onboarding/addendum, validate signed WebSocket connection and session token, capture sanitized actual setup/partial/final prompt/interrupt/DTMF frames. Optional speaker events are disabled until their envelope is verified; do not claim their coverage. Confirm two different caller details produce different relevant follow-ups and a native Nemotron tool/result loop.
 - Timebox an actual Relay onboarding blocker to 30–45 minutes. Switch explicitly to `VOICE_TRANSPORT=gather` and label the lost streaming-interruption capability. Do not replace it with raw audio infrastructure.
 - Benign consent: A stays screened while B hears the private summary. Test current 1 → exactly A+B two-way audio; 2/silence/expired offer → no connection. The UI says connected only after both intended participant joins. Each repetition is another outbound attempt.
 - Revocation: while B's Gather remains active, A changes the request to an authentication secret. Wait for the risky assessment and revocation receipt, then press B's old 1 within the bounded rejection window. Hear the withdrawal explanation; verify no bridge. A physical key after B has already hung up is not this proof.
@@ -56,6 +56,10 @@ This section is a checklist for later authorized tests, not permission for addit
 - Community: after a risky call, wait for Maya's stored `community.applied` version. Select Maya before a new call from a different phone. Use a paraphrase; show matched action/context/version. Follow with a benign new-number reminder. No caller-ID match, person identification or retraining claim.
 
 ## Ninety-second cut after live gates pass
+
+### Next bounded rehearsal scope — prepared, not yet authorized
+
+After M1 and the hosted model/Relay gates pass, the minimum two-branch rehearsal needs **two new manual inbound A calls, two additional outbound Sarah/B handoff attempts, and one independent outbound family/C attempt**. Run benign consent first (B accepts, confirm exactly A+B), then risky revocation (B leaves its private Gather open, A requests sign-in digits, B presses the stale 1 within five seconds, C independently answers/acknowledges while A ends). Use three distinct consenting endpoints; C is not enrolled yet. The existing single Sarah smoke authorization does not cover these three additional outbound attempts. Obtain that exact additional scope and C's role designation locally before enabling either calling flag; no automatic retry/no-answer repeat is included. Set a fixed two-minute cap per call and stop after these attempts. Community recurrence and a benign new-number phone control are separate later scope. Keep all ledger reservations through any failure or restart.
 
 Invite the caller to start as the fictional clinic and improvise. Show the contextual follow-up and private offer. Let their speech choose benign acceptance or risky revocation. Narrate only observed states: requested, ringing, answered, acknowledged. On a risky branch, show the independent contact; then, after the applied receipt, show the different-number recurrence. If the first branch was benign, the later risky call is the first incident, not recurrence.
 
