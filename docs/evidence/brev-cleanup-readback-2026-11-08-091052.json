@@ -1,0 +1,37 @@
+{
+  "observed_at_utc": "2026-11-08T09:10:52.703340+00:00",
+  "mode": "read_only_cleanup_reconciliation",
+  "exact_bound_resource_http_status": 200,
+  "exact_resource_absent": false,
+  "inventory_http_status": 200,
+  "bound_id_absent_from_inventory": false,
+  "organization_resource_count": 1,
+  "deletion_verified": false,
+  "billing_http_status": 202,
+  "remaining_credit_usd": 51.67,
+  "auto_recharge_enabled": false,
+  "reported_usage": [
+    {
+      "kind": "compute",
+      "cost_usd": "2.60",
+      "reported_instance_price": "1.50",
+      "reported_seconds": 6224,
+      "experiment": "other_historical"
+    },
+    {
+      "kind": "compute",
+      "cost_usd": "5.73",
+      "reported_instance_price": "1.50",
+      "reported_seconds": 13760,
+      "experiment": "current_campaign"
+    }
+  ],
+  "hard_deadline_utc": "2026-11-08T09:39:50Z",
+  "actual_provider_deletion_timestamp_known": false,
+  "separate_volume_inventory_verified": false,
+  "billing_finality_verified": false,
+  "limit": "A404read establishes absence when observed, not exact deletion time. Billing may lag and reported usage units have prior inconsistencies.",
+  "phone_calls": 0,
+  "inference_requests": 0,
+  "resource_mutations": 0
+}

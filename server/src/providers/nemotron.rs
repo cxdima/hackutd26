@@ -692,6 +692,46 @@ pub struct ModelToolCall {
     pub assistant_message: Value,
 }
 
+// Invalid native arguments stay rejected. Keep the original proposal only in
+// memory so a bounded caller can return a matching tool error, never execute it.
+struct RejectedAssessment {
+    call: ModelToolCall,
+    reason: &'static str,
+}
+impl std::fmt::Display for RejectedAssessment {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.reason)
+    }
+}
+impl std::fmt::Debug for RejectedAssessment {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RejectedAssessment")
+            .field("reason", &self.reason)
+            .finish_non_exhaustive()
+    }
+}
+impl std::error::Error for RejectedAssessment {}
+
+/// Spend at most one structural-repair opportunity in an existing assessment
+/// loop. This is a rejected tool result, not a validated/executable proposal.
+pub fn rejected_assessment_for_repair(
+    error: &anyhow::Error,
+    phase: ToolPhase,
+    epoch: u64,
+    repair_used: &mut bool,
+) -> Option<(ModelToolCall, Value)> {
+    if phase != ToolPhase::Assessment || *repair_used {
+        return None;
+    }
+    let rejected = error.downcast_ref::<RejectedAssessment>()?;
+    *repair_used = true;
+    Some((
+        rejected.call.clone(),
+        json!({"ok":false,"error":rejected.reason,"epoch":epoch}),
+    ))
+}
+
 pub fn parse_response(body: Value) -> Result<ModelToolCall> {
     let choices = body
         .get("choices")
@@ -743,7 +783,40 @@ pub fn parse_response(body: Value) -> Result<ModelToolCall> {
         .ok_or_else(|| anyhow!("Nemotron tool arguments must be a bounded JSON string"))?;
     let arguments: Value = serde_json::from_str(raw)
         .map_err(|_| anyhow!("Nemotron tool arguments are invalid JSON"))?;
+    let proposal = ModelToolCall {
+        id: id.into(),
+        name: name.into(),
+        arguments: arguments.clone(),
+        assistant_message: message.clone(),
+    };
     if let Err(error) = ToolCall::parse(name, arguments.clone()) {
+        // These consistency checks are last in strict CallUnderstanding
+        // validation. All envelope, enum, text, evidence-shape and bounds checks
+        // above must pass first. Ready+missing is deliberately not repairable.
+        let reason = match (
+            name,
+            arguments["understanding"]["readiness"].as_str(),
+            error.to_string().as_str(),
+        ) {
+            (
+                "record_assessment",
+                Some("needs_information"),
+                "Clarification must identify missing information",
+            ) => Some("Clarification must identify missing information"),
+            (
+                "record_assessment",
+                Some("no_message"),
+                "Ready or no-message understanding cannot have missing information",
+            ) => Some("Ready or no-message understanding cannot have missing information"),
+            _ => None,
+        };
+        if let Some(reason) = reason {
+            return Err(RejectedAssessment {
+                call: proposal,
+                reason,
+            }
+            .into());
+        }
         // Diagnostics describe only schema-owned names/types and accepted enum
         // values. Never retain free text, unexpected field names or reasoning.
         let schemas = tools::schemas();
@@ -759,12 +832,7 @@ pub fn parse_response(body: Value) -> Result<ModelToolCall> {
         return Err(anyhow!("{error}; sanitized tool shape: {diagnostic}"));
     }
     // Keep the exact assistant tool message for the native tool-result loop. Never expose content as speech.
-    Ok(ModelToolCall {
-        id: id.into(),
-        name: name.into(),
-        arguments,
-        assistant_message: message.clone(),
-    })
+    Ok(proposal)
 }
 
 fn argument_shape(schema: &Value, value: &Value) -> Value {
@@ -811,6 +879,143 @@ fn argument_shape(schema: &Value, value: &Value) -> Value {
 mod tests {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    fn inconsistent_assessment(readiness: &str, missing: Value) -> Value {
+        let mut body = response();
+        body["choices"][0]["message"]["tool_calls"][0]["function"] = json!({"name":"record_assessment","arguments":json!({
+            "observation":{"speech_act":"request","requested_object":"authentication_secret","direction":"caller_requests_from_sarah"},
+            "evidence_refs":[{"turn_id":"t1","quote":"Ask her to read her login code."}],
+            "understanding":{"version":1,"claimed_identity":null,"purpose":"private-marker-never-log","requested_action":"Read account access code","supplied_facts":[],"missing_information":missing,"readiness":readiness}
+        }).to_string()});
+        body
+    }
+
+    #[test]
+    fn only_two_rejected_readiness_shapes_can_receive_one_native_repair_without_acceptance() {
+        for (readiness, missing, expected_error) in [
+            (
+                "needs_information",
+                json!([]),
+                "Clarification must identify missing information",
+            ),
+            (
+                "no_message",
+                json!(["A missing detail"]),
+                "Ready or no-message understanding cannot have missing information",
+            ),
+        ] {
+            let body = inconsistent_assessment(readiness, missing);
+            let original = body["choices"][0]["message"].clone();
+            let error =
+                parse_response(body).expect_err("Contradictory readiness must stay rejected");
+            assert!(!error.to_string().contains("private-marker"));
+            assert!(!format!("{error:?}").contains("private-marker"));
+            let mut used = false;
+            let (call, result) =
+                rejected_assessment_for_repair(&error, ToolPhase::Assessment, 7, &mut used)
+                    .expect("A strictly bounded native repair is available");
+            assert!(used);
+            assert_eq!(call.assistant_message, original);
+            assert_eq!(call.id, original["tool_calls"][0]["id"]);
+            assert_eq!(result, json!({"ok":false,"error":expected_error,"epoch":7}));
+            assert!(ToolCall::parse(&call.name, call.arguments.clone()).is_err());
+            assert!(
+                rejected_assessment_for_repair(&error, ToolPhase::Assessment, 7, &mut used)
+                    .is_none()
+            );
+            let mut wrong_phase_used = false;
+            assert!(
+                rejected_assessment_for_repair(
+                    &error,
+                    ToolPhase::NextStep,
+                    7,
+                    &mut wrong_phase_used
+                )
+                .is_none()
+            );
+            assert!(!wrong_phase_used);
+        }
+        let first =
+            parse_response(inconsistent_assessment("needs_information", json!([]))).unwrap_err();
+        let second =
+            parse_response(inconsistent_assessment("no_message", json!(["detail"]))).unwrap_err();
+        let mut used = false;
+        assert!(
+            rejected_assessment_for_repair(&first, ToolPhase::Assessment, 0, &mut used).is_some()
+        );
+        assert!(
+            rejected_assessment_for_repair(&second, ToolPhase::Assessment, 0, &mut used).is_none(),
+            "A different contradiction cannot spend a second repair"
+        );
+    }
+
+    #[test]
+    fn truncated_malformed_unknown_and_other_invalid_assessments_are_never_repairable() {
+        let baseline = inconsistent_assessment("needs_information", json!([]));
+        let mut variants = vec![inconsistent_assessment("ready", json!(["detail"]))];
+        let mut truncated = baseline.clone();
+        truncated["choices"][0]["finish_reason"] = json!("length");
+        variants.push(truncated);
+        let mut malformed = baseline.clone();
+        malformed["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"] = json!("{");
+        variants.push(malformed);
+        let mut unknown = baseline.clone();
+        unknown["choices"][0]["message"]["tool_calls"][0]["function"]["name"] =
+            json!("dial_arbitrary_number");
+        variants.push(unknown);
+        let mut missing_id = baseline.clone();
+        missing_id["choices"][0]["message"]["tool_calls"][0]["id"] = json!("");
+        variants.push(missing_id);
+        let mut multiple = baseline.clone();
+        let second = multiple["choices"][0]["message"]["tool_calls"][0].clone();
+        multiple["choices"][0]["message"]["tool_calls"]
+            .as_array_mut()
+            .unwrap()
+            .push(second);
+        variants.push(multiple);
+        for (pointer, value) in [
+            ("/understanding/version", json!(2)),
+            ("/understanding/purpose", json!("")),
+            ("/observation/direction", json!("invalid_direction")),
+            ("/evidence_refs", json!([])),
+            (
+                "/understanding/supplied_facts",
+                json!([{"turn_id":"t1","quote":""}]),
+            ),
+        ] {
+            let mut invalid = baseline.clone();
+            let mut arguments: Value = serde_json::from_str(
+                invalid["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+                    .as_str()
+                    .unwrap(),
+            )
+            .unwrap();
+            *arguments.pointer_mut(pointer).unwrap() = value;
+            invalid["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"] =
+                json!(arguments.to_string());
+            variants.push(invalid);
+        }
+        for body in variants {
+            let error = parse_response(body).unwrap_err();
+            let mut used = false;
+            assert!(
+                rejected_assessment_for_repair(&error, ToolPhase::Assessment, 0, &mut used)
+                    .is_none()
+            );
+            assert!(!used);
+        }
+        let mut used = false;
+        assert!(
+            rejected_assessment_for_repair(
+                &anyhow!("Clarification must identify missing information"),
+                ToolPhase::Assessment,
+                0,
+                &mut used
+            )
+            .is_none(),
+            "A matching string without the typed rejection is not sufficient"
+        );
+    }
 
     async fn local_server(status: u16, body: String) -> (String, tokio::task::JoinHandle<String>) {
         local_server_delayed(status, body, Duration::ZERO).await

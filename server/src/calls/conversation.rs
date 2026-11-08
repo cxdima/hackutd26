@@ -5,7 +5,7 @@ use crate::{
     providers::{
         nemotron::{
             ModelCapabilities, Nemotron, ToolPhase, append_tool_result, conversation_messages,
-            next_step_phase, system_prompt,
+            next_step_phase, rejected_assessment_for_repair, system_prompt,
         },
         twilio,
     },
@@ -890,6 +890,7 @@ impl Actor {
                 let mut epoch = s.policy_epoch;
                 let mut phase = ToolPhase::Assessment;
                 let mut last_denial: Option<String> = None;
+                let mut structural_repair_used = false;
                 for _ in 0..4 {
                     let observed = model.next_tool_observed_for(&messages, phase).await;
                     // A measured response is not an accepted decision or audible
@@ -897,7 +898,24 @@ impl Actor {
                     let mut observation_session = s.clone();
                     observation_session.policy_epoch = epoch;
                     let _ = store.append(Some(&observation_session), "system", "model.request.completed", json!({"generation_id":s.generation_id,"turn_version":s.turn_version,"boundary":"model_http","heard":false,"observation":observed.observation}), s.execution_mode).await;
-                    let tool = observed.result?;
+                    let tool = match observed.result {
+                        Ok(tool) => tool,
+                        Err(error) => {
+                            let Some((rejected, outcome)) = rejected_assessment_for_repair(
+                                &error,
+                                phase,
+                                epoch,
+                                &mut structural_repair_used,
+                            ) else {
+                                return Err(error);
+                            };
+                            // This malformed assessment never reaches actor authorization.
+                            // Preserve the original native call/result pair for one repair.
+                            append_tool_result(&mut messages, &rejected, &outcome);
+                            let _ = store.append(Some(&observation_session), "system", "model.assessment.repair_requested", json!({"generation_id":s.generation_id,"turn_version":s.turn_version,"validation_boundary":"native_structure","reason":outcome["error"],"accepted":false,"heard":false}), s.execution_mode).await;
+                            continue;
+                        }
+                    };
                     let outcome = h
                         .send(Input::ModelTool {
                             generation: s.generation_id,

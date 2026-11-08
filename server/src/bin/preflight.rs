@@ -5,7 +5,7 @@ use firstring::{
     config::{Config, ExecutionMode, ModelBackend, ModelSettings},
     providers::nemotron::{
         ModelCapabilities, ModelToolCall, Nemotron, RequestObservation, ToolPhase,
-        append_tool_result, conversation_messages, next_step_phase,
+        append_tool_result, conversation_messages, next_step_phase, rejected_assessment_for_repair,
     },
     tools::{
         CallbackReason, ContactRole, Direction, Observation, QuestionPurpose, RequestedObject,
@@ -1465,10 +1465,32 @@ async fn evaluate_case(
     let mut messages = messages(case, "");
     let mut assessment_step = 1;
     let mut last_denial: Option<String> = None;
+    let mut structural_repair_used = false;
     let (first, mut session, observation) = loop {
-        let first = budget
+        let first = match budget
             .request(model, &messages, ToolPhase::Assessment)
-            .await?;
+            .await
+        {
+            Ok(tool) => tool,
+            Err(error) => {
+                let Some((rejected, outcome)) = rejected_assessment_for_repair(
+                    &error,
+                    ToolPhase::Assessment,
+                    0,
+                    &mut structural_repair_used,
+                ) else {
+                    return Err(error);
+                };
+                result.trace.push(json!({"step":assessment_step,"tool_call_id":rejected.id,"name":rejected.name,"result":outcome,"validation_boundary":"native_structure","accepted":false}));
+                append_tool_result(&mut messages, &rejected, &outcome);
+                ensure!(
+                    assessment_step < 4,
+                    "Model exhausted the runtime four-step budget before an accepted assessment"
+                );
+                assessment_step += 1;
+                continue;
+            }
+        };
         match assess(case, &first) {
             Ok((session, observation)) => break (first, session, observation),
             Err(error) => {
@@ -2004,6 +2026,68 @@ mod tests {
             assert_eq!(reply["ok"], false);
             assert!(reply["error"].as_str().unwrap().contains("Identity claim"));
             assert_eq!(result.trace[0]["result"]["ok"], false);
+            assert!(!result.completed_external_action);
+        }
+    }
+
+    #[tokio::test]
+    async fn evaluator_structural_repair_preserves_native_id_and_budget() {
+        use axum::{Json, Router, routing::post};
+        use std::sync::{Arc, Mutex};
+        for repeat in [false, true] {
+            let seen = Arc::new(Mutex::new(Vec::<Value>::new()));
+            let captured = seen.clone();
+            let app = Router::new().route("/chat", post(move |Json(request): Json<Value>| {
+                let captured = captured.clone();
+                async move {
+                    let mut seen = captured.lock().unwrap();
+                    let index = seen.len(); seen.push(request.clone());
+                    let context: Value = serde_json::from_str(request["messages"][1]["content"].as_str().unwrap()).unwrap();
+                    let current = &context["current_exchange"]["caller_turn"];
+                    let evidence = json!([{"turn_id":current["id"],"quote":current["text"]}]);
+                    let mut understanding = test_understanding();
+                    if index == 0 || repeat { understanding["readiness"] = json!("no_message"); understanding["missing_information"] = json!(["Contradictory missing fact"]); }
+                    let (name, arguments) = if index < 2 || repeat {
+                        ("record_assessment", json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":evidence,"understanding":understanding}))
+                    } else { ("take_message", json!({"summary":"Caller supplied a complete routine update.","evidence_refs":evidence})) };
+                    Json(json!({"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":format!("structural-{index}"),"type":"function","function":{"name":name,"arguments":arguments.to_string()}}]}}]}))
+                }
+            }));
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let model = Nemotron::new(
+                "local-only".into(),
+                format!("http://{}/chat", listener.local_addr().unwrap()),
+                "fixture".into(),
+            );
+            let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+            let mut case = fixture().cases.remove(0);
+            case.turns[0].text = "Please tell Sarah the delivery has arrived.".into();
+            case.expected.accepted_next_tools = vec!["take_message".into()];
+            let mut result = CaseResult::default();
+            let mut budget = Budget::new(4);
+            let outcome = evaluate_case(&model, &mut budget, &case, &mut result).await;
+            server.abort();
+            if repeat {
+                assert!(outcome.is_err());
+                assert_eq!(budget.submitted, 2);
+                assert!(!result.evidence_valid && result.recorded_summary.is_none());
+            } else {
+                outcome.unwrap();
+                assert_eq!(budget.submitted, 3);
+                assert!(result.evidence_valid);
+                assert!(result.recorded_summary.is_some());
+            }
+            let requests = seen.lock().unwrap();
+            assert_eq!(
+                requests[1]["tool_choice"]["function"]["name"],
+                "record_assessment"
+            );
+            let reply = requests[1]["messages"].as_array().unwrap().last().unwrap();
+            assert_eq!(reply["tool_call_id"], "structural-0");
+            let reply: Value = serde_json::from_str(reply["content"].as_str().unwrap()).unwrap();
+            assert_eq!(reply["ok"], false);
+            assert_eq!(result.trace[0]["result"]["ok"], false);
+            assert_eq!(result.trace[0]["validation_boundary"], "native_structure");
             assert!(!result.completed_external_action);
         }
     }

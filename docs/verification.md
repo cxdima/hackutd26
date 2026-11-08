@@ -1,5 +1,14 @@
 # Verification
 
+## Campaign closeout — 2026-11-08
+
+Fresh final implementation checks: `cargo fmt --all -- --check`, workspace/all-targetClippy(`-D warnings`), workspacebuild and **324Rusttests passed;2explicitignored**. Frontend53tests pluslint/typecheck/build passed; prior focusedbrowser render verified savedmessage sourceversion display. These are localchecks, not phoneproof.
+
+The additional structural retry preserves nativecallID and returns a rejected toolresult for exactly two readiness contradictions. One retry consumes the existing4step/6sbudget. Truncated/malformed/unknown/ungrounded outputs remain rejected; no invalid proposal reaches actor authorization. Actual development riskcase used3requests(1041schema-rejected,1146correctedassessment,531action ms), completed a categoricalnote. Corrected model readiness still wrongly sought a secret; Rust's blockedphase prevented asking it. Warning summary and human preference remain failures.
+
+**Attempt19 failed:** both production transcripts reached Rust, but assessment responses ended`length`at512tokens,2305/2458ms. No accepted assessment/message/protection. Recording and actualrecoveryspeech retained. Do not advertise the generalfamilybranch as phoneverified.19attemptsused,7remaining,0Sarahprobeconsumed. Finalappmode is transport-only afterscheduledGPUdeletion, not a healthy hostedAI fallback.
+
+
 ## Distinct-origin phone checks — 2026-11-08 08:50 UTC
 
 Attempts16–18 used the newly owned858origin to the existing972FirstRing target, with matching persisted origin bindings and no Sarah/family call.16/17both saved the actual appointment transcript and produced caller-side recognition of saved-message goodbye. Samebinary/voice/clip comparison1000→600ms ASR finalization measured energy-based audible gaps4873→4553ms, while modelHTTPsums1722→1760ms. One pair; no generalized noise/speed claim. [Timing receipt](evidence/speech-timeout-pair-2026-11-08.json).

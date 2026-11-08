@@ -1,0 +1,30 @@
+{
+  "exported_at_utc": "2026-11-08T09:09:58.545270+00:00",
+  "work_deadline_utc": "2026-11-08T09:09:50Z",
+  "cleanup_deadline_utc": "2026-11-08T09:39:50Z",
+  "active_calls": 0,
+  "automated_reservations": 19,
+  "allowance": 26,
+  "remaining": 7,
+  "sarah_attempt_unused": true,
+  "artifacts": [
+    {
+      "path": ".tools/firstring-campaign-flux-600",
+      "sha256": "bedde93f429cc5372ad605d595987cba746fb215492c4200d3778b657949e795",
+      "scope": "local_only"
+    },
+    {
+      "path": ".tools/firstring-campaign-native-repair",
+      "sha256": "29bc029ce69206deb7c11bed7896da319de89f0190c6d3bbe7b1d8d0d062faac",
+      "scope": "local_only"
+    },
+    {
+      "path": ".tools/campaign-final-evidence.db",
+      "sha256": "340816751d3e9fe9393f414a211f5f2940b01f589d9e7ff2219ac374bf81057b",
+      "scope": "local_only"
+    }
+  ],
+  "best_phone_binary": ".tools/firstring-campaign-flux-600",
+  "experimental_binary": ".tools/firstring-campaign-native-repair",
+  "artifact_note": "Both binaries and database retained locally; no model weight training or weight export. Hosted fallback unhealthy."
+}

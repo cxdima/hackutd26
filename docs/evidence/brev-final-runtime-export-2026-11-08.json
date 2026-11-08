@@ -1,0 +1,112 @@
+{
+  "recorded_at": "2026-11-08T09:02:45.334771+00:00",
+  "kind": "final_precleanup_runtime_export",
+  "status": "exported_resource_still_running",
+  "model_pins": {
+    "model_repository": "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4",
+    "model_revision": "bee7596271d1495f6992ae224aefde4410e816b8",
+    "checkpoint_bytes": 21561882284,
+    "checkpoint_safetensors_files": 52,
+    "served_model_name": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "container_tag": "vllm/vllm-openai:v0.27.1",
+    "container_digest": "sha256:0a51ea5b4ae2dc5d81890e5173f54203d2a3ae0cfffe51b8fd2afd4391bfd967",
+    "tool_call_parser": "qwen3_coder",
+    "reasoning_parser": "nemotron_v3"
+  },
+  "effective_config_previously_read_from_loaded_container": {
+    "packages": {
+      "vllm": "0.27.1",
+      "xgrammar": "0.2.3",
+      "transformers": "5.15.0",
+      "torch": "2.13.0+cu130"
+    },
+    "snapshot_exists": true,
+    "generation_config.json": {
+      "eos_token_id": [
+        2,
+        11
+      ],
+      "bos_token_id": 1,
+      "pad_token_id": 0
+    },
+    "config.json": {
+      "eos_token_id": 2,
+      "bos_token_id": 1,
+      "model_type": "nemotron_h"
+    },
+    "tokenizer_config.json": {
+      "eos_token": "<|im_end|>",
+      "pad_token": "<|im_end|>"
+    }
+  },
+  "current_remote_readback": {
+    "observed_at_utc": "2026-11-08T09:02:45.376438+00:00",
+    "container_image": "vllm/vllm-openai@sha256:0a51ea5b4ae2dc5d81890e5173f54203d2a3ae0cfffe51b8fd2afd4391bfd967",
+    "container_started_at": "2026-11-08T07:08:58.095451825Z",
+    "retained_log_chat_request_count": 237,
+    "retained_log_chat_http200_count": 237,
+    "retained_log_http200_by_utc_minute": {
+      "2026-11-08T07:14": 4,
+      "2026-11-08T07:15": 7,
+      "2026-11-08T07:18": 1,
+      "2026-11-08T07:19": 1,
+      "2026-11-08T07:25": 1,
+      "2026-11-08T07:29": 3,
+      "2026-11-08T07:30": 15,
+      "2026-11-08T07:34": 14,
+      "2026-11-08T07:35": 4,
+      "2026-11-08T07:40": 2,
+      "2026-11-08T07:41": 1,
+      "2026-11-08T07:42": 2,
+      "2026-11-08T07:44": 12,
+      "2026-11-08T07:46": 4,
+      "2026-11-08T07:47": 5,
+      "2026-11-08T07:58": 2,
+      "2026-11-08T07:59": 2,
+      "2026-11-08T08:00": 2,
+      "2026-11-08T08:02": 5,
+      "2026-11-08T08:04": 8,
+      "2026-11-08T08:05": 14,
+      "2026-11-08T08:06": 4,
+      "2026-11-08T08:13": 4,
+      "2026-11-08T08:14": 4,
+      "2026-11-08T08:17": 4,
+      "2026-11-08T08:19": 2,
+      "2026-11-08T08:21": 5,
+      "2026-11-08T08:32": 14,
+      "2026-11-08T08:40": 13,
+      "2026-11-08T08:42": 14,
+      "2026-11-08T08:43": 2,
+      "2026-11-08T08:44": 2,
+      "2026-11-08T08:46": 2,
+      "2026-11-08T08:47": 10,
+      "2026-11-08T08:48": 2,
+      "2026-11-08T08:49": 4,
+      "2026-11-08T08:52": 13,
+      "2026-11-08T08:54": 14,
+      "2026-11-08T08:55": 4,
+      "2026-11-08T08:56": 11
+    },
+    "retained_log_error_lines": 0,
+    "request_metadata_only": true,
+    "no_generated_text_retained": true
+  },
+  "files_sha256": {
+    "scripts/brev-nemotron/serve.sh": "c8719e3a1a7a188ff3f575ccdffe1d9504827569d105016b815a20474c9c50b7",
+    "scripts/brev-nemotron/watchdog.py": "3351d2e59d8e58beee4846d5e077b5335151b5fa5c41de4d90c79a385129ca46",
+    "scripts/brev-nemotron/remote_guard.py": "16f5f8903c8c73d5a6500a68feda21cf8866ca54ac7c675f132f1daa8aa46ee1",
+    "scripts/brev-nemotron/connection_guard.py": "2cf62606958478822714a9bb2d3060c1fe6570278f52dfb52945c4e947b0726b"
+  },
+  "latest_cost_control_receipt": "docs/evidence/brev-cost-control-2026-11-08-0900.json",
+  "work_deadline_utc": "2026-11-08T09:09:50Z",
+  "hard_delete_utc": "2026-11-08T09:39:50Z",
+  "gpu_requests_from_export": 0,
+  "phone_calls_from_export": 0,
+  "resource_mutations": 0,
+  "limitations": [
+    "HTTP200 counts are transport metadata, not semantic or native-tool success counts.",
+    "Docker log retention may limit lifetime request counts.",
+    "Model weight files are NOT copied locally; deleting this non-stoppable instance removes its cloud cache.",
+    "Export is not deletion proof; run the exact-ID read-only verifier after deletion."
+  ]
+}

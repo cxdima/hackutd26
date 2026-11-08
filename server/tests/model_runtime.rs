@@ -541,3 +541,86 @@ async fn repeated_identical_native_validation_denial_stops_after_one_repair_atte
 async fn repaired_native_assessment_keeps_the_normal_action_loop_available() {
     validation_repair_loop(true).await;
 }
+
+#[tokio::test]
+async fn structural_assessment_repair_is_native_bounded_and_never_authorizes_rejected_risk() {
+    for repaired in [true, false] {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let count = calls.clone();
+        let waiting = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+        let (at_second, resume) = (waiting.clone(), release.clone());
+        let router = Router::new().route("/chat", post(move |Json(body): Json<Value>| {
+            let index = count.fetch_add(1, Ordering::SeqCst);
+            let (at_second, resume) = (at_second.clone(), resume.clone());
+            async move {
+                let context: Value = serde_json::from_str(body["messages"][1]["content"].as_str().unwrap()).unwrap();
+                let current = context["turns"].as_array().unwrap().iter().rev().find(|turn| turn["speaker"] == "caller").unwrap();
+                let evidence = json!([{"turn_id":current["id"],"quote":current["text"]}]);
+                if index == 1 {
+                    assert_eq!(body["tool_choice"]["function"]["name"], "record_assessment");
+                    let result = body["messages"].as_array().unwrap().last().unwrap();
+                    assert_eq!(result["tool_call_id"], "structural-0");
+                    let result: Value = serde_json::from_str(result["content"].as_str().unwrap()).unwrap();
+                    assert_eq!(result["ok"], false);
+                    assert_eq!(result["epoch"], 0);
+                    at_second.notify_one();
+                    resume.notified().await;
+                }
+                let bad = index == 0 || !repaired;
+                let (name, args) = if index == 2 {
+                    ("take_message", json!({"summary":CALL_TEXT,"evidence_refs":evidence}))
+                } else {
+                    let observation = if bad { json!({"speech_act":"request","requested_object":"authentication_secret","direction":"caller_requests_from_sarah"}) } else { json!({"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"}) };
+                    ("record_assessment", json!({"observation":observation,"evidence_refs":evidence,"understanding":{"version":1,"claimed_identity":null,"purpose":"Share update","requested_action":"Save update","supplied_facts":[],"missing_information":[],"readiness":if bad {"needs_information"} else {"ready"}}}))
+                };
+                Json(json!({"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":format!("structural-{index}"),"type":"function","function":{"name":name,"arguments":args.to_string()}}]}}]}))
+            }
+        }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let (app, handle) = app(
+            &format!("http://{}/chat", listener.local_addr().unwrap()),
+            ExecutionMode::Live,
+        )
+        .await;
+        let provider = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+        let mut audio = handle.audio.subscribe();
+        handle
+            .send(Input::FinalPrompt {
+                text: CALL_TEXT.into(),
+            })
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(2), waiting.notified())
+            .await
+            .unwrap();
+        let snapshot = handle.send(Input::Snapshot).await.unwrap();
+        assert!(snapshot["assessments"].as_array().unwrap().is_empty());
+        assert_eq!(snapshot["blocked"], false);
+        assert!(snapshot["message"].is_null());
+        assert!(audio.try_recv().is_err());
+        assert!(app.store.actions(&handle.id).await.unwrap().is_empty());
+        assert!(
+            app.store
+                .events_after(0)
+                .await
+                .unwrap()
+                .iter()
+                .all(|event| event.kind != "agent.tool.proposed")
+        );
+        release.notify_one();
+        tokio::time::timeout(Duration::from_secs(2), audio.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let snapshot = handle.send(Input::Snapshot).await.unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), if repaired { 3 } else { 2 });
+        assert_eq!(
+            snapshot["assessments"].as_array().unwrap().len(),
+            usize::from(repaired)
+        );
+        assert_eq!(snapshot["message"].is_null(), !repaired);
+        assert!(app.store.actions(&handle.id).await.unwrap().is_empty());
+        provider.abort();
+    }
+}

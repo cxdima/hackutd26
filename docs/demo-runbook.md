@@ -1,5 +1,7 @@
 # FirstRing demo runbook
 
+**Campaign closed:** GPU deletion verified09:13UTC; current phone mode is transport-only, not AI.19/26reservations used,7remain. Recorded appointment/correction successes are available; the newest family→secret call failed both assessments. See [final report](campaign-report-2026-11-08.md) before using the prepared live sequence below.
+
 ## Current scope and gates
 
 PhoneAonly. Current campaign uses an actual Brev H100 running pinned Nemotron Lightning, with hosted configuration retained for rollback but its latest request health failed on timeouts. Check the current backend and evidence separately. Jessica/ElevenLabsv4 is the requested speech preset, including cached closing audio; emergency Polly fallback is explicitly logged.
