@@ -507,10 +507,7 @@ export class OverviewPage {
   });
   readonly action = computed(() => {
     const call = this.featured();
-    if (!call) return '';
-    return call.outcome === 'trusted'
-      ? 'No. The caller is on the trusted list.'
-      : personAction(call).text;
+    return call ? personAction(call).text : '';
   });
   readonly recent = computed(() =>
     this.calls()

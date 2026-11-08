@@ -425,22 +425,14 @@ import { ReputationPanel } from './reputation-panel';
         </section>
       }
 
-      <details class="mt-12 rounded-[var(--radius-card)] border-2 border-paper-3">
-        <summary
-          class="flex min-h-14 cursor-pointer items-center justify-between gap-4 px-5 text-[1.125rem] font-extrabold"
-        >
-          Every receipt, in order
-        </summary>
-        <div class="px-5 pb-6"><app-decision-spine [call]="c" /></div>
+      <details class="disclosure mt-12">
+        <summary>Every receipt, in order</summary>
+        <div class="pb-4"><app-decision-spine [call]="c" /></div>
       </details>
 
-      <details class="mt-4 rounded-[var(--radius-card)] border-2 border-paper-3">
-        <summary
-          class="flex min-h-14 cursor-pointer items-center justify-between gap-4 px-5 text-[1.125rem] font-extrabold"
-        >
-          Technical details
-        </summary>
-        <section class="px-5 pb-8" aria-labelledby="nvidia-heading">
+      <details class="disclosure mt-0 !border-t-0">
+        <summary>Technical details</summary>
+        <section class="pb-6" aria-labelledby="nvidia-heading">
           <h3 id="nvidia-heading" class="text-[1.125rem] font-extrabold">NVIDIA decision model</h3>
           <div class="mt-2"><app-model-evidence [call]="c" /></div>
         </section>
