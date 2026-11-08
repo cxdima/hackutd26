@@ -21,3 +21,6 @@ web/playwright-report/
 
 # Agent worktrees and local agent state
 .claude/
+
+# JetBrains IDE settings
+.idea/
