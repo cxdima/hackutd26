@@ -336,7 +336,7 @@ async fn ordinary_model_failure_retains_captured_words_without_security_lecture_
     let spoken = frame.payload["token"].as_str().unwrap();
     assert_eq!(
         spoken,
-        "I heard you. I couldn't save the message yet. Is there anything else to add?"
+        "Sorry, I didn't catch that. Could you say it again?"
     );
     for unsolicited in [
         "password",
@@ -359,6 +359,41 @@ async fn ordinary_model_failure_retains_captured_words_without_security_lecture_
             .iter()
             .any(|event| event.kind == "dependency.failed")
     );
+}
+
+#[tokio::test]
+async fn second_model_failure_in_a_call_closes_protectively_instead_of_inviting_more() {
+    let (app, handle) = app("http://127.0.0.1:9/unused", ExecutionMode::Replay).await;
+    let mut audio = handle.audio.subscribe();
+    for text in [
+        "Oh, my name is John Smith. I wanna send you a code.",
+        "Send me your Social Security number.",
+    ] {
+        handle
+            .send(Input::FinalPrompt { text: text.into() })
+            .await
+            .unwrap();
+        let before = handle.send(Input::Snapshot).await.unwrap();
+        handle
+            .send(Input::ModelFailed {
+                generation: before["generation_id"].as_u64().unwrap(),
+                detail: "Nemotron transport failed".into(),
+            })
+            .await
+            .unwrap();
+    }
+    let first = audio.recv().await.unwrap();
+    assert_eq!(
+        first.payload["token"],
+        "Sorry, I didn't catch that. Could you say it again?"
+    );
+    let second = audio.recv().await.unwrap();
+    assert_eq!(second.payload["type"], "end", "{:?}", second.payload);
+    let after = handle.send(Input::Snapshot).await.unwrap();
+    assert_eq!(after["closing_reason"], "model_failure");
+    let stored = app.store.sessions().await.unwrap().pop().unwrap();
+    assert!(stored.message.is_none(), "nothing is saved or shared");
+    assert!(app.store.actions(&handle.id).await.unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -511,7 +546,7 @@ async fn validation_repair_loop(repaired: bool) {
             response.payload["token"]
                 .as_str()
                 .unwrap()
-                .contains("couldn't save")
+                .contains("didn't catch that")
         );
         assert!(snapshot["assessments"].as_array().unwrap().is_empty());
         assert!(snapshot["message"].is_null());

@@ -43,6 +43,28 @@ async fn enrollment_is_consented_time_boxed_and_takes_one_call() {
     assert!(twiml.contains("/voice/clone-recording?household=sarah"));
     // The arm is consumed: the next call is screened normally.
     assert!(voice_clone::intercept(&app, "CA2").await.unwrap().is_none());
+    // While that setup call is recording, a second setup is refused...
+    assert!(voice_clone::arm(&app, "sarah", "Dima").await.is_err());
+    // ...but a setup call that hung up before the tone never produces a recording.
+    // After a few minutes it reads as failed and the owner can simply try again.
+    let key = "voice_clone.v1:sarah";
+    let mut stored: serde_json::Value =
+        serde_json::from_str(&app.store.metadata(key).await.unwrap().unwrap()).unwrap();
+    assert_eq!(stored["state"], "recording");
+    stored["updated_at"] =
+        serde_json::json!((chrono::Utc::now() - chrono::Duration::minutes(10)).to_rfc3339());
+    app.store
+        .set_metadata(key, &stored.to_string())
+        .await
+        .unwrap();
+    let stalled: voice_clone::Enrollment = serde_json::from_value(stored).unwrap();
+    let view = voice_clone::view(Some(&stalled), "sarah");
+    assert_eq!(view["state"], "failed");
+    assert!(view["error"].as_str().unwrap().contains("Try again"));
+    assert_eq!(
+        voice_clone::arm(&app, "sarah", "Dima").await.unwrap().state,
+        "armed"
+    );
     assert!(voice_clone::active_voice("sarah").is_none());
     assert!(
         voice_clone::set_active(&app, "sarah", true).await.is_err(),

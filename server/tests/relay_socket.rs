@@ -407,7 +407,7 @@ async fn benign_model_failure_keeps_existing_message_fallback() {
         output["token"]
             .as_str()
             .unwrap()
-            .contains("I couldn't save the message yet")
+            .contains("Sorry, I didn't catch that.")
     );
     assert!(handle.send(Input::Snapshot).await.unwrap()["closing_reason"].is_null());
     assert!(
@@ -1209,5 +1209,38 @@ async fn orphan_speech_recovery_reaches_socket_but_late_recovery_after_final_is_
     assert_eq!(
         handle.send(Input::Snapshot).await.unwrap()["turn_version"],
         2
+    );
+}
+
+#[tokio::test]
+async fn a_silent_relay_prompts_the_caller_instead_of_leaving_dead_air() {
+    let server = server().await;
+    let (_, snapshot) = server.app.incoming(CALLER).await.unwrap();
+    let mut socket = connect(
+        &server,
+        "/voice/relay",
+        Some("https://relay.fixture.example/voice/relay"),
+    )
+    .await
+    .unwrap();
+    send_json(&mut socket, setup(&snapshot)).await;
+    wait_event(&server.app, "voice.connected").await;
+    // Speech recognition delivers nothing: within ~12 s FirstRing must speak.
+    let spoken = loop {
+        let message = tokio::time::timeout(Duration::from_secs(15), socket.next())
+            .await
+            .expect("FirstRing must prompt a silent caller")
+            .unwrap()
+            .unwrap();
+        if let Message::Text(text) = message {
+            let frame: Value = serde_json::from_str(&text).unwrap();
+            if frame["type"] == "text" {
+                break frame["token"].as_str().unwrap().to_string();
+            }
+        }
+    };
+    assert_eq!(
+        spoken,
+        "Sorry, I didn't hear anything. What's the call about?"
     );
 }

@@ -492,7 +492,7 @@ mod tests {
         let second = &requests[2];
         let text = second["messages"].to_string();
         assert!(text.contains(QUESTION));
-        assert!(!text.contains("I heard you. I couldn't save the message yet."));
+        assert!(!text.contains("Sorry, I didn't catch that."));
         assert!(!text.contains("expected_action"));
         assert!(!text.contains("semantic_review"));
         assert!(!text.contains("attempt19-turn2"));

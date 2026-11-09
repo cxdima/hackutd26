@@ -2059,7 +2059,7 @@ mod tests {
             first.payload["token"]
                 .as_str()
                 .unwrap()
-                .contains("couldn't save")
+                .contains("didn't catch that")
         );
         assert_eq!(
             calls.load(Ordering::SeqCst),

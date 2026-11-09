@@ -182,12 +182,12 @@ async fn rejected_or_obsolete_understanding_never_emits_accepted_history() {
         &[],
     );
     let mut rejected = arguments.clone();
-    rejected["understanding"]["claimed_identity"] = json!("Unsupported identity");
+    rejected["understanding"]["supplied_facts"] =
+        json!([{"turn_id":turn["turn_id"],"quote":"words the caller never said"}]);
     let result = apply_native_assessment(&handle, &old, rejected)
         .await
         .unwrap();
     assert_eq!(result["ok"], false);
-    assert!(result["error"].as_str().unwrap().contains("Identity claim"));
     handle
         .send(Input::Speech {
             partial: Some("Actually".into()),
@@ -338,8 +338,19 @@ fn accepted_facts_must_quote_real_caller_words_and_identity_remains_grounded() {
         RequestedObject::RoutineInformation,
     );
     let mut u = understanding(Readiness::Ready);
+    // An identity the caller never said is dropped, never stored and never fatal.
+    let mut probe = s.clone();
     u.claimed_identity = Some("Verified son".into());
-    assert!(s.accept_understanding(u.clone()).is_err());
+    probe.accept_understanding(u.clone()).unwrap();
+    assert!(
+        probe
+            .understanding
+            .as_ref()
+            .unwrap()
+            .understanding
+            .claimed_identity
+            .is_none()
+    );
     u.claimed_identity = None;
     u.supplied_facts.push(GroundedFact {
         text: "at the north entrance".into(),
@@ -434,4 +445,133 @@ fn native_fact_is_one_literal_source_span_not_a_second_generated_paraphrase() {
     let mut invalid = arguments;
     invalid["understanding"]["supplied_facts"][0]["verified"] = true.into();
     assert!(firstring::tools::ToolCall::parse("record_assessment", invalid).is_err());
+}
+
+#[test]
+fn paraphrased_identity_from_the_callers_own_words_is_kept_and_never_blocks_the_assessment() {
+    let (s, _) = assessed(
+        "My name is John. I'm from Faith Bank. There has been a fraud alert. I'm going to send you a four digit security code. Please send it to me.",
+        RequestedObject::AuthenticationSecret,
+    );
+    let mut u = understanding(Readiness::Ready);
+    // The live call that failed twice: name and affiliation joined from two phrases.
+    let mut kept = s.clone();
+    u.claimed_identity = Some("John from Faith Bank".into());
+    kept.accept_understanding(u.clone()).unwrap();
+    assert_eq!(
+        kept.understanding
+            .as_ref()
+            .unwrap()
+            .understanding
+            .claimed_identity
+            .as_deref(),
+        Some("John from Faith Bank")
+    );
+    // Words the caller never said are dropped; the rest of the understanding stands.
+    let mut dropped = s.clone();
+    u.claimed_identity = Some("Agent Smith from the IRS".into());
+    dropped.accept_understanding(u).unwrap();
+    assert!(
+        dropped
+            .understanding
+            .unwrap()
+            .understanding
+            .claimed_identity
+            .is_none()
+    );
+}
+
+#[tokio::test]
+async fn a_rejected_understanding_never_cancels_a_valid_protective_block() {
+    let (app, handle) = replay_actor().await;
+    let text = "I'm from Faith Bank. Please send me the security code we texted you.";
+    let turn = handle
+        .send(Input::FinalPrompt { text: text.into() })
+        .await
+        .unwrap();
+    let old = handle.send(Input::Snapshot).await.unwrap();
+    let mut arguments = native_assessment(
+        &turn["turn_id"],
+        text,
+        "ready",
+        "Obtain a security code",
+        "Send the security code",
+        &[],
+    );
+    arguments["observation"] = json!({"speech_act":"request","requested_object":"authentication_secret","direction":"caller_requests_from_sarah"});
+    // The model fabricates a supporting fact: the understanding is invalid.
+    arguments["understanding"]["supplied_facts"] =
+        json!([{"turn_id":turn["turn_id"],"quote":"words the caller never said"}]);
+    let result = apply_native_assessment(&handle, &old, arguments)
+        .await
+        .unwrap();
+    assert_eq!(result["ok"], true, "{result}");
+    let after = handle.send(Input::Snapshot).await.unwrap();
+    assert_eq!(after["blocked"], true);
+    assert!(
+        after["understanding"].is_null(),
+        "the invalid understanding is not stored"
+    );
+    assert!(app.store.actions(&handle.id).await.unwrap().is_empty());
+}
+
+async fn apply_tool(handle: &Handle, snapshot: &Value, name: &str, arguments: Value) -> Value {
+    handle
+        .send(Input::ModelTool {
+            generation: snapshot["generation_id"].as_u64().unwrap(),
+            epoch: snapshot["policy_epoch"].as_u64().unwrap(),
+            version: snapshot["turn_version"].as_u64().unwrap(),
+            deadline: Instant::now() + Duration::from_secs(5),
+            tool: ModelToolCall {
+                id: format!("{name}-test"),
+                name: name.into(),
+                arguments,
+                assistant_message: json!({}),
+            },
+        })
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn code_clarification_needs_a_code_the_caller_actually_mentioned() {
+    for (text, allowed) in [
+        // The live call: reputation history primed "What's the code used for?" three times.
+        (
+            "I'm supposed to get my carries checked out tomorrow at the dental facility.",
+            false,
+        ),
+        ("Iced cheese for", false),
+        ("Can you please send me the 6 digit code?", true),
+        ("Read me the PIN on the letter.", true),
+    ] {
+        let (_app, handle) = replay_actor().await;
+        let turn = handle
+            .send(Input::FinalPrompt { text: text.into() })
+            .await
+            .unwrap();
+        let snapshot = handle.send(Input::Snapshot).await.unwrap();
+        let mut assessment = native_assessment(
+            &turn["turn_id"],
+            text,
+            "needs_information",
+            "Unclear request",
+            "Unclear request",
+            &["What the request is for"],
+        );
+        assessment["observation"] = json!({"speech_act":"request","requested_object":"unknown","direction":"caller_requests_from_sarah"});
+        let assessed = apply_native_assessment(&handle, &snapshot, assessment)
+            .await
+            .unwrap();
+        assert_eq!(assessed["ok"], true, "{text}: {assessed}");
+        let snapshot = handle.send(Input::Snapshot).await.unwrap();
+        let asked = apply_tool(
+            &handle,
+            &snapshot,
+            "ask_caller",
+            json!({"question":"What's the code used for?","purpose":"clarify_code_type","evidence_refs":[{"turn_id":turn["turn_id"],"quote":text}]}),
+        )
+        .await;
+        assert_eq!(asked["ok"], allowed, "{text}: {asked}");
+    }
 }

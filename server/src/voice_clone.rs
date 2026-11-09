@@ -98,13 +98,30 @@ pub async fn refresh(app: &App) -> Result<()> {
     Ok(())
 }
 
+/// A setup call that ended before the tone never produces a recording callback.
+/// After a few minutes such an enrollment counts as failed so the owner can retry.
+fn stalled(v: &Enrollment, now: DateTime<Utc>) -> bool {
+    (v.state == "recording" && now - v.updated_at > Duration::minutes(3))
+        || (v.state == "processing" && now - v.updated_at > Duration::minutes(5))
+}
+const STALLED_ERROR: &str = "The setup call ended before a usable recording was made. Try again.";
+
 pub fn view(value: Option<&Enrollment>, household: &str) -> Value {
     let now = Utc::now();
     let state = value.map_or("none".to_string(), |v| {
         if v.state == "armed" && v.expires_at.is_some_and(|e| e <= now) {
             "expired".into()
+        } else if stalled(v, now) {
+            "failed".into()
         } else {
             v.state.clone()
+        }
+    });
+    let error = value.and_then(|v| {
+        if stalled(v, now) {
+            Some(STALLED_ERROR.to_string())
+        } else {
+            v.error.clone()
         }
     });
     json!({
@@ -115,7 +132,7 @@ pub fn view(value: Option<&Enrollment>, household: &str) -> Value {
         "voice_ready": value.is_some_and(|v| v.voice_id.is_some() && ["ready","active"].contains(&v.state.as_str())),
         "active": value.is_some_and(|v| v.state == "active"),
         "sample_seconds": value.and_then(|v| v.sample_seconds),
-        "error": value.and_then(|v| v.error.clone()),
+        "error": error,
         "passage": PASSAGE,
         "provider": "ElevenLabs Instant Voice Cloning",
         "provider_configured": api_key().is_ok(),
@@ -136,7 +153,8 @@ pub async fn arm(app: &App, household: &str, speaker: &str) -> Result<Enrollment
     );
     if let Some(previous) = load(app, household).await? {
         ensure!(
-            !["recording", "processing"].contains(&previous.state.as_str()),
+            !["recording", "processing"].contains(&previous.state.as_str())
+                || stalled(&previous, Utc::now()),
             "A recording is already being processed"
         );
     }

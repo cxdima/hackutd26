@@ -90,6 +90,9 @@ pub struct Session {
     pub understanding: Option<AcceptedUnderstanding>,
     #[serde(default)]
     pub closing_reason: Option<String>,
+    /// Decision-model failures on this call; a second one closes protectively.
+    #[serde(default)]
+    pub model_failures: u32,
     pub legs: Vec<Leg>,
     pub execution_mode: ExecutionMode,
     pub data_origin: String,
@@ -156,6 +159,7 @@ impl Session {
             message: None,
             understanding: None,
             closing_reason: None,
+            model_failures: 0,
             legs: vec![],
             execution_mode: mode,
             data_origin: "synthetic".into(),
@@ -216,19 +220,20 @@ impl Session {
     }
     pub fn accept_understanding(
         &mut self,
-        value: crate::tools::CallUnderstanding,
+        mut value: crate::tools::CallUnderstanding,
     ) -> anyhow::Result<()> {
         value.validate()?;
         for fact in &value.supplied_facts {
             self.evidence_valid(&fact.evidence_refs, false)?;
         }
-        if let Some(identity) = &value.claimed_identity {
-            anyhow::ensure!(
-                self.turns
-                    .iter()
-                    .any(|turn| turn.speaker == "caller" && turn.text.contains(identity)),
-                "Identity claim must quote caller words"
-            );
+        // A claimed identity is an unverified display label, never an input to policy.
+        // Keep it when every word comes from one caller turn ("John from Faith Bank"
+        // from "My name is John. I'm from Faith Bank."); otherwise drop it instead of
+        // rejecting the whole assessment, so a label can never sink a safety decision.
+        if let Some(identity) = &value.claimed_identity
+            && !self.identity_grounded(identity)
+        {
+            value.claimed_identity = None;
         }
         self.understanding = Some(AcceptedUnderstanding {
             understanding: value,
@@ -237,6 +242,26 @@ impl Session {
             policy_epoch: self.policy_epoch,
         });
         Ok(())
+    }
+    fn identity_grounded(&self, identity: &str) -> bool {
+        fn words(text: &str) -> Vec<String> {
+            text.split(|c: char| !c.is_alphanumeric() && c != '\'' && c != '’')
+                .filter(|w| !w.is_empty())
+                .map(str::to_lowercase)
+                .collect()
+        }
+        let claimed = words(identity);
+        !claimed.is_empty()
+            && self
+                .turns
+                .iter()
+                .filter(|turn| turn.speaker == "caller")
+                .any(|turn| {
+                    turn.text.contains(identity) || {
+                        let said = words(&turn.text);
+                        claimed.iter().all(|w| said.contains(w))
+                    }
+                })
     }
     pub fn require_message_readiness(&self) -> anyhow::Result<()> {
         // Authored legacy replay checkpoints remain usable; a native model result

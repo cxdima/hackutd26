@@ -257,7 +257,7 @@ fn connect_twiml_for_model(
     let speech_timeout = crate::config::relay_speech_timeout_ms();
     // Recognition hints: the household's own name first, so "Sarah" is not heard as "sir".
     let hints = escape(&format!(
-        "{},{},FirstRing,appointment,verification code,Social Security",
+        "{},{},FirstRing,appointment,verification code,Social Security,fraud alert,fraud department,bank,security code,gift card,pharmacy,prescription",
         profile.display_name,
         profile.display_name.to_lowercase()
     ));
@@ -342,6 +342,36 @@ fn escape(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recognition_hints_cover_the_household_name_and_common_scam_phrases() {
+        let profile = crate::profile::Profile::default_for("sarah").unwrap();
+        let xml = connect_twiml_for_model(
+            "https://firstring.example",
+            "token",
+            &profile,
+            true,
+            crate::config::RelaySpeechModel::Nova3,
+        );
+        let hints = xml
+            .split("hints=\"")
+            .nth(1)
+            .unwrap()
+            .split('"')
+            .next()
+            .unwrap();
+        for phrase in [
+            "Sarah",
+            "fraud alert",
+            "fraud department",
+            "bank",
+            "security code",
+            "gift card",
+            "Social Security",
+        ] {
+            assert!(hints.contains(phrase), "missing hint {phrase}: {hints}");
+        }
+    }
 
     #[test]
     fn selectable_asr_agrees_with_diagnostics_without_changing_turn_or_voice_controls() {

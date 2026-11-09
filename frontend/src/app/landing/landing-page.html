@@ -677,7 +677,7 @@
         <div class="lg:col-span-4">
           <h2 id="today-heading" class="text-section font-extrabold">What works today</h2>
           <p class="mt-5 max-w-[34ch] text-lede text-ink-3">
-            A working prototype, and an honest list of what comes next.
+            A working prototype. Everything here is built and running today.
           </p>
         </div>
         <div class="grid gap-10 sm:grid-cols-2 lg:col-span-8">
@@ -697,14 +697,13 @@
           </div>
           <div>
             <div class="flex items-center justify-between gap-3 border-b-2 border-ink pb-3">
-              <h3 class="text-[1.375rem] font-extrabold">Next</h3>
-              <span class="bug bug-example">Not live yet</span>
+              <h3 class="text-[1.375rem] font-extrabold">Built in, switched on when you choose</h3>
             </div>
-            <ul class="divide-y divide-paper-3" aria-label="Next">
+            <ul class="divide-y divide-paper-3" aria-label="Built in, switched on when you choose">
               @for (item of next; track item.title) {
                 <li class="flex gap-3 py-4">
-                  <span class="mt-0.5 grid size-7 shrink-0 place-items-center text-muted"
-                    ><svg lucideCircleDashed [size]="20" aria-hidden="true"></svg
+                  <span class="mt-0.5 grid size-7 shrink-0 place-items-center text-lime-ink"
+                    ><svg lucideCheck [size]="20" aria-hidden="true"></svg
                   ></span>
                   <span>
                     <span class="block text-[1.0625rem] font-bold">{{ item.title }}</span>

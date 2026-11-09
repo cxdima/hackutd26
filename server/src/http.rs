@@ -1147,8 +1147,26 @@ async fn relay_socket(app: App, mut socket: WebSocket) {
         return;
     }
     relay_observation(&h, started, "setup", None).await;
+    // Silence guard: if speech recognition delivers nothing at all after the greeting,
+    // the caller hears a prompt instead of dead air, then a polite goodbye.
+    let mut caller_heard = false;
+    let mut nudges = 0u8;
+    let silence = tokio::time::sleep(SILENCE_NUDGE_AFTER);
+    tokio::pin!(silence);
     loop {
         tokio::select! {biased;
+         _ = &mut silence, if !caller_heard && nudges < 2 => {
+            nudges += 1;
+            let text = if nudges == 1 {
+                "Sorry, I didn't hear anything. What's the call about?"
+            } else {
+                "I'm having trouble hearing you. Please try calling again. Goodbye."
+            };
+            let frame = json!({"type":"text","token":text,"last":true,"interruptible":true,"preemptible":true});
+            if socket.send(Message::Text(frame.to_string().into())).await.is_err(){break;}
+            relay_observation(&h,started,if nudges == 1 {"silence.nudge"} else {"silence.goodbye"},Some(text.chars().count())).await;
+            silence.as_mut().reset(tokio::time::Instant::now() + SILENCE_NUDGE_AFTER);
+         }
          incoming=socket.recv()=>{
           match incoming {
            Some(Ok(Message::Text(raw)))=>{
@@ -1162,6 +1180,7 @@ async fn relay_socket(app: App, mut socket: WebSocket) {
              Ok(RelayInput::Error{..})|Err(_)=>{let _=h.send(Input::RelayDisconnected{token:session_token.clone()}).await;relay_observation(&h,started,"error",None).await;break;},
              _=>(None,"other",None),
             };
+            if matches!(event, "prompt.partial" | "prompt.final" | "interrupt" | "dtmf") { caller_heard = true; }
             // Caller policy input must enter the actor before observability can
             // wait on SQLite and allow a concurrent private acceptance to pass.
             if let Some(command)=command{let _=h.send(command).await;}
@@ -1199,6 +1218,8 @@ async fn relay_socket(app: App, mut socket: WebSocket) {
     relay_observation(&h, started, "closed", None).await;
 }
 
+/// How long a connected caller can stay completely unheard before FirstRing prompts.
+const SILENCE_NUDGE_AFTER: std::time::Duration = std::time::Duration::from_secs(12);
 async fn relay_observation(
     handle: &crate::calls::actor::Handle,
     started: std::time::Instant,

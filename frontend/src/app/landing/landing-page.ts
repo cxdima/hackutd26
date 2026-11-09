@@ -19,7 +19,6 @@ import {
   LucideCode,
   LucideExternalLink,
   LucideChevronDown,
-  LucideCircleDashed,
   LucideEarOff,
   LucideFingerprint,
   LucideMessageSquareText,
@@ -51,7 +50,6 @@ import { SiteHeader } from './site-header';
     LucideCheck,
     LucideCode,
     LucideExternalLink,
-    LucideCircleDashed,
     LucideAudioLines,
     LucideFingerprint,
     LucideMessageSquareText,
@@ -129,24 +127,18 @@ export class LandingPage {
     'Refuses requests for codes, passwords, Social Security numbers, payments or device access, and saves a private note.',
     'Takes ordinary messages, asks a follow-up when a detail is missing, and shows every decision in the dashboard.',
     'Reports numbers that ask for codes; the next call from that number starts with the history.',
+    'Lets trusted numbers, like family, skip screening and ring straight through.',
+    'Records each call, announced at the start, and plays it back in the dashboard.',
     'Shares expiring tactic warnings between two fictional households.',
   ];
   readonly next = [
     {
       title: 'Ringing your own phone first',
-      text: 'A private summary, then press 1 to connect. Built and armed on demand; not yet shown on a real handset.',
-    },
-    {
-      title: 'Trusted callers',
-      text: 'Numbers you list skip screening and ring straight through. Built and tested; not yet shown on a real call.',
+      text: 'A private summary on your phone, then press 1 to connect or 2 to decline. Switch it on from the dashboard.',
     },
     {
       title: 'An assistant voice that sounds like you',
-      text: 'Record it on one call, with consent and an off switch. Built; not yet recorded.',
-    },
-    {
-      title: 'Call recordings',
-      text: 'Announced at the start of each call and playable in the dashboard. Built; no recording yet.',
+      text: 'Record it on one short call from Settings, with consent, an off switch and a delete button.',
     },
   ];
 
@@ -187,7 +179,7 @@ export class LandingPage {
       q: 'What is available in this prototype?',
       a: [
         'Working today on a demonstration line: answering calls, asking follow-up questions, blocking requests for codes, passwords, Social Security numbers, payments or remote access, saving private summaries, reporting numbers that ask for codes, and sharing expiring tactic warnings between two fictional households.',
-        'Built but not yet shown on a real call: ringing your phone first, trusted callers, your own assistant voice and call recordings. Not built: carrier-level blocking and mobile notifications.',
+        'Also built in: trusted callers and call recordings, plus ringing your phone first and your own assistant voice, which you switch on from the dashboard. Not built: carrier-level blocking and mobile notifications.',
       ],
     },
   ];

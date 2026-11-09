@@ -17,6 +17,45 @@ use std::time::{Duration, Instant};
 
 const MODEL_FAILURE_CLOSING: &str = "I can't help with that request. Goodbye.";
 
+/// Whether caller words mention a code-like secret or a run of digits.
+fn mentions_code(text: &str) -> bool {
+    let lower = text.to_lowercase();
+    let words: Vec<&str> = lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .collect();
+    let named = words.iter().any(|w| {
+        matches!(
+            *w,
+            "code"
+                | "codes"
+                | "pin"
+                | "pins"
+                | "passcode"
+                | "password"
+                | "passwords"
+                | "digit"
+                | "digits"
+                | "otp"
+                | "verification"
+                | "security"
+                | "login"
+        )
+    });
+    let mut run = 0;
+    let digits = lower.chars().any(|c| {
+        run = if c.is_ascii_digit() {
+            run + 1
+        } else if c == ' ' || c == '-' {
+            run
+        } else {
+            0
+        };
+        run >= 4
+    });
+    named || digits
+}
+
 impl Actor {
     pub(crate) async fn conversation(&mut self, input: Input) -> anyhow::Result<Value> {
         let input = match input {
@@ -289,18 +328,26 @@ impl Actor {
                         json!({"provider":if detail == crate::audio_fixture::INJECTED_MODEL_FAILURE {"fixture_injection"} else {"nemotron"},"detail":detail,"synthetic":detail == crate::audio_fixture::INJECTED_MODEL_FAILURE}),
                     )
                     .await?;
-                    if self.session.blocked
+                    self.session.model_failures += 1;
+                    let blocked_and_assessed = self.session.blocked
                         && self.session.turn_version > 0
                         && self.session.assessed_version == self.session.turn_version
-                        && !self.session.speech_pending
-                    {
-                        // A committed policy assessment already rejected the request.
-                        // Do not invent a model action/message when its next request fails.
+                        && !self.session.speech_pending;
+                    // Without the decision model nothing can be assessed. One retry is
+                    // allowed; a second failure closes rather than inviting more detail.
+                    let repeated = self.session.model_failures >= 2
+                        && !self.session.legs.iter().any(|l| !terminal(&l.status));
+                    if blocked_and_assessed || repeated {
+                        // A committed policy assessment already rejected the request, or the
+                        // model is unavailable: do not invent a model action/message.
                         let mut candidate = self.session.clone();
                         candidate.closing_reason = Some("model_failure".into());
                         candidate.state = "closing".into();
-                        candidate.current_action =
-                            "Risky request blocked; closing after model failure".into();
+                        candidate.current_action = if blocked_and_assessed {
+                            "Risky request blocked; closing after model failure".into()
+                        } else {
+                            "Decision model unavailable; closing without sharing anything".into()
+                        };
                         candidate.speech_pending = true;
                         candidate.generation_id += 1;
                         self.app.store.save(&candidate).await?;
@@ -322,7 +369,8 @@ impl Actor {
                         } else {
                             "Conversation unavailable; message-taking fallback".into()
                         };
-                    self.speak("I heard you. I couldn't save the message yet. Is there anything else to add?").await?;
+                    self.speak("Sorry, I didn't catch that. Could you say it again?")
+                        .await?;
                 }
             }
             Input::Whisper { offer_id, sid } => {
@@ -947,7 +995,7 @@ impl Actor {
                                 let context = json!({"lookup_receipt_id":lookup.receipt.id,"version":snapshot.version,"scope":snapshot.scope,"level":snapshot.level,"scam_categories":snapshot.scam_categories,"tactic_ids":snapshot.tactic_ids,"tactic_identifier_kind":"categorical_taxonomy_v1","matched_capsule_ids":[],"correction":snapshot.correction,"demo_household_count":snapshot.demo_household_count,"verified_independent_households":snapshot.verified_independent_households,"independence":snapshot.independence,"expires_at":snapshot.expires_at});
                                 if let Some(system) = messages[0]["content"].as_str() {
                                     messages[0]["content"] = json!(format!(
-                                        "{system}\nTrusted presented-number reputation context: {context}. This is prior reported behavior, not the current caller's identity or current intent. Never infer identity, automatically block, invent risk, or authorize an action from it. Assess current caller words and evidence normally. Demo profiles are simulated, not independent verified people. Different-number tactic memory remains a separate source."
+                                        "{system}\nTrusted presented-number reputation context: {context}. This is prior reported behavior, not the current caller's identity or current intent. Never infer identity, automatically block, invent risk, or authorize an action from it. Assess current caller words and evidence normally; do not ask about a code, PIN or password unless the current caller mentions one. Demo profiles are simulated, not independent verified people. Different-number tactic memory remains a separate source."
                                     ));
                                 }
                                 reputation_lookup = Some(lookup);
@@ -1052,8 +1100,15 @@ impl Actor {
                     &observation,
                     &evidence_refs,
                 )?;
-                if let Some(value) = understanding {
-                    candidate.accept_understanding(value)?;
+                if let Some(value) = understanding
+                    && let Err(error) = candidate.accept_understanding(value)
+                {
+                    // A rejected message understanding never cancels a valid protective
+                    // block: the observation and its evidence already passed, and the
+                    // protective path does not use the understanding.
+                    if !candidate.blocked {
+                        return Err(error);
+                    }
                 }
                 self.session = candidate;
                 self.emit("system",if self.session.blocked{"policy.denied"}else{"policy.allowed"},json!({"operation":"assessment","observation":observation,"quote":self.session.evidence_quote,"handoff_allowed":!self.session.blocked && !self.session.ambiguous})).await?;
@@ -1090,6 +1145,17 @@ impl Actor {
                     "Assess the current turn before asking a follow-up"
                 );
                 self.session.evidence_valid(&evidence_refs, true)?;
+                if purpose == QuestionPurpose::ClarifyCodeType {
+                    // Reputation history or a garbled transcript must not put a code in the
+                    // caller's mouth: only ask about a code the caller actually mentioned.
+                    anyhow::ensure!(
+                        self.session
+                            .turns
+                            .iter()
+                            .any(|turn| turn.speaker == "caller" && mentions_code(&turn.text)),
+                        "The caller did not mention a code. Ask about their actual purpose in plain words instead."
+                    );
+                }
                 let question = if purpose == QuestionPurpose::ClarifyCodeType {
                     "What's the code used for?".to_string()
                 } else {

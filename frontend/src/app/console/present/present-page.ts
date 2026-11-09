@@ -480,20 +480,44 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                   }
                 </p>
 
-                <div class="mt-[2.4vh]">
-                  <p class="caption-speaker !text-[0.95rem]">
-                    &gt;&gt; Caller{{ f.caller?.partial ? ' (speaking)' : '' }}
-                  </p>
-                  <p
-                    id="present-caption"
-                    class="present-caption mt-2 font-extrabold leading-[1.12] tracking-[-0.025em]"
-                    [class]="captionClass()"
-                    [class.opacity-80]="f.caller?.partial"
-                    aria-live="polite"
-                  >
-                    {{ f.caller?.text ?? 'Waiting for the caller to speak…'
-                    }}{{ f.caller?.partial ? '…' : '' }}
-                  </p>
+                <!-- Both sides of the conversation, in the order they happened. -->
+                <div class="mt-[2.4vh] flex flex-col gap-[2vh]">
+                  @if (f.firstring && replyFirst()) {
+                    <div>
+                      <p class="caption-speaker !text-[0.95rem] !text-lime">&gt;&gt; FirstRing</p>
+                      <p
+                        class="mt-1.5 max-w-[40ch] text-[clamp(1.2rem,min(2.2vw,3.6vh),2.25rem)] leading-[1.2] font-bold tracking-[-0.015em] text-lime"
+                      >
+                        {{ f.firstring.text }}
+                      </p>
+                    </div>
+                  }
+                  <div>
+                    <p class="caption-speaker !text-[0.95rem]">
+                      &gt;&gt; Caller{{ f.caller?.partial ? ' (speaking)' : '' }}
+                    </p>
+                    <p
+                      id="present-caption"
+                      class="present-caption mt-2 font-extrabold leading-[1.12] tracking-[-0.025em]"
+                      [class]="captionClass()"
+                      [class.opacity-80]="f.caller?.partial"
+                      aria-live="polite"
+                    >
+                      {{ f.caller?.text ?? 'Waiting for the caller to speak…'
+                      }}{{ f.caller?.partial ? '…' : '' }}
+                    </p>
+                  </div>
+                  @if (f.firstring && !replyFirst()) {
+                    <div>
+                      <p class="caption-speaker !text-[0.95rem] !text-lime">&gt;&gt; FirstRing</p>
+                      <p
+                        class="mt-1.5 max-w-[40ch] text-[clamp(1.2rem,min(2.2vw,3.6vh),2.25rem)] leading-[1.2] font-bold tracking-[-0.015em] text-lime"
+                        aria-live="polite"
+                      >
+                        {{ f.firstring.text }}
+                      </p>
+                    </div>
+                  }
                 </div>
 
                 @if (f.branchAt !== undefined) {
@@ -554,16 +578,6 @@ type Screen = 'unavailable' | 'waiting' | 'missing' | 'call' | 'community';
                     </p>
                     @if (f.step?.detail; as detail) {
                       <p class="mt-1 text-[clamp(1rem,2.2vh,1.1875rem)] text-ink-3">{{ detail }}</p>
-                    }
-                    @if (f.firstring) {
-                      <p
-                        class="mt-[1.6vh] border-t border-paper-3 pt-[1.2vh] text-[clamp(1rem,2.1vh,1.125rem)] leading-snug"
-                      >
-                        <span class="caption-speaker !text-[0.95rem] !text-lime-ink"
-                          >&gt;&gt; FirstRing</span
-                        >
-                        {{ f.firstring.text }}
-                      </p>
                     }
                   </div>
                 </div>
@@ -938,9 +952,18 @@ export class PresentPage {
   /** Long captions step down so the outcome stays on a projected screen. */
   readonly captionClass = computed(() => {
     const length = this.focus()?.caller?.text.length ?? 0;
-    if (length > 160) return 'max-w-[38ch] text-[clamp(1.375rem,min(2.6vw,4.2vh),2.75rem)]';
-    if (length > 90) return 'max-w-[32ch] text-[clamp(1.5rem,min(3.2vw,5.2vh),3.25rem)]';
+    // With FirstRing's reply on screen too, the caller's line is one step smaller.
+    const both = !!this.focus()?.firstring;
+    if (length > 160 || (both && length > 90))
+      return 'max-w-[38ch] text-[clamp(1.375rem,min(2.6vw,4.2vh),2.75rem)]';
+    if (length > 90 || both) return 'max-w-[32ch] text-[clamp(1.5rem,min(3.2vw,5.2vh),3.25rem)]';
     return 'max-w-[28ch] text-[clamp(1.75rem,min(4.2vw,6.6vh),4.25rem)]';
+  });
+  /** FirstRing's reply leads when the caller has spoken again since it. */
+  readonly replyFirst = computed(() => {
+    const f = this.focus();
+    if (!f?.firstring || !f.caller) return false;
+    return Date.parse(f.firstring.at ?? '') < Date.parse(f.caller.at ?? '');
   });
   readonly tallyLabel = computed(() => {
     const kind = this.focus()?.outcome.kind;

@@ -52,7 +52,7 @@ test.describe('landing page', () => {
     ).toBeVisible();
     await page.getByText('What is available in this prototype?').click();
     await expect(
-      page.getByText('Built but not yet shown on a real call', { exact: false }),
+      page.getByText('Also built in: trusted callers and call recordings', { exact: false }),
     ).toBeVisible();
     await expect(
       page.getByText(

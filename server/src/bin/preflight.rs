@@ -1973,7 +1973,7 @@ mod tests {
                     let current = &context["current_exchange"]["caller_turn"];
                     let evidence = json!([{"turn_id":current["id"],"quote":current["text"]}]);
                     let mut understanding = test_understanding();
-                    if index == 0 || repeat { understanding["claimed_identity"] = json!("Invented joined identity"); }
+                    if index == 0 || repeat { understanding["supplied_facts"] = json!([{"turn_id":current["id"],"quote":"words the caller never said"}]); }
                     let (name, arguments) = if index < 2 || repeat {
                         ("record_assessment", json!({"observation":{"speech_act":"statement","requested_object":"routine_information","direction":"caller_supplies"},"evidence_refs":evidence,"understanding":understanding}))
                     } else { ("take_message", json!({"summary":"Caller supplied a complete routine update.","evidence_refs":evidence})) };
@@ -2024,7 +2024,12 @@ mod tests {
             )
             .unwrap();
             assert_eq!(reply["ok"], false);
-            assert!(reply["error"].as_str().unwrap().contains("Identity claim"));
+            assert!(
+                reply["error"]
+                    .as_str()
+                    .unwrap()
+                    .contains("Evidence must quote")
+            );
             assert_eq!(result.trace[0]["result"]["ok"], false);
             assert!(!result.completed_external_action);
         }
